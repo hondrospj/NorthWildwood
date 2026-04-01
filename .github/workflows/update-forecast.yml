@@ -16,7 +16,7 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
 
-      - name: Build forecast.json
+      - name: Build forecast.json from PETSS station page
         shell: bash
         run: |
           python - <<'PY'
@@ -24,24 +24,26 @@ jobs:
           import io
           import json
           import re
-          import tarfile
+          import urllib.parse
           import urllib.request
+          import xml.etree.ElementTree as ET
           from datetime import datetime, timedelta, timezone
           from pathlib import Path
 
           STATION_ID = "8535581"
           STATION_NAME = "STONE HARBOR, GREAT CHANNEL, NJ"
-
-          # Your setup: PETSS and rasters are already NAVD88
           INPUT_DATUM = "NAVD88"
 
           MIN_LAYER_STAGE = -2.0
           MAX_LAYER_STAGE = 14.0
           MAX_HOURS = 72
 
-          PETSS_ROOT = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/petss/prod"
-          CYCLES = ["18", "12", "06", "00"]
-          LOOKBACK_DAYS = 3
+          # NOAA PETSS static hydrograph page for one station.
+          # Search result confirmed this page supports station hydrographs and TXT/CSV/XML options.
+          STATION_PAGE = (
+              "https://slosh.nws.noaa.gov/petss/index.php"
+              "?datum=NAVD88&show=1-1-0-1-1-1-1-1&static=1&stid=8535581"
+          )
 
           OUT_PATH = Path("forecast.json")
 
@@ -51,6 +53,14 @@ jobs:
           def clamp_stage(stage):
               return max(MIN_LAYER_STAGE, min(MAX_LAYER_STAGE, stage))
 
+          def fetch_text(url):
+              req = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "Mozilla/5.0"}
+              )
+              with urllib.request.urlopen(req, timeout=120) as resp:
+                  return resp.read().decode("utf-8", "replace")
+
           def fetch_bytes(url):
               req = urllib.request.Request(
                   url,
@@ -59,151 +69,212 @@ jobs:
               with urllib.request.urlopen(req, timeout=120) as resp:
                   return resp.read()
 
-          def build_candidates():
-              now_utc = datetime.now(timezone.utc)
-              dates = [now_utc.date() - timedelta(days=i) for i in range(LOOKBACK_DAYS)]
-              out = []
-              for d in dates:
-                  ymd = d.strftime("%Y%m%d")
-                  for cyc in CYCLES:
-                      issue_dt = datetime.strptime(f"{ymd}{cyc}", "%Y%m%d%H").replace(tzinfo=timezone.utc)
-                      url = f"{PETSS_ROOT}/petss.{ymd}/petss.t{cyc}z.csv.tar.gz"
-                      out.append((issue_dt, url))
-              out.sort(reverse=True)
-              return out
+          def absolutize(base, href):
+              return urllib.parse.urljoin(base, href)
 
-          def normalize_text(s):
-              return re.sub(r"[^A-Z0-9]+", " ", str(s).upper()).strip()
+          def extract_export_links(html, base_url):
+              # Look for hrefs that appear near CSV / TXT / XML labels
+              # This is intentionally broad because NOAA page markup can vary.
+              links = re.findall(r'href=["\\\']([^"\\\']+)["\\\']', html, flags=re.I)
+              abs_links = [absolutize(base_url, h) for h in links]
 
-          def is_number(s):
-              try:
-                  float(str(s).strip())
-                  return True
-              except Exception:
-                  return False
+              csv_links = []
+              txt_links = []
+              xml_links = []
 
-          def row_matches_station(row):
-              joined = " | ".join(str(x) for x in row)
-              norm = normalize_text(joined)
+              for link in abs_links:
+                  lower = link.lower()
+                  if "csv" in lower:
+                      csv_links.append(link)
+                  elif "txt" in lower:
+                      txt_links.append(link)
+                  elif "xml" in lower:
+                      xml_links.append(link)
 
-              if STATION_ID in norm:
-                  return True
+              # Prefer export-like links that mention the station or petss
+              def rank(candidates):
+                  scored = []
+                  for c in candidates:
+                      score = 0
+                      low = c.lower()
+                      if "8535581" in low:
+                          score += 5
+                      if "petss" in low:
+                          score += 3
+                      if "navd" in low:
+                          score += 2
+                      if "static" in low:
+                          score += 1
+                      scored.append((score, c))
+                  scored.sort(reverse=True)
+                  return [c for _, c in scored]
 
-              return (
-                  "STONE HARBOR" in norm and
-                  "GREAT CHANNEL" in norm
-              )
+              return {
+                  "csv": rank(csv_links),
+                  "txt": rank(txt_links),
+                  "xml": rank(xml_links),
+              }
 
-          def extract_72_values_from_row(row):
-              nums = []
-              for cell in row:
-                  cell = str(cell).strip()
-                  if is_number(cell):
-                      nums.append(float(cell))
+          def parse_issue_time_from_html(html):
+              # Try a few common date/time patterns.
+              patterns = [
+                  r'(\d{2}/\d{2}\s+\d{2}Z)',
+                  r'(\d{2}/\d{2}/\d{4}\s+\d{2}Z)',
+                  r'(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z)',
+              ]
+              for pat in patterns:
+                  m = re.search(pat, html)
+                  if m:
+                      text = m.group(1)
+                      # Only the ISO pattern can be parsed safely here.
+                      if "T" in text:
+                          try:
+                              return datetime.fromisoformat(text.replace("Z", "+00:00"))
+                          except Exception:
+                              pass
+              return datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
 
-              # Use the last 72 numeric values in the row.
-              if len(nums) >= MAX_HOURS:
-                  vals = nums[-MAX_HOURS:]
-                  return [round_tenth(v) for v in vals]
-
-              return None
-
-          def try_parse_csv_text(text, member_name):
+          def parse_csv_series(text):
               lines = text.splitlines()
               if not lines:
                   return None
 
-              sample = "\n".join(lines[:10])
               try:
-                  dialect = csv.Sniffer().sniff(sample)
+                  dialect = csv.Sniffer().sniff("\\n".join(lines[:10]))
               except Exception:
                   dialect = csv.excel
 
               reader = csv.reader(lines, dialect)
+              rows = list(reader)
+              if not rows:
+                  return None
 
-              for row in reader:
-                  if not row:
-                      continue
-                  if row_matches_station(row):
-                      vals = extract_72_values_from_row(row)
-                      if vals:
-                          print(f"Matched station in {member_name}")
-                          return vals
+              # Strategy:
+              # find rows with at least 72 numeric values; use the longest one.
+              best = None
+              best_count = -1
+
+              for row in rows:
+                  nums = []
+                  for cell in row:
+                      s = str(cell).strip()
+                      try:
+                          nums.append(float(s))
+                      except Exception:
+                          pass
+
+                  if len(nums) > best_count:
+                      best_count = len(nums)
+                      best = nums
+
+              if best and len(best) >= MAX_HOURS:
+                  vals = [round_tenth(v) for v in best[-MAX_HOURS:]]
+                  return vals
 
               return None
 
-          def fetch_latest_petss_csv_tar():
-              last_error = None
-
-              for issue_dt, url in build_candidates():
+          def parse_txt_series(text):
+              # Pull all decimal/integer tokens; use last 72 as the time series.
+              nums = []
+              for m in re.finditer(r'[-+]?\\d+(?:\\.\\d+)?', text):
                   try:
-                      blob = fetch_bytes(url)
-                      if len(blob) > 1000:
-                          return issue_dt, url, blob
-                  except Exception as e:
-                      last_error = e
+                      nums.append(float(m.group(0)))
+                  except Exception:
+                      pass
 
-              raise RuntimeError(f"Could not find a recent PETSS csv tarball. Last error: {last_error}")
+              if len(nums) >= MAX_HOURS:
+                  return [round_tenth(v) for v in nums[-MAX_HOURS:]]
 
-          def extract_station_series_from_tar(blob):
-              with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
-                  members = [m for m in tf.getmembers() if m.isfile() and m.name.lower().endswith(".csv")]
-                  print("CSV files in tarball:", len(members))
+              return None
 
-                  for m in members:
-                      f = tf.extractfile(m)
-                      if f is None:
-                          continue
+          def parse_xml_series(text):
+              try:
+                  root = ET.fromstring(text)
+              except Exception:
+                  return None
 
+              nums = []
+              for elem in root.iter():
+                  if elem.text:
+                      s = elem.text.strip()
                       try:
-                          text = f.read().decode("utf-8", "replace")
+                          nums.append(float(s))
                       except Exception:
-                          continue
+                          pass
 
-                      vals = try_parse_csv_text(text, m.name)
-                      if vals:
-                          return vals, m.name
+              if len(nums) >= MAX_HOURS:
+                  return [round_tenth(v) for v in nums[-MAX_HOURS:]]
+
+              return None
+
+          def main():
+              page_html = fetch_text(STATION_PAGE)
+              issue_dt = parse_issue_time_from_html(page_html)
+
+              exports = extract_export_links(page_html, STATION_PAGE)
+
+              attempts = []
+
+              # Prefer CSV, then TXT, then XML
+              for kind in ["csv", "txt", "xml"]:
+                  for url in exports[kind]:
+                      try:
+                          if kind == "csv":
+                              text = fetch_text(url)
+                              vals = parse_csv_series(text)
+                          elif kind == "txt":
+                              text = fetch_text(url)
+                              vals = parse_txt_series(text)
+                          else:
+                              text = fetch_text(url)
+                              vals = parse_xml_series(text)
+
+                          attempts.append({"kind": kind, "url": url, "parsed": bool(vals)})
+
+                          if vals and len(vals) >= MAX_HOURS:
+                              hours = []
+                              for hour_index, navd88_ft in enumerate(vals[:MAX_HOURS]):
+                                  navd88_ft = round_tenth(navd88_ft)
+                                  matched_ft = round_tenth(clamp_stage(navd88_ft))
+                                  was_clamped = matched_ft != navd88_ft
+
+                                  hours.append({
+                                      "hourIndex": hour_index,
+                                      "timeUtc": (issue_dt + timedelta(hours=hour_index + 1)).isoformat().replace("+00:00", "Z"),
+                                      "sourceStageFt": navd88_ft,
+                                      "sourceDatum": INPUT_DATUM,
+                                      "navd88StageFt": navd88_ft,
+                                      "matchedStageKey": f"{matched_ft:.1f}",
+                                      "wasClamped": was_clamped
+                                  })
+
+                              payload = {
+                                  "stationId": STATION_ID,
+                                  "stationNameConfigured": STATION_NAME,
+                                  "issuedUtc": issue_dt.isoformat().replace("+00:00", "Z"),
+                                  "sourceUrl": url,
+                                  "sourcePage": STATION_PAGE,
+                                  "inputDatum": INPUT_DATUM,
+                                  "hours": hours,
+                                  "debugAttempts": attempts
+                              }
+
+                              OUT_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+                              print("Wrote", OUT_PATH)
+                              print("Station page:", STATION_PAGE)
+                              print("Chosen export:", url)
+                              print("First 5 stages:", [h["navd88StageFt"] for h in hours[:5]])
+                              return
+
+                      except Exception as e:
+                          attempts.append({"kind": kind, "url": url, "parsed": False, "error": str(e)})
 
               raise RuntimeError(
-                  f"Could not find station {STATION_ID} / {STATION_NAME} in any CSV inside the PETSS tarball."
+                  "Could not parse a 72-hour PETSS series from the station page exports. "
+                  + json.dumps(attempts[:20], indent=2)
               )
 
-          issue_dt, source_url, blob = fetch_latest_petss_csv_tar()
-          values, matched_member = extract_station_series_from_tar(blob)
-
-          hours = []
-          for hour_index, navd88_ft in enumerate(values[:MAX_HOURS]):
-              navd88_ft = round_tenth(navd88_ft)
-
-              matched_ft = round_tenth(clamp_stage(navd88_ft))
-              was_clamped = matched_ft != navd88_ft
-
-              hours.append({
-                  "hourIndex": hour_index,
-                  "timeUtc": (issue_dt + timedelta(hours=hour_index + 1)).isoformat().replace("+00:00", "Z"),
-                  "sourceStageFt": navd88_ft,
-                  "sourceDatum": INPUT_DATUM,
-                  "navd88StageFt": navd88_ft,
-                  "matchedStageKey": f"{matched_ft:.1f}",
-                  "wasClamped": was_clamped
-              })
-
-          payload = {
-              "stationId": STATION_ID,
-              "stationNameConfigured": STATION_NAME,
-              "issuedUtc": issue_dt.isoformat().replace("+00:00", "Z"),
-              "sourceUrl": source_url,
-              "sourceMember": matched_member,
-              "inputDatum": INPUT_DATUM,
-              "hours": hours
-          }
-
-          OUT_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
-          print("Wrote", OUT_PATH)
-          print("Source tarball:", source_url)
-          print("Matched CSV member:", matched_member)
-          print("First 5 stages:", [h["navd88StageFt"] for h in hours[:5]])
+          main()
           PY
 
       - name: Commit updated forecast
