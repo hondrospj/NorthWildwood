@@ -1,1 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>North Wildwood PETSS Flood Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
+    }
 
+    #app {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      height: 100%;
+    }
+
+    #panel {
+      padding: 16px;
+      border-right: 1px solid #ddd;
+      overflow: auto;
+      background: #fff;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+    }
+
+    .muted {
+      color: #555;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #ececec;
+    }
+
+    .big {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    button {
+      padding: 9px 12px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+
+    #warn {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #fff3e0;
+      border: 1px solid #ffd8a8;
+      border-radius: 8px;
+      color: #8a4b00;
+      display: none;
+    }
+
+    #urlBox {
+      width: 100%;
+      height: 220px;
+      display: none;
+      margin-top: 8px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .ok {
+      color: #0a7f2e;
+      font-weight: 700;
+    }
+
+    .bad {
+      color: #b42318;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="panel">
+      <h1>North Wildwood Flood Forecast</h1>
+      <div class="muted">Gauge: Stone Harbor (8535581)</div>
+      <div class="muted">Portal owner: Z00380509_StocktonU</div>
+      <div class="muted">Public layer folder names are not needed by the app.</div>
+
+      <div class="section">
+        <div id="issuedText" class="muted">Forecast issued: loading…</div>
+        <div id="sourceText" class="muted">Source file: loading…</div>
+        <div id="catalogText" class="muted">Layer catalog: loading…</div>
+      </div>
+
+      <div class="section">
+        <label for="hourSlider">Forecast hour</label>
+        <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
+        <div id="hourText" class="big">Hour 0</div>
+        <div id="timeText" class="muted">Time: --</div>
+      </div>
+
+      <div class="section">
+        <div id="rawStageText">PETSS stage: --</div>
+        <div id="navdStageText">NAVD88 stage: --</div>
+        <div id="matchedText">Matched layer: --</div>
+        <div id="loadedUrlText" class="muted">Service URL: --</div>
+        <div id="warn"></div>
+      </div>
+
+      <div class="section">
+        <button id="playBtn">Play</button>
+        <button id="stopBtn">Stop</button>
+        <button id="reloadBtn">Reload</button>
+        <button id="showUrlsBtn">Show layer URLs</button>
+        <button id="downloadUrlsBtn">Download layer URLs</button>
+        <textarea id="urlBox" readonly></textarea>
+      </div>
+
+      <div class="section">
+        <div class="muted">
+          The blue flood-depth symbology is already baked into your hosted tile layers,
+          so the page only swaps the correct stage layer in and out.
+        </div>
+      </div>
+
+      <div class="section">
+        <div id="status">Starting…</div>
+      </div>
+    </aside>
+
+    <main id="map"></main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.14/dist/esri-leaflet.js"></script>
+  <script>
+    const ARCGIS_REST = "https://www.arcgis.com/sharing/rest";
+    const OWNER = "Z00380509_StocktonU";
+    const TITLE_PREFIX = "NW_FloodDepth_";
+    const TITLE_RE = /^NW_FloodDepth_([pm])(\\d{2})_(\\d)_NAVD88$/;
+
+    const MAP_CENTER = [39.0007, -74.8089];
+    const MAP_ZOOM = 13;
+
+    let map;
+    let currentFloodLayer = null;
+    let forecastData = null;
+    let layerCatalog = {};
+    let playTimer = null;
+
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById("status");
+      el.textContent = msg;
+      el.className = isError ? "bad" : "ok";
+    }
+
+    function setWarn(msg) {
+      const el = document.getElementById("warn");
+      if (!msg) {
+        el.style.display = "none";
+        el.textContent = "";
+      } else {
+        el.style.display = "block";
+        el.textContent = msg;
+      }
+    }
+
+    async function fetchJson(url, params = {}) {
+      const u = new URL(url);
+      Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+      const r = await fetch(u.toString(), { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${u}`);
+      return r.json();
+    }
+
+    function titleToStageKey(title) {
+      const m = title.match(TITLE_RE);
+      if (!m) return null;
+      const sign = m[1] === "m" ? -1 : 1;
+      const whole = parseInt(m[2], 10);
+      const tenth = parseInt(m[3], 10);
+      return (sign * (whole + tenth / 10)).toFixed(1);
+    }
+
+    function wantedStageKeys() {
+      const keys = [];
+      for (let i = -20; i <= 140; i++) {
+        keys.push((i / 10).toFixed(1));
+      }
+      return keys;
+    }
+
+    async function searchAllItems() {
+      let start = 1;
+      let all = [];
+
+      while (true) {
+        const data = await fetchJson(`${ARCGIS_REST}/search`, {
+          q: `owner:"${OWNER}" AND "${TITLE_PREFIX}"`,
+          sortField: "title",
+          sortOrder: "asc",
+          num: 100,
+          start,
+          f: "json"
+        });
+
+        all = all.concat(data.results || []);
+
+        if (!data.nextStart || data.nextStart === -1) break;
+        start = data.nextStart;
+      }
+
+      return all;
+    }
+
+    async function fetchItemDetail(id) {
+      return fetchJson(`${ARCGIS_REST}/content/items/${id}`, { f: "json" });
+    }
+
+    async function buildLayerCatalog() {
+      setStatus("Searching ArcGIS Online for your public flood stage items…");
+
+      const rawItems = await searchAllItems();
+
+      const stageCandidates = rawItems.filter(item => TITLE_RE.test(item.title));
+      setStatus(`Found ${stageCandidates.length} title matches. Resolving service URLs…`);
+
+      const resolved = await Promise.all(stageCandidates.map(async (item) => {
+        let url = item.url || null;
+
+        if (!url && item.id) {
+          try {
+            const detail = await fetchItemDetail(item.id);
+            url = detail.url || null;
+          } catch (err) {
+            url = null;
+          }
+        }
+
+        const stageKey = titleToStageKey(item.title);
+
+        return {
+          id: item.id,
+          title: item.title,
+          stageKey,
+          url
+        };
+      }));
+
+      const catalog = {};
+      for (const item of resolved) {
+        if (!item.stageKey) continue;
+        if (!item.url) continue;
+        if (!/\\/MapServer\\/?$/i.test(item.url)) continue;
+        catalog[item.stageKey] = {
+          title: item.title,
+          url: item.url.replace(/\\/+$/, "")
+        };
+      }
+
+      layerCatalog = catalog;
+
+      const wanted = wantedStageKeys();
+      const found = wanted.filter(k => !!layerCatalog[k]).length;
+      const missing = wanted.filter(k => !layerCatalog[k]);
+
+      document.getElementById("catalogText").textContent =
+        `Layer catalog: ${found} of ${wanted.length} stages resolved`;
+
+      const urlDump = {};
+      for (const k of wanted) {
+        urlDump[k] = layerCatalog[k] ? layerCatalog[k].url : null;
+      }
+      document.getElementById("urlBox").value = JSON.stringify(urlDump, null, 2);
+
+      if (missing.length) {
+        setStatus(
+          `Layer catalog built. Found ${found}/${wanted.length} stages.\nMissing stages: ${missing.join(", ")}`
+        );
+      } else {
+        setStatus(`Layer catalog built. All ${found} stage layers resolved.`);
+      }
+    }
+
+    async function loadForecast() {
+      forecastData = await fetchJson("./forecast.json");
+      document.getElementById("issuedText").textContent =
+        `Forecast issued: ${forecastData.issuedUtc || "not available yet"}`;
+      document.getElementById("sourceText").textContent =
+        `Source file: ${forecastData.sourceUrl || "not available yet"}`;
+
+      const slider = document.getElementById("hourSlider");
+      const count = forecastData.hours ? forecastData.hours.length : 0;
+      slider.max = String(Math.max(0, count - 1));
+      slider.value = "0";
+    }
+
+    function initMap() {
+      map = L.map("map").setView(MAP_CENTER, MAP_ZOOM);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+    }
+
+    function clearFloodLayer() {
+      if (currentFloodLayer) {
+        map.removeLayer(currentFloodLayer);
+        currentFloodLayer = null;
+      }
+    }
+
+    function setFloodLayerFromStage(stageKey) {
+      clearFloodLayer();
+
+      const info = layerCatalog[stageKey];
+      if (!info) {
+        document.getElementById("loadedUrlText").textContent =
+          `Service URL: no public hosted tile layer found for ${stageKey}`;
+        return;
+      }
+
+      currentFloodLayer = L.esri.tiledMapLayer({
+        url: info.url,
+        opacity: 0.80
+      }).addTo(map);
+
+      document.getElementById("loadedUrlText").textContent =
+        `Service URL: ${info.url}`;
+    }
+
+    function renderHour(index) {
+      if (!forecastData || !forecastData.hours || !forecastData.hours.length) return;
+
+      const h = forecastData.hours[index];
+      if (!h) return;
+
+      document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
+      document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
+      document.getElementById("rawStageText").textContent =
+        `PETSS stage: ${Number(h.sourceStageFt).toFixed(1)} ft ${h.sourceDatum}`;
+      document.getElementById("navdStageText").textContent =
+        `NAVD88 stage: ${Number(h.navd88StageFt).toFixed(1)} ft`;
+      document.getElementById("matchedText").textContent =
+        `Matched layer: ${h.matchedStageKey} ft NAVD88`;
+
+      if (h.wasClamped) {
+        setWarn(
+          `Forecast was outside your published layer range, so it was clamped to ${h.matchedStageKey} ft NAVD88.`
+        );
+      } else {
+        setWarn("");
+      }
+
+      setFloodLayerFromStage(h.matchedStageKey);
+    }
+
+    function stopPlayback() {
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
+      }
+    }
+
+    function startPlayback() {
+      stopPlayback();
+      const slider = document.getElementById("hourSlider");
+      let i = Number(slider.value);
+
+      playTimer = setInterval(() => {
+        renderHour(i);
+        slider.value = String(i);
+        i += 1;
+        if (i >= forecastData.hours.length) i = 0;
+      }, 1200);
+    }
+
+    function toggleUrls() {
+      const box = document.getElementById("urlBox");
+      box.style.display = box.style.display === "block" ? "none" : "block";
+    }
+
+    function downloadUrls() {
+      const text = document.getElementById("urlBox").value;
+      const blob = new Blob([text], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "north_wildwood_layer_urls.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function reloadAll() {
+      stopPlayback();
+      setStatus("Reloading layer catalog and forecast…");
+
+      await buildLayerCatalog();
+      await loadForecast();
+      renderHour(0);
+    }
+
+    async function main() {
+      initMap();
+
+      document.getElementById("hourSlider").addEventListener("input", (e) => {
+        stopPlayback();
+        renderHour(Number(e.target.value));
+      });
+
+      document.getElementById("playBtn").addEventListener("click", startPlayback);
+      document.getElementById("stopBtn").addEventListener("click", stopPlayback);
+      document.getElementById("reloadBtn").addEventListener("click", reloadAll);
+      document.getElementById("showUrlsBtn").addEventListener("click", toggleUrls);
+      document.getElementById("downloadUrlsBtn").addEventListener("click", downloadUrls);
+
+      await reloadAll();
+    }
+
+    main().catch(err => {
+      console.error(err);
+      setStatus(err.message, true);
+    });
+  </script>
+</body>
+</html>
