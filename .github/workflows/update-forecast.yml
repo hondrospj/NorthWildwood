@@ -1,0 +1,191 @@
+name: Update PETSS forecast
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+      timezone: "America/New_York"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Build forecast.json
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          import urllib.request
+          import urllib.error
+          from datetime import datetime, timedelta, timezone
+          from pathlib import Path
+
+          STATION_ID = "8535581"
+          STATION_NAME = "STONE HARBOR, GREAT CHANNEL, NJ"
+
+          # Change this to "NAVD88" if your chosen PETSS station text is already NAVD88.
+          INPUT_DATUM = "MLLW"
+
+          # NOAA datum page for 8535581
+          NAVD88_MINUS_MLLW_FT = 2.66
+
+          MIN_LAYER_STAGE = -2.0
+          MAX_LAYER_STAGE = 14.0
+          MAX_HOURS = 72
+
+          PETSS_ROOT = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/petss/prod"
+          CYCLES = ["18", "12", "06", "00"]
+          LOOKBACK_DAYS = 3
+
+          OUT_PATH = Path("forecast.json")
+
+          def round_tenth(x):
+              return round(float(x) * 10.0) / 10.0
+
+          def clamp_stage(stage):
+              return max(MIN_LAYER_STAGE, min(MAX_LAYER_STAGE, stage))
+
+          def fetch_text(url):
+              req = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "Mozilla/5.0"}
+              )
+              with urllib.request.urlopen(req, timeout=60) as resp:
+                  return resp.read().decode("utf-8", "replace")
+
+          def build_candidates():
+              now_utc = datetime.now(timezone.utc)
+              dates = [now_utc.date() - timedelta(days=i) for i in range(LOOKBACK_DAYS)]
+              out = []
+              for d in dates:
+                  ymd = d.strftime("%Y%m%d")
+                  for cyc in CYCLES:
+                      issue_dt = datetime.strptime(f"{ymd}{cyc}", "%Y%m%d%H").replace(tzinfo=timezone.utc)
+                      url = f"{PETSS_ROOT}/petss.{ymd}/petss.t{cyc}z.mean.stormtide.east.txt"
+                      out.append((issue_dt, url))
+              out.sort(reverse=True)
+              return out
+
+          def fetch_latest_petss():
+              last_error = None
+              for issue_dt, url in build_candidates():
+                  try:
+                      text = fetch_text(url)
+                      upper = text.upper()
+                      if STATION_ID in upper or STATION_ID in text:
+                          return issue_dt, url, text
+                  except Exception as e:
+                      last_error = e
+              raise RuntimeError(f"Could not find a recent PETSS text product for station {STATION_ID}. Last error: {last_error}")
+
+          def preprocess(text):
+              text = text.replace("\r", "\n")
+              text = re.sub(r"(?<=\\d)-(?=\\d)", " -", text)
+              text = re.sub(r"\\s+", " ", text)
+              return text.strip()
+
+          def is_station_token(token):
+              return token.isdigit() and len(token) in (7, 8)
+
+          def is_int_token(token):
+              return re.fullmatch(r"-?\\d+", token) is not None
+
+          def extract_station_series(text, station_id):
+              tokens = preprocess(text).split(" ")
+
+              if station_id not in tokens:
+                  raise RuntimeError(f"Station {station_id} not found in PETSS text product.")
+
+              i = tokens.index(station_id)
+              j = i + 1
+
+              # Station name tokens
+              name_parts = []
+              while j < len(tokens):
+                  tok = tokens[j]
+                  if is_int_token(tok):
+                      break
+                  if is_station_token(tok):
+                      break
+                  name_parts.append(tok)
+                  j += 1
+
+              values = []
+              while j < len(tokens):
+                  tok = tokens[j]
+
+                  if is_station_token(tok) and len(values) >= MAX_HOURS:
+                      break
+
+                  if is_int_token(tok):
+                      values.append(int(tok))
+
+                  j += 1
+
+              if len(values) < MAX_HOURS:
+                  raise RuntimeError(
+                      f"Only found {len(values)} values for station {station_id}; expected at least {MAX_HOURS}."
+                  )
+
+              return " ".join(name_parts).strip(), values[:MAX_HOURS]
+
+          def to_navd88(source_ft):
+              if INPUT_DATUM.upper() == "MLLW":
+                  return round_tenth(source_ft - NAVD88_MINUS_MLLW_FT)
+              if INPUT_DATUM.upper() == "NAVD88":
+                  return round_tenth(source_ft)
+              raise ValueError("INPUT_DATUM must be MLLW or NAVD88")
+
+          issue_dt, source_url, text = fetch_latest_petss()
+          parsed_name, values_tenths = extract_station_series(text, STATION_ID)
+
+          hours = []
+          for hour_index, raw_val in enumerate(values_tenths):
+              source_ft = raw_val / 10.0
+              navd88_ft = to_navd88(source_ft)
+
+              matched_ft = round_tenth(clamp_stage(navd88_ft))
+              was_clamped = matched_ft != navd88_ft
+
+              hours.append({
+                  "hourIndex": hour_index,
+                  "timeUtc": (issue_dt + timedelta(hours=hour_index + 1)).isoformat().replace("+00:00", "Z"),
+                  "sourceStageFt": round_tenth(source_ft),
+                  "sourceDatum": INPUT_DATUM.upper(),
+                  "navd88StageFt": navd88_ft,
+                  "matchedStageKey": f"{matched_ft:.1f}",
+                  "wasClamped": was_clamped
+              })
+
+          payload = {
+              "stationId": STATION_ID,
+              "stationNameConfigured": STATION_NAME,
+              "stationNameParsed": parsed_name,
+              "issuedUtc": issue_dt.isoformat().replace("+00:00", "Z"),
+              "sourceUrl": source_url,
+              "inputDatum": INPUT_DATUM.upper(),
+              "hours": hours
+          }
+
+          OUT_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+          print("Wrote", OUT_PATH)
+          print("Source:", source_url)
+          print("Parsed station name:", parsed_name)
+          PY
+
+      - name: Commit updated forecast
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add forecast.json
+          git diff --staged --quiet || git commit -m "Update PETSS forecast"
+          git push
