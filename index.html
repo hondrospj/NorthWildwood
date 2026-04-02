@@ -45,6 +45,7 @@
       color: #555;
       font-size: 14px;
       line-height: 1.4;
+      word-break: break-word;
     }
 
     .section {
@@ -90,6 +91,7 @@
       border-radius: 8px;
       color: #8a4b00;
       display: none;
+      white-space: pre-wrap;
     }
 
     #urlBox {
@@ -105,6 +107,34 @@
       width: 120px;
       padding: 6px;
       margin-right: 8px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #1e40af;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    /* Dedicated flood pane above the basemap */
+    .leaflet-pane.flood-pane {
+      z-index: 420;
+      pointer-events: none;
+    }
+
+    /*
+      This is the key visual fix:
+      it makes the published raster read as a flood overlay instead of a faint
+      beige/green texture that visually disappears into OSM.
+    */
+    .leaflet-pane.flood-pane img,
+    .leaflet-pane.flood-pane canvas {
+      opacity: 0.92;
+      filter: saturate(3.8) hue-rotate(135deg) brightness(1.08) contrast(1.22);
+      image-rendering: auto;
     }
   </style>
 </head>
@@ -131,6 +161,12 @@
       </div>
 
       <div class="section">
+        <label for="opacitySlider">Overlay opacity</label>
+        <input id="opacitySlider" type="range" min="20" max="100" value="92" step="1" />
+        <div id="opacityText" class="muted">92%</div>
+      </div>
+
+      <div class="section">
         <div id="stageText">Water level: --</div>
         <div id="matchedText">Matched layer: --</div>
         <div id="loadedUrlText" class="muted">Service URL: --</div>
@@ -154,11 +190,12 @@
 
       <div class="section">
         <div class="muted">
-          This version fixes the New Jersey State Plane definition, removes the
-          unavailable NAD grid dependency, detects each service type from ArcGIS
-          metadata, and can fall back to dynamic map services if a stage is not
-          actually cached as tiles.
+          This version forces the flood surface into a dedicated overlay pane,
+          prefers ArcGIS dynamic export so the flood is drawn as a transparent
+          map image above the basemap, and only falls back to cached tiles if
+          export fails.
         </div>
+        <div id="layerModePill" class="pill">Layer mode: loading…</div>
       </div>
 
       <div class="section">
@@ -190,6 +227,7 @@
     let mapInitialized = false;
     let mapProfile = null;
     let lastRenderToken = 0;
+    let overlayOpacity = 0.92;
 
     const serviceMetaCache = new Map();
 
@@ -233,6 +271,21 @@
       } else {
         el.style.display = "block";
         el.textContent = msg;
+      }
+    }
+
+    function setLayerMode(text) {
+      document.getElementById("layerModePill").textContent = text;
+    }
+
+    function setOpacityText() {
+      document.getElementById("opacityText").textContent =
+        `${Math.round(overlayOpacity * 100)}%`;
+    }
+
+    function applyOverlayOpacity() {
+      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
+        currentFloodLayer.setOpacity(overlayOpacity);
       }
     }
 
@@ -301,9 +354,7 @@
 
     async function getServiceMetaCached(url) {
       const clean = normalizeServiceUrl(url);
-      if (serviceMetaCache.has(clean)) {
-        return serviceMetaCache.get(clean);
-      }
+      if (serviceMetaCache.has(clean)) return serviceMetaCache.get(clean);
       const meta = await fetchServiceMeta(clean);
       serviceMetaCache.set(clean, meta);
       return meta;
@@ -323,13 +374,6 @@
 
     function isWebMercatorWkid(wkid) {
       return [3857, 102100, 102113].includes(Number(wkid));
-    }
-
-    function getLayerKind(meta) {
-      if (meta?.tileInfo || meta?.singleFusedMapCache === true) {
-        return "tiled";
-      }
-      return "dynamic";
     }
 
     function makeCustomCrs(meta, wkid) {
@@ -360,11 +404,19 @@
       mapProfile = null;
     }
 
+    function ensureFloodPane() {
+      if (!map.getPane("floodPane")) {
+        map.createPane("floodPane");
+      }
+      const pane = map.getPane("floodPane");
+      pane.classList.add("flood-pane");
+      pane.style.zIndex = "420";
+      pane.style.pointerEvents = "none";
+    }
+
     function fitMapToMeta(meta) {
       const full = meta?.fullExtent || meta?.initialExtent;
       if (!full || !map) return;
-
-      const wkid = getWkid(meta);
 
       if (
         full.xmin == null ||
@@ -376,6 +428,8 @@
         return;
       }
 
+      const wkid = getWkid(meta);
+
       if (isWebMercatorWkid(wkid)) {
         const sw = L.CRS.EPSG3857.unproject(L.point(full.xmin, full.ymin));
         const ne = L.CRS.EPSG3857.unproject(L.point(full.xmax, full.ymax));
@@ -384,14 +438,13 @@
       }
 
       const crs = map.options.crs;
-      if (!crs?.unproject) {
+      if (crs?.unproject) {
+        const sw = crs.unproject(L.point(full.xmin, full.ymin));
+        const ne = crs.unproject(L.point(full.xmax, full.ymax));
+        map.fitBounds(L.latLngBounds(sw, ne));
+      } else {
         map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-        return;
       }
-
-      const sw = crs.unproject(L.point(full.xmin, full.ymin));
-      const ne = crs.unproject(L.point(full.xmax, full.ymax));
-      map.fitBounds(L.latLngBounds(sw, ne));
     }
 
     async function buildLayerCatalog() {
@@ -488,24 +541,25 @@
     async function initializeMapFromLayerInfo(info) {
       const meta = await getServiceMetaCached(info.url);
       const wkid = getWkid(meta);
-      const layerKind = getLayerKind(meta);
       const lodCount = meta?.tileInfo?.lods?.length || 0;
 
       destroyMapIfNeeded();
 
       if (isWebMercatorWkid(wkid)) {
-        map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        map = L.map("map", {
+          zoomControl: true,
+          preferCanvas: false
+        }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
           attribution: "&copy; OpenStreetMap contributors"
         }).addTo(map);
 
         document.getElementById("crsText").textContent =
-          `Map CRS: Web Mercator (WKID ${wkid}) | ${layerKind} service | ${lodCount} LODs`;
+          `Map CRS: Web Mercator (WKID ${wkid}) | ${lodCount} LODs`;
 
         mapProfile = {
           wkid,
-          layerKind,
           isWebMercator: true
         };
       } else {
@@ -513,7 +567,7 @@
 
         if (!crs) {
           throw new Error(
-            `Service WKID ${wkid} is not Web Mercator and does not expose usable tile metadata. Republish these rasters as cached tile layers or Web Mercator services.`
+            `Service WKID ${wkid} is not Web Mercator and does not expose usable tile metadata.`
           );
         }
 
@@ -524,15 +578,15 @@
         });
 
         document.getElementById("crsText").textContent =
-          `Map CRS: ${(CRS_DEFS[String(wkid)]?.label || `WKID ${wkid}`)} | ${layerKind} service | ${lodCount} LODs`;
+          `Map CRS: ${CRS_DEFS[String(wkid)]?.label || `WKID ${wkid}`} | ${lodCount} LODs`;
 
         mapProfile = {
           wkid,
-          layerKind,
           isWebMercator: false
         };
       }
 
+      ensureFloodPane();
       fitMapToMeta(meta);
       mapInitialized = true;
     }
@@ -560,48 +614,47 @@
       }
     }
 
-    function bindLayerEvents(layer, title) {
+    function bindCommonLayerEvents(layer, title) {
       layer.on("load", () => {
         setStatus(`Loaded ${title}`);
       });
 
-      layer.on("tileerror", (e) => {
-        console.error("tileerror", title, e);
-        setStatus(`Tile error for ${title}`);
-      });
-
       layer.on("error", (e) => {
         console.error("layer error", title, e);
-        setStatus(`Layer error for ${title}`);
       });
 
       layer.on("requesterror", (e) => {
         console.error("requesterror", title, e);
-        setStatus(`Request error for ${title}`);
+      });
+
+      layer.on("tileerror", (e) => {
+        console.error("tileerror", title, e);
       });
     }
 
-    function createRenderableLayer(info, meta) {
-      const kind = getLayerKind(meta);
-
-      if (kind === "tiled") {
-        const layerOpts = {
-          url: info.url,
-          opacity: 1.0
-        };
-
-        if (meta?.tileInfo?.lods?.length) {
-          layerOpts.minZoom = 0;
-          layerOpts.maxZoom = meta.tileInfo.lods.length - 1;
-        }
-
-        return L.esri.tiledMapLayer(layerOpts);
-      }
-
+    function createDynamicFloodLayer(info) {
       return L.esri.dynamicMapLayer({
         url: info.url,
-        opacity: 1.0
+        pane: "floodPane",
+        opacity: overlayOpacity,
+        format: "png32",
+        transparent: true
       });
+    }
+
+    function createTiledFloodLayer(info, meta) {
+      const opts = {
+        url: info.url,
+        pane: "floodPane",
+        opacity: overlayOpacity
+      };
+
+      if (meta?.tileInfo?.lods?.length) {
+        opts.minZoom = 0;
+        opts.maxZoom = meta.tileInfo.lods.length - 1;
+      }
+
+      return L.esri.tiledMapLayer(opts);
     }
 
     async function setFloodLayerFromStage(stageKey, token) {
@@ -615,7 +668,6 @@
       }
 
       const meta = await getServiceMetaCached(info.url);
-
       if (token !== lastRenderToken) return;
 
       const wkid = getWkid(meta);
@@ -627,15 +679,54 @@
 
       clearFloodLayer();
 
-      const layer = createRenderableLayer(info, meta);
-      bindLayerEvents(layer, info.title);
+      let dynamicLoaded = false;
+      let fallbackTriggered = false;
 
-      currentFloodLayer = layer;
-      currentFloodLayer.addTo(map);
+      const dynamicLayer = createDynamicFloodLayer(info);
+      bindCommonLayerEvents(dynamicLayer, info.title);
 
-      if (currentFloodLayer.bringToFront) {
-        currentFloodLayer.bringToFront();
-      }
+      dynamicLayer.once("load", () => {
+        if (token !== lastRenderToken) return;
+        dynamicLoaded = true;
+        currentFloodLayer = dynamicLayer;
+        applyOverlayOpacity();
+        setLayerMode("Layer mode: dynamic export");
+      });
+
+      const fallbackToTiles = () => {
+        if (fallbackTriggered || dynamicLoaded || token !== lastRenderToken) return;
+        fallbackTriggered = true;
+
+        if (map && map.hasLayer(dynamicLayer)) {
+          map.removeLayer(dynamicLayer);
+        }
+
+        const tiledLayer = createTiledFloodLayer(info, meta);
+        bindCommonLayerEvents(tiledLayer, info.title);
+
+        tiledLayer.once("load", () => {
+          if (token !== lastRenderToken) return;
+          currentFloodLayer = tiledLayer;
+          applyOverlayOpacity();
+          setLayerMode("Layer mode: cached tiles");
+          setStatus(`Loaded ${info.title} using cached tiles`);
+        });
+
+        tiledLayer.addTo(map);
+        if (tiledLayer.bringToFront) tiledLayer.bringToFront();
+        currentFloodLayer = tiledLayer;
+      };
+
+      dynamicLayer.once("requesterror", fallbackToTiles);
+      dynamicLayer.once("error", fallbackToTiles);
+
+      dynamicLayer.addTo(map);
+      if (dynamicLayer.bringToFront) dynamicLayer.bringToFront();
+      currentFloodLayer = dynamicLayer;
+
+      setTimeout(() => {
+        fallbackToTiles();
+      }, 2500);
 
       document.getElementById("loadedUrlText").textContent =
         `Service URL: ${info.url}`;
@@ -746,9 +837,17 @@
     }
 
     async function main() {
+      setOpacityText();
+
       document.getElementById("hourSlider").addEventListener("input", async (e) => {
         stopPlayback();
         await renderHour(Number(e.target.value));
+      });
+
+      document.getElementById("opacitySlider").addEventListener("input", (e) => {
+        overlayOpacity = Number(e.target.value) / 100;
+        setOpacityText();
+        applyOverlayOpacity();
       });
 
       document.getElementById("playBtn").addEventListener("click", startPlayback);
