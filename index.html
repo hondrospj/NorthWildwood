@@ -108,7 +108,7 @@
 
     #urlBox {
       width: 100%;
-      height: 140px;
+      height: 150px;
       display: none;
       margin-top: 8px;
       font-family: monospace;
@@ -204,8 +204,8 @@
 
       <div class="section">
         <div class="muted">
-          This viewer uses the ArcGIS Maps SDK directly, so the stage layer is loaded
-          as a native ArcGIS TileLayer instead of manually constructing Leaflet tiles.
+          This viewer loads each stage as a native ArcGIS TileLayer instead of manually
+          building Leaflet tile URLs.
         </div>
         <div class="pill">Hosted tile layer = static pre-rendered cache</div>
       </div>
@@ -236,8 +236,14 @@
       "esri/geometry/Extent",
       "esri/geometry/SpatialReference",
       "esri/core/reactiveUtils"
-    ], function (Map, MapView, TileLayer, Extent, SpatialReference, reactiveUtils) {
-
+    ], function (
+      EsriMap,
+      MapView,
+      TileLayer,
+      Extent,
+      SpatialReference,
+      reactiveUtils
+    ) {
       const SERVICE_ROOT =
         "https://tiles.arcgis.com/tiles/EDFKKZivVyfUwPAb/arcgis/rest/services";
 
@@ -250,13 +256,14 @@
       let map = null;
       let view = null;
       let currentFloodLayer = null;
-      let currentLayerHandle = null;
+      let currentLayerWatchHandle = null;
       let forecastData = null;
       let playTimer = null;
       let overlayOpacity = 0.8;
       let lastRenderToken = 0;
 
-      const metaCache = new Map();
+      // IMPORTANT: force a real JavaScript Map, not the ArcGIS Map class
+      const metaCache = new globalThis.Map();
 
       function setStatus(msg) {
         document.getElementById("status").textContent = msg;
@@ -304,15 +311,20 @@
           }
         }
 
-        const r = await fetch(u.toString(), { cache: "no-store" });
-        const text = await r.text();
+        const response = await fetch(u.toString(), { cache: "no-store" });
+        const text = await response.text();
 
-        if (!r.ok) {
-          throw new Error(`HTTP ${r.status} for ${u.toString()}`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status} for ${u.toString()}`);
         }
 
-        const contentType = (r.headers.get("content-type") || "").toLowerCase();
-        if (contentType.includes("text/html") || /^\s*<!doctype html/i.test(text) || /^\s*<html/i.test(text)) {
+        const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+        if (
+          contentType.includes("text/html") ||
+          /^\s*<!doctype html/i.test(text) ||
+          /^\s*<html/i.test(text)
+        ) {
           throw new Error(`Expected JSON but got HTML for ${u.toString()}`);
         }
 
@@ -358,17 +370,26 @@
 
       async function getStageMeta(stageKey) {
         const key = String(stageKey);
-        if (metaCache.has(key)) return metaCache.get(key);
+
+        if (metaCache.has(key)) {
+          const cached = metaCache.get(key);
+          if (cached instanceof Error) throw cached;
+          return cached;
+        }
 
         const url = stageKeyToServiceUrl(key);
-        const meta = await fetchJson(url, { f: "json" });
 
-        meta.__stageKey = key;
-        meta.__serviceUrl = url;
-        meta.__serviceName = stageKeyToServiceName(key);
-
-        metaCache.set(key, meta);
-        return meta;
+        try {
+          const meta = await fetchJson(url, { f: "json" });
+          meta.__stageKey = key;
+          meta.__serviceUrl = url;
+          meta.__serviceName = stageKeyToServiceName(key);
+          metaCache.set(key, meta);
+          return meta;
+        } catch (err) {
+          metaCache.set(key, err);
+          throw err;
+        }
       }
 
       function getWkid(meta) {
@@ -387,8 +408,10 @@
         const full = meta?.fullExtent || meta?.initialExtent;
         if (!full) return null;
         if (
-          full.xmin == null || full.ymin == null ||
-          full.xmax == null || full.ymax == null
+          full.xmin == null ||
+          full.ymin == null ||
+          full.xmax == null ||
+          full.ymax == null
         ) return null;
 
         return new Extent({
@@ -403,9 +426,9 @@
       }
 
       function clearFloodLayer() {
-        if (currentLayerHandle) {
-          currentLayerHandle.remove();
-          currentLayerHandle = null;
+        if (currentLayerWatchHandle) {
+          currentLayerWatchHandle.remove();
+          currentLayerWatchHandle = null;
         }
 
         if (currentFloodLayer && map) {
@@ -439,7 +462,7 @@
         if (!lod) return null;
 
         const full = meta.fullExtent || meta.initialExtent;
-        if (!full) return null;
+        if (!full || !meta?.tileInfo?.origin) return null;
 
         const x = (full.xmin + full.xmax) / 2;
         const y = (full.ymin + full.ymax) / 2;
@@ -474,13 +497,15 @@
           `level=${info.level}, row=${info.row}, col=${info.col}\n${info.url}`;
 
         img.style.display = "block";
+
         img.onload = () => {
           metaEl.textContent += `\nSample tile loaded: ${img.naturalWidth}x${img.naturalHeight}`;
         };
+
         img.onerror = () => {
           metaEl.textContent += `\nSample tile FAILED to load.`;
           setHardWarn(
-            "The sample cached tile itself failed to load. That means the issue is not slider logic. It is either the tile service, the cache, or sharing/cors on the exact tile endpoint."
+            "The sample cached tile itself failed to load. That means the issue is in the tile service/cache, not the slider logic."
           );
         };
 
@@ -492,10 +517,13 @@
 
         document.getElementById("issuedText").textContent =
           `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
+
         document.getElementById("sourceText").textContent =
           `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
+
         document.getElementById("catalogText").textContent =
           "Catalog mode: deterministic stage URLs from -2.0 to 14.0 NAVD88 (161 possible stages)";
+
         document.getElementById("serviceModeText").textContent =
           "Layer mode: native ArcGIS TileLayer";
 
@@ -546,7 +574,7 @@
           meta = await getStageMeta(normalized);
         } catch (err) {
           if (token !== lastRenderToken) return;
-          setHardWarn(err.message);
+          setHardWarn(err.message || String(err));
           setStatus(`Failed metadata for ${serviceName}`);
           return;
         }
@@ -554,13 +582,10 @@
         if (token !== lastRenderToken) return;
 
         const wkid = getWkid(meta);
-        document.getElementById("crsText").textContent =
-          `Map CRS: WKID ${wkid || 3857}`;
+        document.getElementById("crsText").textContent = `Map CRS: WKID ${wkid || 3857}`;
 
         if (wkid && wkid !== 3857 && wkid !== 102100 && wkid !== 102113) {
-          setHardWarn(
-            `Unsupported WKID ${wkid}. This viewer expects Web Mercator cached tiles.`
-          );
+          setHardWarn(`Unsupported WKID ${wkid}. This viewer expects Web Mercator cached tiles.`);
           setStatus(`Unsupported WKID for ${serviceName}`);
           return;
         }
@@ -606,14 +631,13 @@
             await view.goTo({ zoom: maxLOD }, { animate: false });
           }
         } catch (err) {
-          // ignore goTo interruption
+          // ignore goTo interruptions
         }
 
         try {
           const layerView = await view.whenLayerView(layer);
-          if (token !== lastRenderToken) return;
 
-          currentLayerHandle = reactiveUtils.watch(
+          currentLayerWatchHandle = reactiveUtils.watch(
             () => layerView.updating,
             (updating) => {
               if (layer !== currentFloodLayer) return;
@@ -625,14 +649,7 @@
             },
             { initial: true }
           );
-
-          reactiveUtils.whenOnce(() => !layerView.updating).then(() => {
-            if (layer === currentFloodLayer) {
-              setStatus(`Loaded ${serviceName}`);
-            }
-          });
         } catch (err) {
-          if (token !== lastRenderToken) return;
           setWarn(`LayerView warning: ${err.message || err}`);
         }
 
@@ -708,8 +725,8 @@
 
           renderHour(i).catch(err => {
             console.error(err);
-            setStatus(err.message);
-            setHardWarn(err.message);
+            setStatus(err.message || String(err));
+            setHardWarn(err.message || String(err));
             stopPlayback();
           });
 
@@ -733,7 +750,7 @@
       async function main() {
         setOpacityText();
 
-        map = new Map({
+        map = new EsriMap({
           basemap: "osm"
         });
 
@@ -766,8 +783,8 @@
         document.getElementById("reloadBtn").addEventListener("click", () => {
           reloadAll().catch(err => {
             console.error(err);
-            setStatus(err.message);
-            setHardWarn(err.message);
+            setStatus(err.message || String(err));
+            setHardWarn(err.message || String(err));
           });
         });
 
@@ -782,8 +799,8 @@
         document.getElementById("manualStageBtn").addEventListener("click", () => {
           loadManualStage().catch(err => {
             console.error(err);
-            setStatus(err.message);
-            setHardWarn(err.message);
+            setStatus(err.message || String(err));
+            setHardWarn(err.message || String(err));
           });
         });
 
