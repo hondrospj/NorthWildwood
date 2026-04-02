@@ -19,7 +19,7 @@
 
     #app {
       display: grid;
-      grid-template-columns: 400px 1fr;
+      grid-template-columns: 410px 1fr;
       height: 100%;
     }
 
@@ -78,7 +78,12 @@
       cursor: pointer;
     }
 
-    #status, #warn, #hardWarn {
+    .mini-btn {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    #status, #warn, #hardWarn, #goodMsg {
       margin-top: 8px;
       padding: 10px 12px;
       border-radius: 8px;
@@ -106,9 +111,16 @@
       display: none;
     }
 
+    #goodMsg {
+      background: #ecfdf3;
+      border: 1px solid #86efac;
+      color: #166534;
+      display: none;
+    }
+
     #urlBox {
       width: 100%;
-      height: 150px;
+      height: 170px;
       display: none;
       margin-top: 8px;
       font-family: monospace;
@@ -184,6 +196,7 @@
         <div id="serviceNameText" class="muted">Service name: --</div>
         <div id="loadedUrlText" class="muted">Service URL: --</div>
         <div id="tileUrlText" class="muted">Sample tile URL: --</div>
+        <div id="goodMsg"></div>
         <div id="warn"></div>
         <div id="hardWarn"></div>
       </div>
@@ -200,12 +213,17 @@
         <div class="muted">Manual layer test</div>
         <input id="manualStageInput" type="text" placeholder="e.g. 5.0" />
         <button id="manualStageBtn">Load stage</button>
+        <div style="margin-top:8px;">
+          <button class="mini-btn" data-test-stage="2.0">Test 2.0</button>
+          <button class="mini-btn" data-test-stage="5.0">Test 5.0</button>
+          <button class="mini-btn" data-test-stage="8.0">Test 8.0</button>
+        </div>
       </div>
 
       <div class="section">
         <div class="muted">
-          This viewer loads each stage as a native ArcGIS TileLayer instead of manually
-          building Leaflet tile URLs.
+          This viewer uses ArcGIS TileLayer directly and uses the service's Tilemap
+          capability to find a real cached tile instead of guessing one.
         </div>
         <div class="pill">Hosted tile layer = static pre-rendered cache</div>
       </div>
@@ -250,7 +268,7 @@
       const FORECAST_URL = "./forecast.json";
       const MIN_STAGE = -2.0;
       const MAX_STAGE = 14.0;
-      const DEFAULT_CENTER = [-74.8089, 39.0007]; // [lon, lat]
+      const DEFAULT_CENTER = [-74.8089, 39.0007];
       const DEFAULT_ZOOM = 13;
 
       let map = null;
@@ -262,7 +280,6 @@
       let overlayOpacity = 0.8;
       let lastRenderToken = 0;
 
-      // IMPORTANT: force a real JavaScript Map, not the ArcGIS Map class
       const metaCache = new globalThis.Map();
 
       function setStatus(msg) {
@@ -282,6 +299,17 @@
 
       function setHardWarn(msg) {
         const el = document.getElementById("hardWarn");
+        if (!msg) {
+          el.style.display = "none";
+          el.textContent = "";
+        } else {
+          el.style.display = "block";
+          el.textContent = msg;
+        }
+      }
+
+      function setGood(msg) {
+        const el = document.getElementById("goodMsg");
         if (!msg) {
           el.style.display = "none";
           el.textContent = "";
@@ -455,8 +483,7 @@
         return Math.max(minLOD, Math.min(maxLOD, DEFAULT_ZOOM));
       }
 
-      function buildSampleTileInfo(meta) {
-        const level = getBestPreviewLevel(meta);
+      function getCenterTile(meta, level) {
         const lods = Array.isArray(meta?.tileInfo?.lods) ? meta.tileInfo.lods : [];
         const lod = lods.find(l => Number(l.level) === Number(level));
         if (!lod) return null;
@@ -474,42 +501,119 @@
         const col = Math.floor((x - origin.x) / tileWidth);
         const row = Math.floor((origin.y - y) / tileHeight);
 
-        const url = `${meta.__serviceUrl}/tile/${level}/${row}/${col}`;
-        return { level, row, col, url };
+        return { level, row, col };
       }
 
-      function setSampleTilePreview(meta) {
+      async function findExistingTile(meta) {
+        const minLOD = Number.isFinite(meta?.minLOD) ? meta.minLOD : 13;
+        const maxLOD = Number.isFinite(meta?.maxLOD) ? meta.maxLOD : 17;
+
+        const levelsToTry = [];
+        const preferred = getBestPreviewLevel(meta);
+
+        levelsToTry.push(preferred);
+        for (let z = minLOD; z <= maxLOD; z++) {
+          if (!levelsToTry.includes(z)) levelsToTry.push(z);
+        }
+
+        for (const level of levelsToTry) {
+          const center = getCenterTile(meta, level);
+          if (!center) continue;
+
+          const radius = 4;
+          const top = center.row - radius;
+          const left = center.col - radius;
+          const width = radius * 2 + 1;
+          const height = radius * 2 + 1;
+
+          try {
+            const tilemapUrl =
+              `${meta.__serviceUrl}/tilemap/${level}/${top}/${left}/${width}/${height}`;
+
+            const tm = await fetchJson(tilemapUrl, { f: "json" });
+
+            const data = Array.isArray(tm?.data) ? tm.data : [];
+            const actualTop = Number(tm?.location?.top ?? top);
+            const actualLeft = Number(tm?.location?.left ?? left);
+            const actualWidth = Number(tm?.location?.width ?? width);
+            const actualHeight = Number(tm?.location?.height ?? height);
+
+            let best = null;
+            let bestDist = Infinity;
+
+            for (let r = 0; r < actualHeight; r++) {
+              for (let c = 0; c < actualWidth; c++) {
+                const idx = r * actualWidth + c;
+                const exists = Number(data[idx]) === 1;
+                if (!exists) continue;
+
+                const row = actualTop + r;
+                const col = actualLeft + c;
+                const dist = Math.abs(row - center.row) + Math.abs(col - center.col);
+
+                if (dist < bestDist) {
+                  bestDist = dist;
+                  best = { level, row, col, source: "tilemap" };
+                }
+              }
+            }
+
+            if (best) {
+              best.url = `${meta.__serviceUrl}/tile/${best.level}/${best.row}/${best.col}`;
+              best.tilemapUrl = tilemapUrl;
+              return best;
+            }
+          } catch (err) {
+            // keep trying other levels
+          }
+        }
+
+        return null;
+      }
+
+      async function setSampleTilePreview(meta) {
         const img = document.getElementById("sampleTileImg");
         const metaEl = document.getElementById("sampleTileMeta");
         const tileTextEl = document.getElementById("tileUrlText");
 
-        const info = buildSampleTileInfo(meta);
-        if (!info) {
-          img.style.display = "none";
-          img.removeAttribute("src");
-          metaEl.textContent = "Could not compute a sample tile.";
-          tileTextEl.textContent = "Sample tile URL: --";
+        img.style.display = "none";
+        img.removeAttribute("src");
+        metaEl.textContent = "Searching for an existing cached tile…";
+        tileTextEl.textContent = "Sample tile URL: --";
+
+        const existing = await findExistingTile(meta);
+
+        if (!existing) {
+          metaEl.textContent =
+            "No existing cached tile was found near the service extent center using Tilemap.";
+          setHardWarn(
+            "Tilemap could not find a cached tile near the center of this service. That points to a cache/service problem, not just a bad guessed URL."
+          );
           return;
         }
 
-        tileTextEl.textContent = `Sample tile URL: ${info.url}`;
+        tileTextEl.textContent = `Sample tile URL: ${existing.url}`;
         metaEl.textContent =
-          `level=${info.level}, row=${info.row}, col=${info.col}\n${info.url}`;
+          `Found existing tile via tilemap\nlevel=${existing.level}, row=${existing.row}, col=${existing.col}\n${existing.url}\nTilemap query: ${existing.tilemapUrl}`;
 
-        img.style.display = "block";
+        return new Promise((resolve) => {
+          img.onload = () => {
+            img.style.display = "block";
+            metaEl.textContent += `\nSample tile loaded: ${img.naturalWidth}x${img.naturalHeight}`;
+            setGood("A real cached tile was found and loaded. If the map still looks blank at this stage, the current stage likely has little or no visible inundation.");
+            resolve(true);
+          };
 
-        img.onload = () => {
-          metaEl.textContent += `\nSample tile loaded: ${img.naturalWidth}x${img.naturalHeight}`;
-        };
+          img.onerror = () => {
+            metaEl.textContent += `\nSample tile FAILED to load even though Tilemap reported it exists.`;
+            setHardWarn(
+              "Tilemap reported an existing tile, but the tile image still failed to load. That strongly points to a service delivery/sharing/cache issue."
+            );
+            resolve(false);
+          };
 
-        img.onerror = () => {
-          metaEl.textContent += `\nSample tile FAILED to load.`;
-          setHardWarn(
-            "The sample cached tile itself failed to load. That means the issue is in the tile service/cache, not the slider logic."
-          );
-        };
-
-        img.src = info.url + `?t=${Date.now()}`;
+          img.src = existing.url + `?t=${Date.now()}`;
+        });
       }
 
       async function loadForecast() {
@@ -554,6 +658,7 @@
         clearFloodLayer();
         setWarn("");
         setHardWarn("");
+        setGood("");
 
         const normalized = normalizeStageKey(stageKey);
         if (!normalized) {
@@ -653,10 +758,16 @@
           setWarn(`LayerView warning: ${err.message || err}`);
         }
 
-        setSampleTilePreview(meta);
+        await setSampleTilePreview(meta);
 
         if (Number.isFinite(meta?.minLOD) && Number.isFinite(meta?.maxLOD)) {
           setWarn(`Valid cached zoom range for this stage: ${meta.minLOD} to ${meta.maxLOD}`);
+        }
+
+        if (Number(normalized) <= 0) {
+          setWarn(
+            `Valid cached zoom range for this stage: ${meta.minLOD} to ${meta.maxLOD}\nThis matched stage is ${normalized} ft NAVD88, which may legitimately look blank over land. Use Test 5.0 or Test 8.0 to verify visible flood tiles.`
+          );
         }
       }
 
@@ -673,20 +784,12 @@
         document.getElementById("matchedText").textContent =
           `Matched layer: ${h.matchedStageKey} ft NAVD88`;
 
-        if (h.wasClamped) {
-          setWarn(
-            `Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`
-          );
-        } else {
-          setWarn("");
-        }
-
         const token = ++lastRenderToken;
         await setFloodLayerFromStage(h.matchedStageKey, token);
       }
 
-      async function loadManualStage() {
-        const raw = document.getElementById("manualStageInput").value.trim();
+      async function loadManualStage(rawValue) {
+        const raw = String(rawValue ?? document.getElementById("manualStageInput").value).trim();
         const normalized = normalizeStageKey(raw);
 
         if (!normalized) {
@@ -700,8 +803,6 @@
           `Water level: ${normalized} ft NAVD88`;
         document.getElementById("matchedText").textContent =
           `Matched layer: ${normalized} ft NAVD88`;
-
-        setWarn("");
 
         const token = ++lastRenderToken;
         await setFloodLayerFromStage(normalized, token);
@@ -801,6 +902,18 @@
             console.error(err);
             setStatus(err.message || String(err));
             setHardWarn(err.message || String(err));
+          });
+        });
+
+        document.querySelectorAll("[data-test-stage]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const v = btn.getAttribute("data-test-stage");
+            document.getElementById("manualStageInput").value = v;
+            loadManualStage(v).catch(err => {
+              console.error(err);
+              setStatus(err.message || String(err));
+              setHardWarn(err.message || String(err));
+            });
           });
         });
 
