@@ -1,6 +1,664 @@
 {
-  "stationId": "8535581",
-  "issuedUtc": null,
-  "sourceUrl": null,
-  "hours": []
+  "stationIdRequested": "8535581",
+  "stationAliasesRequested": [
+    "STONE HARBOR",
+    "GREAT CHANNEL",
+    "STONE HARBOR, NJ",
+    "STONE HARBOR"
+  ],
+  "stationIdMatched": "8535581",
+  "stationNameMatched": "STONE HARBOR, NJ",
+  "issuedUtc": "2026-04-01T18:00:00Z",
+  "sourceUrl": "https://nomads.ncep.noaa.gov/pub/data/nccf/com/petss/prod/petss.20260401/petss.t18z.mean.stormtide.east.txt",
+  "inputDatum": "NAVD88",
+  "hours": [
+    {
+      "hourIndex": 0,
+      "timeUtc": "2026-04-01T19:00:00Z",
+      "sourceStageFt": -0.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.2,
+      "matchedStageKey": "-0.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 1,
+      "timeUtc": "2026-04-01T20:00:00Z",
+      "sourceStageFt": -0.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.2,
+      "matchedStageKey": "-0.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 2,
+      "timeUtc": "2026-04-01T21:00:00Z",
+      "sourceStageFt": -0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.3,
+      "matchedStageKey": "-0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 3,
+      "timeUtc": "2026-04-01T22:00:00Z",
+      "sourceStageFt": -0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.3,
+      "matchedStageKey": "-0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 4,
+      "timeUtc": "2026-04-01T23:00:00Z",
+      "sourceStageFt": -0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.3,
+      "matchedStageKey": "-0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 5,
+      "timeUtc": "2026-04-02T00:00:00Z",
+      "sourceStageFt": -0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.1,
+      "matchedStageKey": "-0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 6,
+      "timeUtc": "2026-04-02T01:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 7,
+      "timeUtc": "2026-04-02T02:00:00Z",
+      "sourceStageFt": 0.4,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.4,
+      "matchedStageKey": "0.4",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 8,
+      "timeUtc": "2026-04-02T03:00:00Z",
+      "sourceStageFt": 0.5,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.5,
+      "matchedStageKey": "0.5",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 9,
+      "timeUtc": "2026-04-02T04:00:00Z",
+      "sourceStageFt": 0.4,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.4,
+      "matchedStageKey": "0.4",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 10,
+      "timeUtc": "2026-04-02T05:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 11,
+      "timeUtc": "2026-04-02T06:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 12,
+      "timeUtc": "2026-04-02T07:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 13,
+      "timeUtc": "2026-04-02T08:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 14,
+      "timeUtc": "2026-04-02T09:00:00Z",
+      "sourceStageFt": -0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.1,
+      "matchedStageKey": "-0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 15,
+      "timeUtc": "2026-04-02T10:00:00Z",
+      "sourceStageFt": -0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.1,
+      "matchedStageKey": "-0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 16,
+      "timeUtc": "2026-04-02T11:00:00Z",
+      "sourceStageFt": -0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": -0.1,
+      "matchedStageKey": "-0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 17,
+      "timeUtc": "2026-04-02T12:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 18,
+      "timeUtc": "2026-04-02T13:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 19,
+      "timeUtc": "2026-04-02T14:00:00Z",
+      "sourceStageFt": 0.4,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.4,
+      "matchedStageKey": "0.4",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 20,
+      "timeUtc": "2026-04-02T15:00:00Z",
+      "sourceStageFt": 0.6,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.6,
+      "matchedStageKey": "0.6",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 21,
+      "timeUtc": "2026-04-02T16:00:00Z",
+      "sourceStageFt": 0.6,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.6,
+      "matchedStageKey": "0.6",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 22,
+      "timeUtc": "2026-04-02T17:00:00Z",
+      "sourceStageFt": 0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.3,
+      "matchedStageKey": "0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 23,
+      "timeUtc": "2026-04-02T18:00:00Z",
+      "sourceStageFt": 0.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.2,
+      "matchedStageKey": "0.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 24,
+      "timeUtc": "2026-04-02T19:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 25,
+      "timeUtc": "2026-04-02T20:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 26,
+      "timeUtc": "2026-04-02T21:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 27,
+      "timeUtc": "2026-04-02T22:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 28,
+      "timeUtc": "2026-04-02T23:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 29,
+      "timeUtc": "2026-04-03T00:00:00Z",
+      "sourceStageFt": 0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.3,
+      "matchedStageKey": "0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 30,
+      "timeUtc": "2026-04-03T01:00:00Z",
+      "sourceStageFt": 0.7,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.7,
+      "matchedStageKey": "0.7",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 31,
+      "timeUtc": "2026-04-03T02:00:00Z",
+      "sourceStageFt": 1.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.3,
+      "matchedStageKey": "1.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 32,
+      "timeUtc": "2026-04-03T03:00:00Z",
+      "sourceStageFt": 1.5,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.5,
+      "matchedStageKey": "1.5",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 33,
+      "timeUtc": "2026-04-03T04:00:00Z",
+      "sourceStageFt": 1.5,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.5,
+      "matchedStageKey": "1.5",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 34,
+      "timeUtc": "2026-04-03T05:00:00Z",
+      "sourceStageFt": 1.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.3,
+      "matchedStageKey": "1.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 35,
+      "timeUtc": "2026-04-03T06:00:00Z",
+      "sourceStageFt": 1.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.2,
+      "matchedStageKey": "1.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 36,
+      "timeUtc": "2026-04-03T07:00:00Z",
+      "sourceStageFt": 1.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.0,
+      "matchedStageKey": "1.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 37,
+      "timeUtc": "2026-04-03T08:00:00Z",
+      "sourceStageFt": 0.7,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.7,
+      "matchedStageKey": "0.7",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 38,
+      "timeUtc": "2026-04-03T09:00:00Z",
+      "sourceStageFt": 0.5,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.5,
+      "matchedStageKey": "0.5",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 39,
+      "timeUtc": "2026-04-03T10:00:00Z",
+      "sourceStageFt": 0.4,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.4,
+      "matchedStageKey": "0.4",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 40,
+      "timeUtc": "2026-04-03T11:00:00Z",
+      "sourceStageFt": 0.5,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.5,
+      "matchedStageKey": "0.5",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 41,
+      "timeUtc": "2026-04-03T12:00:00Z",
+      "sourceStageFt": 0.6,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.6,
+      "matchedStageKey": "0.6",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 42,
+      "timeUtc": "2026-04-03T13:00:00Z",
+      "sourceStageFt": 0.7,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.7,
+      "matchedStageKey": "0.7",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 43,
+      "timeUtc": "2026-04-03T14:00:00Z",
+      "sourceStageFt": 0.9,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.9,
+      "matchedStageKey": "0.9",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 44,
+      "timeUtc": "2026-04-03T15:00:00Z",
+      "sourceStageFt": 1.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.0,
+      "matchedStageKey": "1.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 45,
+      "timeUtc": "2026-04-03T16:00:00Z",
+      "sourceStageFt": 1.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.0,
+      "matchedStageKey": "1.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 46,
+      "timeUtc": "2026-04-03T17:00:00Z",
+      "sourceStageFt": 0.8,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.8,
+      "matchedStageKey": "0.8",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 47,
+      "timeUtc": "2026-04-03T18:00:00Z",
+      "sourceStageFt": 0.6,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.6,
+      "matchedStageKey": "0.6",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 48,
+      "timeUtc": "2026-04-03T19:00:00Z",
+      "sourceStageFt": 0.4,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.4,
+      "matchedStageKey": "0.4",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 49,
+      "timeUtc": "2026-04-03T20:00:00Z",
+      "sourceStageFt": 0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.3,
+      "matchedStageKey": "0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 50,
+      "timeUtc": "2026-04-03T21:00:00Z",
+      "sourceStageFt": 0.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.2,
+      "matchedStageKey": "0.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 51,
+      "timeUtc": "2026-04-03T22:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 52,
+      "timeUtc": "2026-04-03T23:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 53,
+      "timeUtc": "2026-04-04T00:00:00Z",
+      "sourceStageFt": 0.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.2,
+      "matchedStageKey": "0.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 54,
+      "timeUtc": "2026-04-04T01:00:00Z",
+      "sourceStageFt": 0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.3,
+      "matchedStageKey": "0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 55,
+      "timeUtc": "2026-04-04T02:00:00Z",
+      "sourceStageFt": 0.5,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.5,
+      "matchedStageKey": "0.5",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 56,
+      "timeUtc": "2026-04-04T03:00:00Z",
+      "sourceStageFt": 0.7,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.7,
+      "matchedStageKey": "0.7",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 57,
+      "timeUtc": "2026-04-04T04:00:00Z",
+      "sourceStageFt": 0.8,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.8,
+      "matchedStageKey": "0.8",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 58,
+      "timeUtc": "2026-04-04T05:00:00Z",
+      "sourceStageFt": 0.7,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.7,
+      "matchedStageKey": "0.7",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 59,
+      "timeUtc": "2026-04-04T06:00:00Z",
+      "sourceStageFt": 0.4,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.4,
+      "matchedStageKey": "0.4",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 60,
+      "timeUtc": "2026-04-04T07:00:00Z",
+      "sourceStageFt": 0.3,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.3,
+      "matchedStageKey": "0.3",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 61,
+      "timeUtc": "2026-04-04T08:00:00Z",
+      "sourceStageFt": 0.2,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.2,
+      "matchedStageKey": "0.2",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 62,
+      "timeUtc": "2026-04-04T09:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 63,
+      "timeUtc": "2026-04-04T10:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 64,
+      "timeUtc": "2026-04-04T11:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 65,
+      "timeUtc": "2026-04-04T12:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 66,
+      "timeUtc": "2026-04-04T13:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 67,
+      "timeUtc": "2026-04-04T14:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 68,
+      "timeUtc": "2026-04-04T15:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 69,
+      "timeUtc": "2026-04-04T16:00:00Z",
+      "sourceStageFt": 0.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.1,
+      "matchedStageKey": "0.1",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 70,
+      "timeUtc": "2026-04-04T17:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 71,
+      "timeUtc": "2026-04-04T18:00:00Z",
+      "sourceStageFt": 0.0,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 0.0,
+      "matchedStageKey": "0.0",
+      "wasClamped": false
+    }
+  ]
 }
