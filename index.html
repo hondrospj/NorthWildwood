@@ -113,7 +113,7 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Flood layers: public ArcGIS Online hosted tile layers</div>
+      <div class="muted">Flood layers: public ArcGIS Online hosted layers</div>
       <div class="muted">Owner searched: Z00380509_StocktonU</div>
 
       <div class="section">
@@ -154,10 +154,10 @@
 
       <div class="section">
         <div class="muted">
-          This version detects the tile service CRS from ArcGIS metadata and
-          initializes the map to match the raster tiles. If the layers were
-          published in New Jersey State Plane instead of Web Mercator, this is
-          the fix that should make them display.
+          This version fixes the New Jersey State Plane definition, removes the
+          unavailable NAD grid dependency, detects each service type from ArcGIS
+          metadata, and can fall back to dynamic map services if a stage is not
+          actually cached as tiles.
         </div>
       </div>
 
@@ -188,19 +188,20 @@
     let layerCatalog = {};
     let playTimer = null;
     let mapInitialized = false;
-    let sharedTileMeta = null;
+    let mapProfile = null;
+    let lastRenderToken = 0;
 
-    // Common CRS defs for NJ-published tile layers.
-    // 3424 is NAD83 / New Jersey (ftUS).
+    const serviceMetaCache = new Map();
+
     const CRS_DEFS = {
       "3424": {
         code: "EPSG:3424",
-        proj4: "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +nadgrids=us_noaa_njhpgn.tif +units=us-ft +no_defs +type=crs",
+        proj4: "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +datum=NAD83 +units=us-ft +no_defs +type=crs",
         label: "EPSG:3424 NAD83 / New Jersey (ftUS)"
       },
       "102711": {
         code: "ESRI:102711",
-        proj4: "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +nadgrids=us_noaa_njhpgn.tif +units=us-ft +no_defs +type=crs",
+        proj4: "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +datum=NAD83 +units=us-ft +no_defs +type=crs",
         label: "ESRI:102711 NAD83 StatePlane New Jersey (US Feet)"
       },
       "3857": {
@@ -247,6 +248,10 @@
       return r.json();
     }
 
+    function normalizeServiceUrl(url) {
+      return String(url || "").replace(/\/+$/, "");
+    }
+
     function titleToStageKey(title) {
       const m = title.match(TITLE_RE);
       if (!m) return null;
@@ -258,7 +263,9 @@
 
     function wantedStageKeys() {
       const keys = [];
-      for (let i = -20; i <= 140; i++) keys.push((i / 10).toFixed(1));
+      for (let i = -20; i <= 140; i++) {
+        keys.push((i / 10).toFixed(1));
+      }
       return keys;
     }
 
@@ -292,14 +299,99 @@
       return fetchJson(url, { f: "pjson" });
     }
 
+    async function getServiceMetaCached(url) {
+      const clean = normalizeServiceUrl(url);
+      if (serviceMetaCache.has(clean)) {
+        return serviceMetaCache.get(clean);
+      }
+      const meta = await fetchServiceMeta(clean);
+      serviceMetaCache.set(clean, meta);
+      return meta;
+    }
+
     function getWkid(meta) {
-      return (
+      return Number(
         meta?.tileInfo?.spatialReference?.latestWkid ??
         meta?.tileInfo?.spatialReference?.wkid ??
         meta?.fullExtent?.spatialReference?.latestWkid ??
         meta?.fullExtent?.spatialReference?.wkid ??
-        null
+        meta?.initialExtent?.spatialReference?.latestWkid ??
+        meta?.initialExtent?.spatialReference?.wkid ??
+        0
       );
+    }
+
+    function isWebMercatorWkid(wkid) {
+      return [3857, 102100, 102113].includes(Number(wkid));
+    }
+
+    function getLayerKind(meta) {
+      if (meta?.tileInfo || meta?.singleFusedMapCache === true) {
+        return "tiled";
+      }
+      return "dynamic";
+    }
+
+    function makeCustomCrs(meta, wkid) {
+      const def = CRS_DEFS[String(wkid)];
+      if (!def || !def.proj4) return null;
+
+      const tileInfo = meta?.tileInfo;
+      if (!tileInfo?.origin || !Array.isArray(tileInfo?.lods) || !tileInfo.lods.length) {
+        return null;
+      }
+
+      const origin = [tileInfo.origin.x, tileInfo.origin.y];
+      const resolutions = tileInfo.lods.map(l => l.resolution);
+
+      return new L.Proj.CRS(def.code, def.proj4, {
+        origin,
+        resolutions
+      });
+    }
+
+    function destroyMapIfNeeded() {
+      if (map) {
+        map.remove();
+        map = null;
+      }
+      currentFloodLayer = null;
+      mapInitialized = false;
+      mapProfile = null;
+    }
+
+    function fitMapToMeta(meta) {
+      const full = meta?.fullExtent || meta?.initialExtent;
+      if (!full || !map) return;
+
+      const wkid = getWkid(meta);
+
+      if (
+        full.xmin == null ||
+        full.ymin == null ||
+        full.xmax == null ||
+        full.ymax == null
+      ) {
+        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        return;
+      }
+
+      if (isWebMercatorWkid(wkid)) {
+        const sw = L.CRS.EPSG3857.unproject(L.point(full.xmin, full.ymin));
+        const ne = L.CRS.EPSG3857.unproject(L.point(full.xmax, full.ymax));
+        map.fitBounds(L.latLngBounds(sw, ne));
+        return;
+      }
+
+      const crs = map.options.crs;
+      if (!crs?.unproject) {
+        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        return;
+      }
+
+      const sw = crs.unproject(L.point(full.xmin, full.ymin));
+      const ne = crs.unproject(L.point(full.xmax, full.ymax));
+      map.fitBounds(L.latLngBounds(sw, ne));
     }
 
     async function buildLayerCatalog() {
@@ -325,17 +417,18 @@
         return {
           title: item.title,
           stageKey: titleToStageKey(item.title),
-          url
+          url: normalizeServiceUrl(url)
         };
       }));
 
       const catalog = {};
       for (const item of resolved) {
         if (!item.stageKey || !item.url) continue;
-        if (!/\/MapServer\/?$/i.test(item.url)) continue;
+        if (!/\/MapServer$/i.test(item.url)) continue;
+
         catalog[item.stageKey] = {
           title: item.title,
-          url: item.url.replace(/\/+$/, "")
+          url: item.url
         };
       }
 
@@ -377,8 +470,10 @@
 
     function getPeakHourIndex() {
       if (!forecastData?.hours?.length) return 0;
+
       let maxIndex = 0;
       let maxVal = -Infinity;
+
       forecastData.hours.forEach((h, i) => {
         const v = Number(h.navd88StageFt);
         if (v > maxVal) {
@@ -386,54 +481,60 @@
           maxIndex = i;
         }
       });
+
       return maxIndex;
     }
 
-    function destroyMapIfNeeded() {
-      if (map) {
-        map.remove();
-        map = null;
-      }
-      mapInitialized = false;
-      currentFloodLayer = null;
-    }
-
-    function makeCustomCrs(meta, wkid) {
-      const def = CRS_DEFS[String(wkid)];
-      if (!def || !def.proj4) return null;
-
-      const tileInfo = meta.tileInfo;
-      const origin = [tileInfo.origin.x, tileInfo.origin.y];
-      const resolutions = tileInfo.lods.map(l => l.resolution);
-
-      return new L.Proj.CRS(def.code, def.proj4, {
-        origin,
-        resolutions
-      });
-    }
-
-    function fitMapToMeta(meta) {
-      const full = meta.fullExtent || meta.initialExtent;
-      if (!full || !map) return;
-
+    async function initializeMapFromLayerInfo(info) {
+      const meta = await getServiceMetaCached(info.url);
       const wkid = getWkid(meta);
+      const layerKind = getLayerKind(meta);
+      const lodCount = meta?.tileInfo?.lods?.length || 0;
 
-      if ([3857, 102100, 102113].includes(Number(wkid))) {
-        if (full.xmin != null && full.ymin != null && full.xmax != null && full.ymax != null) {
-          const sw = L.CRS.EPSG3857.unproject(L.point(full.xmin, full.ymin));
-          const ne = L.CRS.EPSG3857.unproject(L.point(full.xmax, full.ymax));
-          map.fitBounds(L.latLngBounds(sw, ne));
-        } else {
-          map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-        }
+      destroyMapIfNeeded();
+
+      if (isWebMercatorWkid(wkid)) {
+        map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
+
+        document.getElementById("crsText").textContent =
+          `Map CRS: Web Mercator (WKID ${wkid}) | ${layerKind} service | ${lodCount} LODs`;
+
+        mapProfile = {
+          wkid,
+          layerKind,
+          isWebMercator: true
+        };
       } else {
-        const crs = map.options.crs;
-        if (crs && full.xmin != null && full.ymin != null && full.xmax != null && full.ymax != null) {
-          const sw = crs.unproject(L.point(full.xmin, full.ymin));
-          const ne = crs.unproject(L.point(full.xmax, full.ymax));
-          map.fitBounds(L.latLngBounds(sw, ne));
+        const crs = makeCustomCrs(meta, wkid);
+
+        if (!crs) {
+          throw new Error(
+            `Service WKID ${wkid} is not Web Mercator and does not expose usable tile metadata. Republish these rasters as cached tile layers or Web Mercator services.`
+          );
         }
+
+        map = L.map("map", {
+          crs,
+          zoomControl: true,
+          preferCanvas: false
+        });
+
+        document.getElementById("crsText").textContent =
+          `Map CRS: ${(CRS_DEFS[String(wkid)]?.label || `WKID ${wkid}`)} | ${layerKind} service | ${lodCount} LODs`;
+
+        mapProfile = {
+          wkid,
+          layerKind,
+          isWebMercator: false
+        };
       }
+
+      fitMapToMeta(meta);
+      mapInitialized = true;
     }
 
     async function initializeMapFromFirstLayer() {
@@ -446,47 +547,10 @@
         Object.values(layerCatalog)[0];
 
       if (!firstAvailable) {
-        throw new Error("No public flood tile layers were resolved.");
+        throw new Error("No public flood layers were resolved.");
       }
 
-      const meta = await fetchServiceMeta(firstAvailable.url);
-      sharedTileMeta = meta;
-
-      const wkid = Number(getWkid(meta));
-      const lodCount = meta?.tileInfo?.lods?.length || 0;
-
-      destroyMapIfNeeded();
-
-      if ([3857, 102100, 102113].includes(wkid)) {
-        map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors"
-        }).addTo(map);
-
-        document.getElementById("crsText").textContent =
-          `Map CRS: Web Mercator (WKID ${wkid}) | ${lodCount} LODs`;
-      } else {
-        const crs = makeCustomCrs(meta, wkid);
-
-        if (!crs) {
-          throw new Error(
-            `Unsupported tile WKID ${wkid}. Add its proj4 definition before the raster can display.`
-          );
-        }
-
-        map = L.map("map", {
-          crs: crs,
-          zoomControl: true,
-          preferCanvas: false
-        });
-
-        document.getElementById("crsText").textContent =
-          `Map CRS: ${CRS_DEFS[String(wkid)].label} | ${lodCount} LODs`;
-      }
-
-      fitMapToMeta(meta);
-      mapInitialized = true;
+      await initializeMapFromLayerInfo(firstAvailable);
     }
 
     function clearFloodLayer() {
@@ -496,36 +560,77 @@
       }
     }
 
-    function setFloodLayerFromStage(stageKey) {
-      clearFloodLayer();
+    function bindLayerEvents(layer, title) {
+      layer.on("load", () => {
+        setStatus(`Loaded ${title}`);
+      });
 
+      layer.on("tileerror", (e) => {
+        console.error("tileerror", title, e);
+        setStatus(`Tile error for ${title}`);
+      });
+
+      layer.on("error", (e) => {
+        console.error("layer error", title, e);
+        setStatus(`Layer error for ${title}`);
+      });
+
+      layer.on("requesterror", (e) => {
+        console.error("requesterror", title, e);
+        setStatus(`Request error for ${title}`);
+      });
+    }
+
+    function createRenderableLayer(info, meta) {
+      const kind = getLayerKind(meta);
+
+      if (kind === "tiled") {
+        const layerOpts = {
+          url: info.url,
+          opacity: 1.0
+        };
+
+        if (meta?.tileInfo?.lods?.length) {
+          layerOpts.minZoom = 0;
+          layerOpts.maxZoom = meta.tileInfo.lods.length - 1;
+        }
+
+        return L.esri.tiledMapLayer(layerOpts);
+      }
+
+      return L.esri.dynamicMapLayer({
+        url: info.url,
+        opacity: 1.0
+      });
+    }
+
+    async function setFloodLayerFromStage(stageKey, token) {
       const info = layerCatalog[stageKey];
+
       if (!info) {
+        clearFloodLayer();
         document.getElementById("loadedUrlText").textContent =
-          `Service URL: no public tile layer found for ${stageKey}`;
+          `Service URL: no public layer found for ${stageKey}`;
         return;
       }
 
-      const layerOpts = {
-        url: info.url,
-        opacity: 1.0
-      };
+      const meta = await getServiceMetaCached(info.url);
 
-      if (sharedTileMeta?.tileInfo?.lods?.length) {
-        layerOpts.minZoom = 0;
-        layerOpts.maxZoom = sharedTileMeta.tileInfo.lods.length - 1;
+      if (token !== lastRenderToken) return;
+
+      const wkid = getWkid(meta);
+
+      if (!mapInitialized || !mapProfile || Number(mapProfile.wkid) !== Number(wkid)) {
+        await initializeMapFromLayerInfo(info);
+        if (token !== lastRenderToken) return;
       }
 
-      currentFloodLayer = L.esri.tiledMapLayer(layerOpts);
+      clearFloodLayer();
 
-      currentFloodLayer.on("load", () => {
-        setStatus(`Loaded ${info.title}`);
-      });
+      const layer = createRenderableLayer(info, meta);
+      bindLayerEvents(layer, info.title);
 
-      currentFloodLayer.on("tileerror", (e) => {
-        setStatus(`Tile error for ${info.title}: ${e?.error || "unknown error"}`);
-      });
-
+      currentFloodLayer = layer;
       currentFloodLayer.addTo(map);
 
       if (currentFloodLayer.bringToFront) {
@@ -536,7 +641,7 @@
         `Service URL: ${info.url}`;
     }
 
-    function renderHour(index) {
+    async function renderHour(index) {
       if (!forecastData?.hours?.length || !mapInitialized) return;
 
       const h = forecastData.hours[index];
@@ -555,16 +660,23 @@
         setWarn("");
       }
 
-      setFloodLayerFromStage(h.matchedStageKey);
+      const token = ++lastRenderToken;
+      await setFloodLayerFromStage(h.matchedStageKey, token);
     }
 
-    function loadManualStage() {
+    async function loadManualStage() {
       if (!mapInitialized) return;
 
       const val = document.getElementById("manualStageInput").value.trim();
       if (!val) return;
 
-      const key = Number(val).toFixed(1);
+      const num = Number(val);
+      if (!Number.isFinite(num)) {
+        setWarn("Enter a valid numeric stage, like 1.5");
+        return;
+      }
+
+      const key = num.toFixed(1);
 
       document.getElementById("hourText").textContent = "Manual stage";
       document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
@@ -572,7 +684,9 @@
       document.getElementById("matchedText").textContent = `Matched layer: ${key} ft NAVD88`;
 
       setWarn("");
-      setFloodLayerFromStage(key);
+
+      const token = ++lastRenderToken;
+      await setFloodLayerFromStage(key, token);
     }
 
     function stopPlayback() {
@@ -584,11 +698,18 @@
 
     function startPlayback() {
       stopPlayback();
+
       const slider = document.getElementById("hourSlider");
       let i = Number(slider.value);
 
       playTimer = setInterval(() => {
-        renderHour(i);
+        renderHour(i).catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+          stopPlayback();
+        });
+
         slider.value = String(i);
         i += 1;
         if (i >= forecastData.hours.length) i = 0;
@@ -612,6 +733,7 @@
 
     async function reloadAll() {
       stopPlayback();
+      clearFloodLayer();
       setStatus("Reloading forecast and layer catalog…");
 
       await buildLayerCatalog();
@@ -620,21 +742,33 @@
 
       const peakIndex = getPeakHourIndex();
       document.getElementById("hourSlider").value = String(peakIndex);
-      renderHour(peakIndex);
+      await renderHour(peakIndex);
     }
 
     async function main() {
-      document.getElementById("hourSlider").addEventListener("input", (e) => {
+      document.getElementById("hourSlider").addEventListener("input", async (e) => {
         stopPlayback();
-        renderHour(Number(e.target.value));
+        await renderHour(Number(e.target.value));
       });
 
       document.getElementById("playBtn").addEventListener("click", startPlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
-      document.getElementById("reloadBtn").addEventListener("click", reloadAll);
+      document.getElementById("reloadBtn").addEventListener("click", () => {
+        reloadAll().catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
       document.getElementById("showUrlsBtn").addEventListener("click", toggleUrls);
       document.getElementById("downloadUrlsBtn").addEventListener("click", downloadUrls);
-      document.getElementById("manualStageBtn").addEventListener("click", loadManualStage);
+      document.getElementById("manualStageBtn").addEventListener("click", () => {
+        loadManualStage().catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
 
       await reloadAll();
     }
