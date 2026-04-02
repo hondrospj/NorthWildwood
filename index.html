@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>North Wildwood PETSS Flood Viewer</title>
+  <title>North Wildwood Flood Forecast</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link
     rel="stylesheet"
@@ -76,6 +76,7 @@
       border-radius: 8px;
       font-size: 14px;
       white-space: pre-wrap;
+      color: #111;
     }
 
     #warn {
@@ -90,21 +91,11 @@
 
     #urlBox {
       width: 100%;
-      height: 220px;
+      height: 240px;
       display: none;
       margin-top: 8px;
       font-family: monospace;
       font-size: 12px;
-    }
-
-    .ok {
-      color: #0a7f2e;
-      font-weight: 700;
-    }
-
-    .bad {
-      color: #b42318;
-      font-weight: 700;
     }
   </style>
 </head>
@@ -112,13 +103,13 @@
   <div id="app">
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
-      <div class="muted">Gauge: Stone Harbor (8535581)</div>
-      <div class="muted">Portal owner: Z00380509_StocktonU</div>
-      <div class="muted">Public layer folder names are not needed by the app.</div>
+      <div class="muted">Driver station: Stone Harbor (8535581)</div>
+      <div class="muted">Flood layers: public ArcGIS Online hosted tile layers</div>
+      <div class="muted">Owner searched: Z00380509_StocktonU</div>
 
       <div class="section">
         <div id="issuedText" class="muted">Forecast issued: loading…</div>
-        <div id="sourceText" class="muted">Source file: loading…</div>
+        <div id="sourceText" class="muted">Source: loading…</div>
         <div id="catalogText" class="muted">Layer catalog: loading…</div>
       </div>
 
@@ -130,8 +121,7 @@
       </div>
 
       <div class="section">
-        <div id="rawStageText">PETSS stage: --</div>
-        <div id="navdStageText">NAVD88 stage: --</div>
+        <div id="stageText">Water level: --</div>
         <div id="matchedText">Matched layer: --</div>
         <div id="loadedUrlText" class="muted">Service URL: --</div>
         <div id="warn"></div>
@@ -148,8 +138,8 @@
 
       <div class="section">
         <div class="muted">
-          The blue flood-depth symbology is already baked into your hosted tile layers,
-          so the page only swaps the correct stage layer in and out.
+          Each ArcGIS flood-depth layer already contains the blue symbology,
+          so this page only swaps in the correct stage layer.
         </div>
       </div>
 
@@ -166,8 +156,7 @@
   <script>
     const ARCGIS_REST = "https://www.arcgis.com/sharing/rest";
     const OWNER = "Z00380509_StocktonU";
-    const TITLE_PREFIX = "NW_FloodDepth_";
-    const TITLE_RE = /^NW_FloodDepth_([pm])(\\d{2})_(\\d)_NAVD88$/;
+    const TITLE_RE = /^NW_FloodDepth_([pm])(\d{2})_(\d)_NAVD88$/;
 
     const MAP_CENTER = [39.0007, -74.8089];
     const MAP_ZOOM = 13;
@@ -178,10 +167,8 @@
     let layerCatalog = {};
     let playTimer = null;
 
-    function setStatus(msg, isError = false) {
-      const el = document.getElementById("status");
-      el.textContent = msg;
-      el.className = isError ? "bad" : "ok";
+    function setStatus(msg) {
+      document.getElementById("status").textContent = msg;
     }
 
     function setWarn(msg) {
@@ -195,11 +182,17 @@
       }
     }
 
-    async function fetchJson(url, params = {}) {
-      const u = new URL(url);
-      Object.entries(params).forEach(([k, v]) => u.searchParams.set(k, v));
+    async function fetchJson(url, params = null) {
+      const u = new URL(url, window.location.href);
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          u.searchParams.set(k, v);
+        }
+      }
       const r = await fetch(u.toString(), { cache: "no-store" });
-      if (!r.ok) throw new Error(`HTTP ${r.status} for ${u}`);
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
+      }
       return r.json();
     }
 
@@ -207,8 +200,8 @@
       const m = title.match(TITLE_RE);
       if (!m) return null;
       const sign = m[1] === "m" ? -1 : 1;
-      const whole = parseInt(m[2], 10);
-      const tenth = parseInt(m[3], 10);
+      const whole = Number(m[2]);
+      const tenth = Number(m[3]);
       return (sign * (whole + tenth / 10)).toFixed(1);
     }
 
@@ -226,7 +219,7 @@
 
       while (true) {
         const data = await fetchJson(`${ARCGIS_REST}/search`, {
-          q: `owner:"${OWNER}" AND "${TITLE_PREFIX}"`,
+          q: `owner:"${OWNER}" AND "NW_FloodDepth_"`,
           sortField: "title",
           sortOrder: "asc",
           num: 100,
@@ -248,14 +241,14 @@
     }
 
     async function buildLayerCatalog() {
-      setStatus("Searching ArcGIS Online for your public flood stage items…");
+      setStatus("Searching ArcGIS Online for public flood stage layers…");
 
       const rawItems = await searchAllItems();
+      const matches = rawItems.filter(item => TITLE_RE.test(item.title));
 
-      const stageCandidates = rawItems.filter(item => TITLE_RE.test(item.title));
-      setStatus(`Found ${stageCandidates.length} title matches. Resolving service URLs…`);
+      setStatus(`Found ${matches.length} matching titles. Resolving service URLs…`);
 
-      const resolved = await Promise.all(stageCandidates.map(async (item) => {
+      const resolved = await Promise.all(matches.map(async (item) => {
         let url = item.url || null;
 
         if (!url && item.id) {
@@ -267,24 +260,20 @@
           }
         }
 
-        const stageKey = titleToStageKey(item.title);
-
         return {
-          id: item.id,
           title: item.title,
-          stageKey,
-          url
+          stageKey: titleToStageKey(item.title),
+          url: url
         };
       }));
 
       const catalog = {};
       for (const item of resolved) {
-        if (!item.stageKey) continue;
-        if (!item.url) continue;
-        if (!/\\/MapServer\\/?$/i.test(item.url)) continue;
+        if (!item.stageKey || !item.url) continue;
+        if (!/\/MapServer\/?$/i.test(item.url)) continue;
         catalog[item.stageKey] = {
           title: item.title,
-          url: item.url.replace(/\\/+$/, "")
+          url: item.url.replace(/\/+$/, "")
         };
       }
 
@@ -297,27 +286,25 @@
       document.getElementById("catalogText").textContent =
         `Layer catalog: ${found} of ${wanted.length} stages resolved`;
 
-      const urlDump = {};
+      const dump = {};
       for (const k of wanted) {
-        urlDump[k] = layerCatalog[k] ? layerCatalog[k].url : null;
+        dump[k] = layerCatalog[k] ? layerCatalog[k].url : null;
       }
-      document.getElementById("urlBox").value = JSON.stringify(urlDump, null, 2);
+      document.getElementById("urlBox").value = JSON.stringify(dump, null, 2);
 
       if (missing.length) {
-        setStatus(
-          `Layer catalog built. Found ${found}/${wanted.length} stages.\nMissing stages: ${missing.join(", ")}`
-        );
+        setStatus(`Resolved ${found}/${wanted.length} stage layers. Missing: ${missing.join(", ")}`);
       } else {
-        setStatus(`Layer catalog built. All ${found} stage layers resolved.`);
+        setStatus(`Resolved all ${found} stage layers.`);
       }
     }
 
     async function loadForecast() {
       forecastData = await fetchJson("./forecast.json");
       document.getElementById("issuedText").textContent =
-        `Forecast issued: ${forecastData.issuedUtc || "not available yet"}`;
+        `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
       document.getElementById("sourceText").textContent =
-        `Source file: ${forecastData.sourceUrl || "not available yet"}`;
+        `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
 
       const slider = document.getElementById("hourSlider");
       const count = forecastData.hours ? forecastData.hours.length : 0;
@@ -346,7 +333,7 @@
       const info = layerCatalog[stageKey];
       if (!info) {
         document.getElementById("loadedUrlText").textContent =
-          `Service URL: no public hosted tile layer found for ${stageKey}`;
+          `Service URL: no public tile layer found for ${stageKey}`;
         return;
       }
 
@@ -367,17 +354,13 @@
 
       document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
       document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
-      document.getElementById("rawStageText").textContent =
-        `PETSS stage: ${Number(h.sourceStageFt).toFixed(1)} ft ${h.sourceDatum}`;
-      document.getElementById("navdStageText").textContent =
-        `NAVD88 stage: ${Number(h.navd88StageFt).toFixed(1)} ft`;
+      document.getElementById("stageText").textContent =
+        `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
       document.getElementById("matchedText").textContent =
         `Matched layer: ${h.matchedStageKey} ft NAVD88`;
 
       if (h.wasClamped) {
-        setWarn(
-          `Forecast was outside your published layer range, so it was clamped to ${h.matchedStageKey} ft NAVD88.`
-        );
+        setWarn(`Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`);
       } else {
         setWarn("");
       }
@@ -422,8 +405,7 @@
 
     async function reloadAll() {
       stopPlayback();
-      setStatus("Reloading layer catalog and forecast…");
-
+      setStatus("Reloading forecast and layer catalog…");
       await buildLayerCatalog();
       await loadForecast();
       renderHour(0);
@@ -448,7 +430,7 @@
 
     main().catch(err => {
       console.error(err);
-      setStatus(err.message, true);
+      setStatus(err.message);
     });
   </script>
 </body>
