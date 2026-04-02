@@ -1,21 +1,12 @@
 {
   "stationId": "8535581",
   "stationName": "STONE HARBOR, GREAT CHANNEL, NJ",
-  "issuedUtc": "2026-04-02T15:00:00Z",
-  "sourceUrl": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&application=NW_Flood_Viewer&station=8535581&begin_date=20260402+15%3A00&range=72&datum=NAVD&units=english&time_zone=gmt&interval=h&format=json",
+  "issuedUtc": "2026-04-02T16:00:00Z",
+  "sourceUrl": "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?product=predictions&application=NW_Flood_Viewer&station=8535581&begin_date=20260402+16%3A00&range=72&datum=NAVD&units=english&time_zone=gmt&interval=h&format=json",
   "sourceType": "NOAA_COOPS_predictions_NAVD_hourly",
   "hours": [
     {
       "hourIndex": 0,
-      "timeUtc": "2026-04-02T15:00:00Z",
-      "sourceStageFt": 0.9,
-      "sourceDatum": "NAVD88",
-      "navd88StageFt": 0.9,
-      "matchedStageKey": "0.9",
-      "wasClamped": false
-    },
-    {
-      "hourIndex": 1,
       "timeUtc": "2026-04-02T16:00:00Z",
       "sourceStageFt": 0.0,
       "sourceDatum": "NAVD88",
@@ -24,7 +15,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 2,
+      "hourIndex": 1,
       "timeUtc": "2026-04-02T17:00:00Z",
       "sourceStageFt": -1.0,
       "sourceDatum": "NAVD88",
@@ -33,7 +24,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 3,
+      "hourIndex": 2,
       "timeUtc": "2026-04-02T18:00:00Z",
       "sourceStageFt": -2.0,
       "sourceDatum": "NAVD88",
@@ -42,7 +33,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 4,
+      "hourIndex": 3,
       "timeUtc": "2026-04-02T19:00:00Z",
       "sourceStageFt": -2.7,
       "sourceDatum": "NAVD88",
@@ -51,7 +42,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 5,
+      "hourIndex": 4,
       "timeUtc": "2026-04-02T20:00:00Z",
       "sourceStageFt": -2.7,
       "sourceDatum": "NAVD88",
@@ -60,7 +51,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 6,
+      "hourIndex": 5,
       "timeUtc": "2026-04-02T21:00:00Z",
       "sourceStageFt": -2.1,
       "sourceDatum": "NAVD88",
@@ -69,7 +60,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 7,
+      "hourIndex": 6,
       "timeUtc": "2026-04-02T22:00:00Z",
       "sourceStageFt": -1.1,
       "sourceDatum": "NAVD88",
@@ -78,7 +69,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 8,
+      "hourIndex": 7,
       "timeUtc": "2026-04-02T23:00:00Z",
       "sourceStageFt": 0.1,
       "sourceDatum": "NAVD88",
@@ -87,7 +78,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 9,
+      "hourIndex": 8,
       "timeUtc": "2026-04-03T00:00:00Z",
       "sourceStageFt": 1.2,
       "sourceDatum": "NAVD88",
@@ -96,7 +87,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 10,
+      "hourIndex": 9,
       "timeUtc": "2026-04-03T01:00:00Z",
       "sourceStageFt": 1.9,
       "sourceDatum": "NAVD88",
@@ -105,7 +96,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 11,
+      "hourIndex": 10,
       "timeUtc": "2026-04-03T02:00:00Z",
       "sourceStageFt": 2.0,
       "sourceDatum": "NAVD88",
@@ -114,7 +105,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 12,
+      "hourIndex": 11,
       "timeUtc": "2026-04-03T03:00:00Z",
       "sourceStageFt": 1.6,
       "sourceDatum": "NAVD88",
@@ -123,7 +114,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 13,
+      "hourIndex": 12,
       "timeUtc": "2026-04-03T04:00:00Z",
       "sourceStageFt": 0.8,
       "sourceDatum": "NAVD88",
@@ -132,7 +123,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 14,
+      "hourIndex": 13,
       "timeUtc": "2026-04-03T05:00:00Z",
       "sourceStageFt": -0.3,
       "sourceDatum": "NAVD88",
@@ -141,7 +132,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 15,
+      "hourIndex": 14,
       "timeUtc": "2026-04-03T06:00:00Z",
       "sourceStageFt": -1.5,
       "sourceDatum": "NAVD88",
@@ -150,7 +141,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 16,
+      "hourIndex": 15,
       "timeUtc": "2026-04-03T07:00:00Z",
       "sourceStageFt": -2.4,
       "sourceDatum": "NAVD88",
@@ -159,7 +150,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 17,
+      "hourIndex": 16,
       "timeUtc": "2026-04-03T08:00:00Z",
       "sourceStageFt": -2.8,
       "sourceDatum": "NAVD88",
@@ -168,7 +159,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 18,
+      "hourIndex": 17,
       "timeUtc": "2026-04-03T09:00:00Z",
       "sourceStageFt": -2.5,
       "sourceDatum": "NAVD88",
@@ -177,7 +168,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 19,
+      "hourIndex": 18,
       "timeUtc": "2026-04-03T10:00:00Z",
       "sourceStageFt": -1.7,
       "sourceDatum": "NAVD88",
@@ -186,7 +177,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 20,
+      "hourIndex": 19,
       "timeUtc": "2026-04-03T11:00:00Z",
       "sourceStageFt": -0.6,
       "sourceDatum": "NAVD88",
@@ -195,7 +186,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 21,
+      "hourIndex": 20,
       "timeUtc": "2026-04-03T12:00:00Z",
       "sourceStageFt": 0.4,
       "sourceDatum": "NAVD88",
@@ -204,7 +195,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 22,
+      "hourIndex": 21,
       "timeUtc": "2026-04-03T13:00:00Z",
       "sourceStageFt": 1.2,
       "sourceDatum": "NAVD88",
@@ -213,7 +204,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 23,
+      "hourIndex": 22,
       "timeUtc": "2026-04-03T14:00:00Z",
       "sourceStageFt": 1.4,
       "sourceDatum": "NAVD88",
@@ -222,7 +213,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 24,
+      "hourIndex": 23,
       "timeUtc": "2026-04-03T15:00:00Z",
       "sourceStageFt": 1.2,
       "sourceDatum": "NAVD88",
@@ -231,7 +222,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 25,
+      "hourIndex": 24,
       "timeUtc": "2026-04-03T16:00:00Z",
       "sourceStageFt": 0.4,
       "sourceDatum": "NAVD88",
@@ -240,7 +231,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 26,
+      "hourIndex": 25,
       "timeUtc": "2026-04-03T17:00:00Z",
       "sourceStageFt": -0.5,
       "sourceDatum": "NAVD88",
@@ -249,7 +240,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 27,
+      "hourIndex": 26,
       "timeUtc": "2026-04-03T18:00:00Z",
       "sourceStageFt": -1.4,
       "sourceDatum": "NAVD88",
@@ -258,7 +249,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 28,
+      "hourIndex": 27,
       "timeUtc": "2026-04-03T19:00:00Z",
       "sourceStageFt": -2.3,
       "sourceDatum": "NAVD88",
@@ -267,7 +258,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 29,
+      "hourIndex": 28,
       "timeUtc": "2026-04-03T20:00:00Z",
       "sourceStageFt": -2.7,
       "sourceDatum": "NAVD88",
@@ -276,7 +267,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 30,
+      "hourIndex": 29,
       "timeUtc": "2026-04-03T21:00:00Z",
       "sourceStageFt": -2.4,
       "sourceDatum": "NAVD88",
@@ -285,7 +276,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 31,
+      "hourIndex": 30,
       "timeUtc": "2026-04-03T22:00:00Z",
       "sourceStageFt": -1.6,
       "sourceDatum": "NAVD88",
@@ -294,7 +285,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 32,
+      "hourIndex": 31,
       "timeUtc": "2026-04-03T23:00:00Z",
       "sourceStageFt": -0.5,
       "sourceDatum": "NAVD88",
@@ -303,7 +294,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 33,
+      "hourIndex": 32,
       "timeUtc": "2026-04-04T00:00:00Z",
       "sourceStageFt": 0.6,
       "sourceDatum": "NAVD88",
@@ -312,7 +303,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 34,
+      "hourIndex": 33,
       "timeUtc": "2026-04-04T01:00:00Z",
       "sourceStageFt": 1.5,
       "sourceDatum": "NAVD88",
@@ -321,7 +312,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 35,
+      "hourIndex": 34,
       "timeUtc": "2026-04-04T02:00:00Z",
       "sourceStageFt": 2.0,
       "sourceDatum": "NAVD88",
@@ -330,7 +321,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 36,
+      "hourIndex": 35,
       "timeUtc": "2026-04-04T03:00:00Z",
       "sourceStageFt": 1.9,
       "sourceDatum": "NAVD88",
@@ -339,7 +330,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 37,
+      "hourIndex": 36,
       "timeUtc": "2026-04-04T04:00:00Z",
       "sourceStageFt": 1.3,
       "sourceDatum": "NAVD88",
@@ -348,7 +339,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 38,
+      "hourIndex": 37,
       "timeUtc": "2026-04-04T05:00:00Z",
       "sourceStageFt": 0.4,
       "sourceDatum": "NAVD88",
@@ -357,7 +348,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 39,
+      "hourIndex": 38,
       "timeUtc": "2026-04-04T06:00:00Z",
       "sourceStageFt": -0.7,
       "sourceDatum": "NAVD88",
@@ -366,7 +357,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 40,
+      "hourIndex": 39,
       "timeUtc": "2026-04-04T07:00:00Z",
       "sourceStageFt": -1.8,
       "sourceDatum": "NAVD88",
@@ -375,7 +366,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 41,
+      "hourIndex": 40,
       "timeUtc": "2026-04-04T08:00:00Z",
       "sourceStageFt": -2.5,
       "sourceDatum": "NAVD88",
@@ -384,7 +375,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 42,
+      "hourIndex": 41,
       "timeUtc": "2026-04-04T09:00:00Z",
       "sourceStageFt": -2.7,
       "sourceDatum": "NAVD88",
@@ -393,7 +384,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 43,
+      "hourIndex": 42,
       "timeUtc": "2026-04-04T10:00:00Z",
       "sourceStageFt": -2.2,
       "sourceDatum": "NAVD88",
@@ -402,7 +393,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 44,
+      "hourIndex": 43,
       "timeUtc": "2026-04-04T11:00:00Z",
       "sourceStageFt": -1.3,
       "sourceDatum": "NAVD88",
@@ -411,7 +402,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 45,
+      "hourIndex": 44,
       "timeUtc": "2026-04-04T12:00:00Z",
       "sourceStageFt": -0.3,
       "sourceDatum": "NAVD88",
@@ -420,7 +411,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 46,
+      "hourIndex": 45,
       "timeUtc": "2026-04-04T13:00:00Z",
       "sourceStageFt": 0.6,
       "sourceDatum": "NAVD88",
@@ -429,7 +420,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 47,
+      "hourIndex": 46,
       "timeUtc": "2026-04-04T14:00:00Z",
       "sourceStageFt": 1.2,
       "sourceDatum": "NAVD88",
@@ -438,7 +429,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 48,
+      "hourIndex": 47,
       "timeUtc": "2026-04-04T15:00:00Z",
       "sourceStageFt": 1.2,
       "sourceDatum": "NAVD88",
@@ -447,7 +438,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 49,
+      "hourIndex": 48,
       "timeUtc": "2026-04-04T16:00:00Z",
       "sourceStageFt": 0.7,
       "sourceDatum": "NAVD88",
@@ -456,7 +447,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 50,
+      "hourIndex": 49,
       "timeUtc": "2026-04-04T17:00:00Z",
       "sourceStageFt": -0.1,
       "sourceDatum": "NAVD88",
@@ -465,7 +456,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 51,
+      "hourIndex": 50,
       "timeUtc": "2026-04-04T18:00:00Z",
       "sourceStageFt": -1.0,
       "sourceDatum": "NAVD88",
@@ -474,7 +465,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 52,
+      "hourIndex": 51,
       "timeUtc": "2026-04-04T19:00:00Z",
       "sourceStageFt": -1.8,
       "sourceDatum": "NAVD88",
@@ -483,7 +474,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 53,
+      "hourIndex": 52,
       "timeUtc": "2026-04-04T20:00:00Z",
       "sourceStageFt": -2.4,
       "sourceDatum": "NAVD88",
@@ -492,7 +483,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 54,
+      "hourIndex": 53,
       "timeUtc": "2026-04-04T21:00:00Z",
       "sourceStageFt": -2.5,
       "sourceDatum": "NAVD88",
@@ -501,7 +492,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 55,
+      "hourIndex": 54,
       "timeUtc": "2026-04-04T22:00:00Z",
       "sourceStageFt": -1.9,
       "sourceDatum": "NAVD88",
@@ -510,7 +501,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 56,
+      "hourIndex": 55,
       "timeUtc": "2026-04-04T23:00:00Z",
       "sourceStageFt": -1.0,
       "sourceDatum": "NAVD88",
@@ -519,7 +510,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 57,
+      "hourIndex": 56,
       "timeUtc": "2026-04-05T00:00:00Z",
       "sourceStageFt": 0.0,
       "sourceDatum": "NAVD88",
@@ -528,7 +519,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 58,
+      "hourIndex": 57,
       "timeUtc": "2026-04-05T01:00:00Z",
       "sourceStageFt": 1.0,
       "sourceDatum": "NAVD88",
@@ -537,7 +528,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 59,
+      "hourIndex": 58,
       "timeUtc": "2026-04-05T02:00:00Z",
       "sourceStageFt": 1.7,
       "sourceDatum": "NAVD88",
@@ -546,7 +537,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 60,
+      "hourIndex": 59,
       "timeUtc": "2026-04-05T03:00:00Z",
       "sourceStageFt": 1.9,
       "sourceDatum": "NAVD88",
@@ -555,7 +546,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 61,
+      "hourIndex": 60,
       "timeUtc": "2026-04-05T04:00:00Z",
       "sourceStageFt": 1.6,
       "sourceDatum": "NAVD88",
@@ -564,7 +555,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 62,
+      "hourIndex": 61,
       "timeUtc": "2026-04-05T05:00:00Z",
       "sourceStageFt": 0.9,
       "sourceDatum": "NAVD88",
@@ -573,7 +564,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 63,
+      "hourIndex": 62,
       "timeUtc": "2026-04-05T06:00:00Z",
       "sourceStageFt": 0.0,
       "sourceDatum": "NAVD88",
@@ -582,7 +573,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 64,
+      "hourIndex": 63,
       "timeUtc": "2026-04-05T07:00:00Z",
       "sourceStageFt": -1.0,
       "sourceDatum": "NAVD88",
@@ -591,7 +582,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 65,
+      "hourIndex": 64,
       "timeUtc": "2026-04-05T08:00:00Z",
       "sourceStageFt": -2.0,
       "sourceDatum": "NAVD88",
@@ -600,7 +591,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 66,
+      "hourIndex": 65,
       "timeUtc": "2026-04-05T09:00:00Z",
       "sourceStageFt": -2.5,
       "sourceDatum": "NAVD88",
@@ -609,7 +600,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 67,
+      "hourIndex": 66,
       "timeUtc": "2026-04-05T10:00:00Z",
       "sourceStageFt": -2.4,
       "sourceDatum": "NAVD88",
@@ -618,7 +609,7 @@
       "wasClamped": true
     },
     {
-      "hourIndex": 68,
+      "hourIndex": 67,
       "timeUtc": "2026-04-05T11:00:00Z",
       "sourceStageFt": -1.8,
       "sourceDatum": "NAVD88",
@@ -627,7 +618,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 69,
+      "hourIndex": 68,
       "timeUtc": "2026-04-05T12:00:00Z",
       "sourceStageFt": -0.9,
       "sourceDatum": "NAVD88",
@@ -636,7 +627,7 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 70,
+      "hourIndex": 69,
       "timeUtc": "2026-04-05T13:00:00Z",
       "sourceStageFt": 0.0,
       "sourceDatum": "NAVD88",
@@ -645,12 +636,21 @@
       "wasClamped": false
     },
     {
-      "hourIndex": 71,
+      "hourIndex": 70,
       "timeUtc": "2026-04-05T14:00:00Z",
       "sourceStageFt": 0.7,
       "sourceDatum": "NAVD88",
       "navd88StageFt": 0.7,
       "matchedStageKey": "0.7",
+      "wasClamped": false
+    },
+    {
+      "hourIndex": 71,
+      "timeUtc": "2026-04-05T15:00:00Z",
+      "sourceStageFt": 1.1,
+      "sourceDatum": "NAVD88",
+      "navd88StageFt": 1.1,
+      "matchedStageKey": "1.1",
       "wasClamped": false
     }
   ]
