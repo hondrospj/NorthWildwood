@@ -4,10 +4,12 @@
   <meta charset="utf-8" />
   <title>North Wildwood Flood Forecast</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
+
   <style>
     html, body {
       margin: 0;
@@ -31,6 +33,7 @@
     #map {
       width: 100%;
       height: 100%;
+      background: #eef3f8;
     }
 
     h1 {
@@ -91,11 +94,17 @@
 
     #urlBox {
       width: 100%;
-      height: 240px;
+      height: 220px;
       display: none;
       margin-top: 8px;
       font-family: monospace;
       font-size: 12px;
+    }
+
+    #manualStageInput {
+      width: 120px;
+      padding: 6px;
+      margin-right: 8px;
     }
   </style>
 </head>
@@ -111,6 +120,7 @@
         <div id="issuedText" class="muted">Forecast issued: loading…</div>
         <div id="sourceText" class="muted">Source: loading…</div>
         <div id="catalogText" class="muted">Layer catalog: loading…</div>
+        <div id="crsText" class="muted">Map CRS: loading…</div>
       </div>
 
       <div class="section">
@@ -137,9 +147,17 @@
       </div>
 
       <div class="section">
+        <div class="muted">Manual layer test</div>
+        <input id="manualStageInput" type="text" placeholder="e.g. 1.5" />
+        <button id="manualStageBtn">Load stage</button>
+      </div>
+
+      <div class="section">
         <div class="muted">
-          Each ArcGIS flood-depth layer already contains the blue symbology,
-          so this page only swaps in the correct stage layer.
+          This version detects the tile service CRS from ArcGIS metadata and
+          initializes the map to match the raster tiles. If the layers were
+          published in New Jersey State Plane instead of Web Mercator, this is
+          the fix that should make them display.
         </div>
       </div>
 
@@ -152,20 +170,55 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/esri-leaflet@3.0.14/dist/esri-leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js"></script>
+  <script src="https://unpkg.com/proj4@2.9.2/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+
   <script>
     const ARCGIS_REST = "https://www.arcgis.com/sharing/rest";
     const OWNER = "Z00380509_StocktonU";
     const TITLE_RE = /^NW_FloodDepth_([pm])(\d{2})_(\d)_NAVD88$/;
 
-    const MAP_CENTER = [39.0007, -74.8089];
-    const MAP_ZOOM = 13;
+    const DEFAULT_CENTER = [39.0007, -74.8089];
+    const DEFAULT_ZOOM = 13;
 
-    let map;
+    let map = null;
     let currentFloodLayer = null;
     let forecastData = null;
     let layerCatalog = {};
     let playTimer = null;
+    let mapInitialized = false;
+    let sharedTileMeta = null;
+
+    // Common CRS defs for NJ-published tile layers.
+    // 3424 is NAD83 / New Jersey (ftUS).
+    const CRS_DEFS = {
+      "3424": {
+        code: "EPSG:3424",
+        proj4: "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +nadgrids=us_noaa_njhpgn.tif +units=us-ft +no_defs +type=crs",
+        label: "EPSG:3424 NAD83 / New Jersey (ftUS)"
+      },
+      "102711": {
+        code: "ESRI:102711",
+        proj4: "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +nadgrids=us_noaa_njhpgn.tif +units=us-ft +no_defs +type=crs",
+        label: "ESRI:102711 NAD83 StatePlane New Jersey (US Feet)"
+      },
+      "3857": {
+        code: "EPSG:3857",
+        proj4: null,
+        label: "EPSG:3857 Web Mercator"
+      },
+      "102100": {
+        code: "EPSG:3857",
+        proj4: null,
+        label: "WKID 102100 Web Mercator"
+      },
+      "102113": {
+        code: "EPSG:3857",
+        proj4: null,
+        label: "WKID 102113 Web Mercator"
+      }
+    };
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -190,9 +243,7 @@
         }
       }
       const r = await fetch(u.toString(), { cache: "no-store" });
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
-      }
+      if (!r.ok) throw new Error(`HTTP ${r.status} for ${u.toString()}`);
       return r.json();
     }
 
@@ -207,9 +258,7 @@
 
     function wantedStageKeys() {
       const keys = [];
-      for (let i = -20; i <= 140; i++) {
-        keys.push((i / 10).toFixed(1));
-      }
+      for (let i = -20; i <= 140; i++) keys.push((i / 10).toFixed(1));
       return keys;
     }
 
@@ -228,7 +277,6 @@
         });
 
         all = all.concat(data.results || []);
-
         if (!data.nextStart || data.nextStart === -1) break;
         start = data.nextStart;
       }
@@ -238,6 +286,20 @@
 
     async function fetchItemDetail(id) {
       return fetchJson(`${ARCGIS_REST}/content/items/${id}`, { f: "json" });
+    }
+
+    async function fetchServiceMeta(url) {
+      return fetchJson(url, { f: "pjson" });
+    }
+
+    function getWkid(meta) {
+      return (
+        meta?.tileInfo?.spatialReference?.latestWkid ??
+        meta?.tileInfo?.spatialReference?.wkid ??
+        meta?.fullExtent?.spatialReference?.latestWkid ??
+        meta?.fullExtent?.spatialReference?.wkid ??
+        null
+      );
     }
 
     async function buildLayerCatalog() {
@@ -255,7 +317,7 @@
           try {
             const detail = await fetchItemDetail(item.id);
             url = detail.url || null;
-          } catch (err) {
+          } catch {
             url = null;
           }
         }
@@ -263,7 +325,7 @@
         return {
           title: item.title,
           stageKey: titleToStageKey(item.title),
-          url: url
+          url
         };
       }));
 
@@ -301,6 +363,7 @@
 
     async function loadForecast() {
       forecastData = await fetchJson("./forecast.json");
+
       document.getElementById("issuedText").textContent =
         `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
       document.getElementById("sourceText").textContent =
@@ -312,16 +375,122 @@
       slider.value = "0";
     }
 
-    function initMap() {
-      map = L.map("map").setView(MAP_CENTER, MAP_ZOOM);
+    function getPeakHourIndex() {
+      if (!forecastData?.hours?.length) return 0;
+      let maxIndex = 0;
+      let maxVal = -Infinity;
+      forecastData.hours.forEach((h, i) => {
+        const v = Number(h.navd88StageFt);
+        if (v > maxVal) {
+          maxVal = v;
+          maxIndex = i;
+        }
+      });
+      return maxIndex;
+    }
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors"
-      }).addTo(map);
+    function destroyMapIfNeeded() {
+      if (map) {
+        map.remove();
+        map = null;
+      }
+      mapInitialized = false;
+      currentFloodLayer = null;
+    }
+
+    function makeCustomCrs(meta, wkid) {
+      const def = CRS_DEFS[String(wkid)];
+      if (!def || !def.proj4) return null;
+
+      const tileInfo = meta.tileInfo;
+      const origin = [tileInfo.origin.x, tileInfo.origin.y];
+      const resolutions = tileInfo.lods.map(l => l.resolution);
+
+      return new L.Proj.CRS(def.code, def.proj4, {
+        origin,
+        resolutions
+      });
+    }
+
+    function fitMapToMeta(meta) {
+      const full = meta.fullExtent || meta.initialExtent;
+      if (!full || !map) return;
+
+      const wkid = getWkid(meta);
+
+      if ([3857, 102100, 102113].includes(Number(wkid))) {
+        if (full.xmin != null && full.ymin != null && full.xmax != null && full.ymax != null) {
+          const sw = L.CRS.EPSG3857.unproject(L.point(full.xmin, full.ymin));
+          const ne = L.CRS.EPSG3857.unproject(L.point(full.xmax, full.ymax));
+          map.fitBounds(L.latLngBounds(sw, ne));
+        } else {
+          map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        }
+      } else {
+        const crs = map.options.crs;
+        if (crs && full.xmin != null && full.ymin != null && full.xmax != null && full.ymax != null) {
+          const sw = crs.unproject(L.point(full.xmin, full.ymin));
+          const ne = crs.unproject(L.point(full.xmax, full.ymax));
+          map.fitBounds(L.latLngBounds(sw, ne));
+        }
+      }
+    }
+
+    async function initializeMapFromFirstLayer() {
+      if (mapInitialized) return;
+
+      const firstAvailable =
+        layerCatalog["1.0"] ||
+        layerCatalog["0.5"] ||
+        layerCatalog["0.0"] ||
+        Object.values(layerCatalog)[0];
+
+      if (!firstAvailable) {
+        throw new Error("No public flood tile layers were resolved.");
+      }
+
+      const meta = await fetchServiceMeta(firstAvailable.url);
+      sharedTileMeta = meta;
+
+      const wkid = Number(getWkid(meta));
+      const lodCount = meta?.tileInfo?.lods?.length || 0;
+
+      destroyMapIfNeeded();
+
+      if ([3857, 102100, 102113].includes(wkid)) {
+        map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
+
+        document.getElementById("crsText").textContent =
+          `Map CRS: Web Mercator (WKID ${wkid}) | ${lodCount} LODs`;
+      } else {
+        const crs = makeCustomCrs(meta, wkid);
+
+        if (!crs) {
+          throw new Error(
+            `Unsupported tile WKID ${wkid}. Add its proj4 definition before the raster can display.`
+          );
+        }
+
+        map = L.map("map", {
+          crs: crs,
+          zoomControl: true,
+          preferCanvas: false
+        });
+
+        document.getElementById("crsText").textContent =
+          `Map CRS: ${CRS_DEFS[String(wkid)].label} | ${lodCount} LODs`;
+      }
+
+      fitMapToMeta(meta);
+      mapInitialized = true;
     }
 
     function clearFloodLayer() {
-      if (currentFloodLayer) {
+      if (currentFloodLayer && map) {
         map.removeLayer(currentFloodLayer);
         currentFloodLayer = null;
       }
@@ -337,17 +506,38 @@
         return;
       }
 
-      currentFloodLayer = L.esri.tiledMapLayer({
+      const layerOpts = {
         url: info.url,
-        opacity: 0.80
-      }).addTo(map);
+        opacity: 1.0
+      };
+
+      if (sharedTileMeta?.tileInfo?.lods?.length) {
+        layerOpts.minZoom = 0;
+        layerOpts.maxZoom = sharedTileMeta.tileInfo.lods.length - 1;
+      }
+
+      currentFloodLayer = L.esri.tiledMapLayer(layerOpts);
+
+      currentFloodLayer.on("load", () => {
+        setStatus(`Loaded ${info.title}`);
+      });
+
+      currentFloodLayer.on("tileerror", (e) => {
+        setStatus(`Tile error for ${info.title}: ${e?.error || "unknown error"}`);
+      });
+
+      currentFloodLayer.addTo(map);
+
+      if (currentFloodLayer.bringToFront) {
+        currentFloodLayer.bringToFront();
+      }
 
       document.getElementById("loadedUrlText").textContent =
         `Service URL: ${info.url}`;
     }
 
     function renderHour(index) {
-      if (!forecastData || !forecastData.hours || !forecastData.hours.length) return;
+      if (!forecastData?.hours?.length || !mapInitialized) return;
 
       const h = forecastData.hours[index];
       if (!h) return;
@@ -366,6 +556,23 @@
       }
 
       setFloodLayerFromStage(h.matchedStageKey);
+    }
+
+    function loadManualStage() {
+      if (!mapInitialized) return;
+
+      const val = document.getElementById("manualStageInput").value.trim();
+      if (!val) return;
+
+      const key = Number(val).toFixed(1);
+
+      document.getElementById("hourText").textContent = "Manual stage";
+      document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
+      document.getElementById("stageText").textContent = `Water level: ${key} ft NAVD88`;
+      document.getElementById("matchedText").textContent = `Matched layer: ${key} ft NAVD88`;
+
+      setWarn("");
+      setFloodLayerFromStage(key);
     }
 
     function stopPlayback() {
@@ -406,14 +613,17 @@
     async function reloadAll() {
       stopPlayback();
       setStatus("Reloading forecast and layer catalog…");
+
       await buildLayerCatalog();
       await loadForecast();
-      renderHour(0);
+      await initializeMapFromFirstLayer();
+
+      const peakIndex = getPeakHourIndex();
+      document.getElementById("hourSlider").value = String(peakIndex);
+      renderHour(peakIndex);
     }
 
     async function main() {
-      initMap();
-
       document.getElementById("hourSlider").addEventListener("input", (e) => {
         stopPlayback();
         renderHour(Number(e.target.value));
@@ -424,6 +634,7 @@
       document.getElementById("reloadBtn").addEventListener("click", reloadAll);
       document.getElementById("showUrlsBtn").addEventListener("click", toggleUrls);
       document.getElementById("downloadUrlsBtn").addEventListener("click", downloadUrls);
+      document.getElementById("manualStageBtn").addEventListener("click", loadManualStage);
 
       await reloadAll();
     }
@@ -431,6 +642,7 @@
     main().catch(err => {
       console.error(err);
       setStatus(err.message);
+      setWarn(err.message);
     });
   </script>
 </body>
