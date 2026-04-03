@@ -1,663 +1,386 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>North Wildwood Flood Forecast</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+<script>
+  const RASTER_BASE = "https://rasters.rasterrepo.com";
+  const FORECAST_URL = "./forecast.json";
+  const MIN_STAGE = -2.0;
+  const MAX_STAGE = 14.0;
+  const DEFAULT_CENTER = [39.0007, -74.8089];
+  const DEFAULT_ZOOM = 13;
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  let map = null;
+  let currentFloodLayer = null;
+  let forecastData = null;
+  let playTimer = null;
+  let overlayOpacity = 1.0;
+  let lastRenderToken = 0;
+  let mapHasFit = false;
 
-  <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      font-family: Arial, Helvetica, sans-serif;
+  const rasterCache = new Map();
+
+  function setStatus(msg) {
+    document.getElementById("status").textContent = msg;
+  }
+
+  function setWarn(msg) {
+    const el = document.getElementById("warn");
+    if (!msg) {
+      el.style.display = "none";
+      el.textContent = "";
+    } else {
+      el.style.display = "block";
+      el.textContent = msg;
     }
+  }
 
-    #app {
-      display: grid;
-      grid-template-columns: 390px 1fr;
-      height: 100%;
+  function setHardWarn(msg) {
+    const el = document.getElementById("hardWarn");
+    if (!msg) {
+      el.style.display = "none";
+      el.textContent = "";
+    } else {
+      el.style.display = "block";
+      el.textContent = msg;
     }
+  }
 
-    #panel {
-      padding: 16px;
-      border-right: 1px solid #ddd;
-      overflow: auto;
-      background: #fff;
-    }
+  function setOpacityText() {
+    document.getElementById("opacityText").textContent =
+      `${Math.round(overlayOpacity * 100)}%`;
+  }
 
-    #map {
-      width: 100%;
-      height: 100%;
-      background: #eef3f8;
-    }
+  function showStageUrl(text) {
+    const box = document.getElementById("urlBox");
+    box.style.display = "block";
+    box.value = text;
+  }
 
-    h1 {
-      margin: 0 0 8px 0;
-      font-size: 24px;
-    }
-
-    .muted {
-      color: #555;
-      font-size: 14px;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-
-    .section {
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid #ececec;
-    }
-
-    .big {
-      font-size: 22px;
-      font-weight: 700;
-      margin-top: 8px;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      margin-top: 8px;
-    }
-
-    button {
-      padding: 9px 12px;
-      margin-right: 8px;
-      margin-bottom: 8px;
-      cursor: pointer;
-    }
-
-    #status {
-      margin-top: 8px;
-      padding: 10px 12px;
-      background: #f6f8fa;
-      border: 1px solid #e1e4e8;
-      border-radius: 8px;
-      font-size: 14px;
-      white-space: pre-wrap;
-      color: #111;
-    }
-
-    #warn {
-      margin-top: 8px;
-      padding: 10px 12px;
-      background: #fff3e0;
-      border: 1px solid #ffd8a8;
-      border-radius: 8px;
-      color: #8a4b00;
-      display: none;
-      white-space: pre-wrap;
-    }
-
-    #hardWarn {
-      margin-top: 8px;
-      padding: 10px 12px;
-      background: #fee2e2;
-      border: 1px solid #fca5a5;
-      border-radius: 8px;
-      color: #991b1b;
-      display: none;
-      white-space: pre-wrap;
-    }
-
-    #urlBox {
-      width: 100%;
-      height: 220px;
-      display: none;
-      margin-top: 8px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-
-    #manualStageInput {
-      width: 120px;
-      padding: 6px;
-      margin-right: 8px;
-    }
-
-    .pill {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #eef4ff;
-      color: #1e40af;
-      font-size: 13px;
-      margin-top: 8px;
-    }
-
-    .leaflet-pane.flood-pane {
-      z-index: 420;
-      pointer-events: none;
-    }
-
-    .leaflet-pane.flood-pane img {
-      opacity: 1;
-      image-rendering: auto;
-    }
-  </style>
-</head>
-<body>
-  <div id="app">
-    <aside id="panel">
-      <h1>North Wildwood Flood Forecast</h1>
-      <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Raster source mode: direct hosted tile URLs</div>
-      <div class="muted">Service root: tiles.arcgis.com</div>
-
-      <div class="section">
-        <div id="issuedText" class="muted">Forecast issued: loading…</div>
-        <div id="sourceText" class="muted">Source: loading…</div>
-        <div id="catalogText" class="muted">Catalog mode: loading…</div>
-        <div id="crsText" class="muted">Map CRS: loading…</div>
-        <div id="serviceModeText" class="muted">Layer mode: loading…</div>
-      </div>
-
-      <div class="section">
-        <label for="hourSlider">Forecast hour</label>
-        <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
-        <div id="hourText" class="big">Hour 0</div>
-        <div id="timeText" class="muted">Time: --</div>
-      </div>
-
-      <div class="section">
-        <label for="opacitySlider">Overlay opacity</label>
-        <input id="opacitySlider" type="range" min="0" max="100" value="100" step="1" />
-        <div id="opacityText" class="muted">100%</div>
-      </div>
-
-      <div class="section">
-        <div id="stageText">Water level: --</div>
-        <div id="matchedText">Matched layer: --</div>
-        <div id="serviceNameText" class="muted">Service name: --</div>
-        <div id="loadedUrlText" class="muted">Service URL: --</div>
-        <div id="warn"></div>
-        <div id="hardWarn"></div>
-      </div>
-
-      <div class="section">
-        <button id="playBtn">Play</button>
-        <button id="stopBtn">Stop</button>
-        <button id="reloadBtn">Reload</button>
-        <button id="showUrlsBtn">Show stage URL</button>
-        <textarea id="urlBox" readonly></textarea>
-      </div>
-
-      <div class="section">
-        <div class="muted">Manual layer test</div>
-        <input id="manualStageInput" type="text" placeholder="e.g. 5.0" />
-        <button id="manualStageBtn">Load stage</button>
-      </div>
-
-      <div class="section">
-        <div class="muted">
-          This viewer now loads each stage directly from the known ArcGIS hosted
-          tile naming pattern instead of relying on ArcGIS search results.
-        </div>
-        <div class="pill">Hosted tile layer = static pre-rendered tiles</div>
-      </div>
-
-      <div class="section">
-        <div id="status">Starting…</div>
-      </div>
-    </aside>
-
-    <main id="map"></main>
-  </div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <script>
-    const SERVICE_ROOT =
-      "https://tiles.arcgis.com/tiles/EDFKKZivVyfUwPAb/arcgis/rest/services";
-
-    const FORECAST_URL = "./forecast.json";
-    const MIN_STAGE = -2.0;
-    const MAX_STAGE = 14.0;
-    const DEFAULT_CENTER = [39.0007, -74.8089];
-    const DEFAULT_ZOOM = 13;
-
-    let map = null;
-    let currentFloodLayer = null;
-    let forecastData = null;
-    let playTimer = null;
-    let overlayOpacity = 1.0;
-    let currentMeta = null;
-    let lastRenderToken = 0;
-
-    const metaCache = new Map();
-
-    function setStatus(msg) {
-      document.getElementById("status").textContent = msg;
-    }
-
-    function setWarn(msg) {
-      const el = document.getElementById("warn");
-      if (!msg) {
-        el.style.display = "none";
-        el.textContent = "";
-      } else {
-        el.style.display = "block";
-        el.textContent = msg;
+  async function fetchJson(url, params = null) {
+    const u = new URL(url, window.location.href);
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        u.searchParams.set(k, v);
       }
     }
+    const r = await fetch(u.toString(), { cache: "no-store" });
+    if (!r.ok) {
+      throw new Error(`HTTP ${r.status} for ${u.toString()}`);
+    }
+    return r.json();
+  }
 
-    function setHardWarn(msg) {
-      const el = document.getElementById("hardWarn");
-      if (!msg) {
-        el.style.display = "none";
-        el.textContent = "";
-      } else {
-        el.style.display = "block";
-        el.textContent = msg;
-      }
+  function normalizeStageKey(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
+    return (Math.round(clipped * 10) / 10).toFixed(1);
+  }
+
+  function stageKeyToFileName(stageKey) {
+    const num = Number(stageKey);
+    const sign = num < 0 ? "m" : "p";
+    let absVal = Math.abs(num);
+    let whole = Math.floor(absVal + 1e-9);
+    let tenth = Math.round((absVal - whole) * 10);
+
+    if (tenth === 10) {
+      whole += 1;
+      tenth = 0;
     }
 
-    function setOpacityText() {
-      document.getElementById("opacityText").textContent =
-        `${Math.round(overlayOpacity * 100)}%`;
-    }
+    return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88.tif`;
+  }
 
-    function showStageUrl(text) {
-      const box = document.getElementById("urlBox");
-      box.style.display = "block";
-      box.value = text;
-    }
+  function stageKeyToRasterUrl(stageKey) {
+    return `${RASTER_BASE}/${stageKeyToFileName(stageKey)}`;
+  }
 
-    async function fetchJson(url, params = null) {
-      const u = new URL(url, window.location.href);
-      if (params) {
-        for (const [k, v] of Object.entries(params)) {
-          u.searchParams.set(k, v);
+  async function getRaster(stageKey) {
+    const key = String(stageKey);
+    if (rasterCache.has(key)) return rasterCache.get(key);
+
+    const url = stageKeyToRasterUrl(key);
+
+    const promise = fetch(url, { cache: "force-cache" })
+      .then(async (r) => {
+        if (!r.ok) {
+          throw new Error(`Raster not found: ${url}`);
         }
-      }
-      const r = await fetch(u.toString(), { cache: "no-store" });
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
-      }
-      return r.json();
-    }
-
-    function normalizeStageKey(value) {
-      const n = Number(value);
-      if (!Number.isFinite(n)) return null;
-      const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
-      return (Math.round(clipped * 10) / 10).toFixed(1);
-    }
-
-    function stageKeyToServiceName(stageKey) {
-      const num = Number(stageKey);
-      const sign = num < 0 ? "m" : "p";
-      let absVal = Math.abs(num);
-      let whole = Math.floor(absVal + 1e-9);
-      let tenth = Math.round((absVal - whole) * 10);
-
-      if (tenth === 10) {
-        whole += 1;
-        tenth = 0;
-      }
-
-      return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88`;
-    }
-
-    function stageKeyToServiceUrl(stageKey) {
-      return `${SERVICE_ROOT}/${stageKeyToServiceName(stageKey)}/MapServer`;
-    }
-
-    function stageKeyToTileUrlTemplate(stageKey) {
-      return `${stageKeyToServiceUrl(stageKey)}/tile/{z}/{y}/{x}`;
-    }
-
-    async function getStageMeta(stageKey) {
-      const key = String(stageKey);
-      if (metaCache.has(key)) return metaCache.get(key);
-
-      const url = stageKeyToServiceUrl(key);
-      try {
-        const meta = await fetchJson(url, { f: "pjson" });
-        meta.__stageKey = key;
-        meta.__serviceUrl = url;
-        meta.__tileUrlTemplate = stageKeyToTileUrlTemplate(key);
-        meta.__serviceName = stageKeyToServiceName(key);
-        metaCache.set(key, meta);
-        return meta;
-      } catch (err) {
-        metaCache.set(key, null);
-        return null;
-      }
-    }
-
-    function getWkid(meta) {
-      return Number(
-        meta?.tileInfo?.spatialReference?.latestWkid ??
-        meta?.tileInfo?.spatialReference?.wkid ??
-        meta?.fullExtent?.spatialReference?.latestWkid ??
-        meta?.fullExtent?.spatialReference?.wkid ??
-        0
-      );
-    }
-
-    function fitMapToMeta(meta) {
-      if (!map || !meta) return;
-
-      const full = meta.fullExtent || meta.initialExtent;
-      if (!full) {
-        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-        return;
-      }
-
-      if (
-        full.xmin == null ||
-        full.ymin == null ||
-        full.xmax == null ||
-        full.ymax == null
-      ) {
-        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-        return;
-      }
-
-      const sw = L.CRS.EPSG3857.unproject(L.point(full.xmin, full.ymin));
-      const ne = L.CRS.EPSG3857.unproject(L.point(full.xmax, full.ymax));
-      map.fitBounds(L.latLngBounds(sw, ne));
-    }
-
-    function ensureMap(meta) {
-      if (map) return;
-
-      map = L.map("map", {
-        zoomControl: true,
-        preferCanvas: false
-      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors"
-      }).addTo(map);
-
-      map.createPane("floodPane");
-      const pane = map.getPane("floodPane");
-      pane.classList.add("flood-pane");
-      pane.style.zIndex = "420";
-      pane.style.pointerEvents = "none";
-
-      document.getElementById("crsText").textContent =
-        `Map CRS: Web Mercator (WKID ${getWkid(meta) || 3857})`;
-
-      fitMapToMeta(meta);
-    }
-
-    function clearFloodLayer() {
-      if (currentFloodLayer && map) {
-        map.removeLayer(currentFloodLayer);
-        currentFloodLayer = null;
-      }
-    }
-
-    function applyOverlayOpacity() {
-      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
-        currentFloodLayer.setOpacity(overlayOpacity);
-      }
-    }
-
-    async function loadForecast() {
-      forecastData = await fetchJson(FORECAST_URL);
-
-      document.getElementById("issuedText").textContent =
-        `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
-      document.getElementById("sourceText").textContent =
-        `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
-      document.getElementById("catalogText").textContent =
-        "Catalog mode: deterministic stage URLs from -2.0 to 14.0 NAVD88 (161 possible stages)";
-      document.getElementById("serviceModeText").textContent =
-        "Layer mode: direct hosted tile layer";
-
-      const slider = document.getElementById("hourSlider");
-      const count = forecastData.hours ? forecastData.hours.length : 0;
-      slider.max = String(Math.max(0, count - 1));
-      slider.value = "0";
-    }
-
-    function getPeakHourIndex() {
-      if (!forecastData?.hours?.length) return 0;
-
-      let maxIndex = 0;
-      let maxVal = -Infinity;
-
-      forecastData.hours.forEach((h, i) => {
-        const v = Number(h.navd88StageFt);
-        if (v > maxVal) {
-          maxVal = v;
-          maxIndex = i;
-        }
+        const arrayBuffer = await r.arrayBuffer();
+        const georaster = await parseGeoraster(arrayBuffer);
+        georaster.__url = url;
+        georaster.__fileName = stageKeyToFileName(key);
+        return georaster;
       });
 
-      return maxIndex;
+    rasterCache.set(key, promise);
+    return promise;
+  }
+
+  function ensureMap() {
+    if (map) return;
+
+    map = L.map("map", {
+      zoomControl: true,
+      preferCanvas: false
+    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+
+    document.getElementById("crsText").textContent =
+      "Map CRS: Leaflet / OSM basemap";
+  }
+
+  function clearFloodLayer() {
+    if (currentFloodLayer && map) {
+      map.removeLayer(currentFloodLayer);
+      currentFloodLayer = null;
     }
+  }
 
-    async function setFloodLayerFromStage(stageKey, token) {
-      clearFloodLayer();
-      currentMeta = null;
-      setHardWarn("");
-
-      const normalized = normalizeStageKey(stageKey);
-      if (!normalized) {
-        setWarn("Invalid stage value.");
-        return;
-      }
-
-      const meta = await getStageMeta(normalized);
-      if (token !== lastRenderToken) return;
-
-      const serviceUrl = stageKeyToServiceUrl(normalized);
-      const serviceName = stageKeyToServiceName(normalized);
-
-      document.getElementById("serviceNameText").textContent =
-        `Service name: ${serviceName}`;
-      document.getElementById("loadedUrlText").textContent =
-        `Service URL: ${serviceUrl}`;
-      showStageUrl(serviceUrl);
-
-      if (!meta) {
-        setWarn(`No published hosted tile service was found for ${normalized} ft.`);
-        setStatus(`Missing service for ${serviceName}`);
-        return;
-      }
-
-      currentMeta = meta;
-      const wkid = getWkid(meta);
-
-      if (wkid && wkid !== 3857 && wkid !== 102100 && wkid !== 102113) {
-        setHardWarn(
-          `This viewer is now set up for Web Mercator hosted tiles, but ${serviceName} reports WKID ${wkid}.`
-        );
-        setStatus(`Unsupported WKID ${wkid} for ${serviceName}`);
-        return;
-      }
-
-      ensureMap(meta);
-
-      const lods = Array.isArray(meta?.tileInfo?.lods) ? meta.tileInfo.lods : [];
-      const lastLod = lods.length ? lods[lods.length - 1] : null;
-      const maxNativeZoom = lastLod && Number.isFinite(lastLod.level)
-        ? lastLod.level
-        : undefined;
-
-      currentFloodLayer = L.tileLayer(meta.__tileUrlTemplate, {
-        pane: "floodPane",
-        opacity: overlayOpacity,
-        crossOrigin: true,
-        minZoom: 0,
-        maxNativeZoom: maxNativeZoom,
-        maxZoom: 22,
-        tileSize: meta?.tileInfo?.rows || 256,
-        updateWhenIdle: false,
-        keepBuffer: 2
-      });
-
-      currentFloodLayer.on("loading", () => {
-        setStatus(`Loading ${serviceName}...`);
-      });
-
-      currentFloodLayer.on("load", () => {
-        setStatus(`Loaded ${serviceName}`);
-      });
-
-      currentFloodLayer.on("tileerror", () => {
-        setHardWarn(
-          `${serviceName} is published, but at least one cached tile failed to load.`
-        );
-      });
-
-      currentFloodLayer.addTo(map);
-
-      if (currentFloodLayer.bringToFront) {
-        currentFloodLayer.bringToFront();
-      }
-
-      /*
-        This is the core truth for your case:
-        if the roads still do not appear flooded after this stage tile is loaded,
-        the hosted tile itself was published with the wrong content/symbology.
-      */
-      if (String(serviceUrl).includes("tiles.arcgis.com")) {
-        setHardWarn(
-          "This is a hosted tile layer on tiles.arcgis.com. If the map still shows marsh texture instead of flooded streets, the published cached tiles themselves are wrong (for example opaque background, wrong symbology, or wrong raster content). Leaflet cannot reconstruct missing flood pixels from a pre-rendered tile."
-        );
-      }
+  function applyOverlayOpacity() {
+    if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
+      currentFloodLayer.setOpacity(overlayOpacity);
     }
+  }
 
-    async function renderHour(index) {
-      if (!forecastData?.hours?.length) return;
+  function getDepthColor(v) {
+    if (v == null || !Number.isFinite(v) || v <= 0) return null;
 
-      const h = forecastData.hours[index];
-      if (!h) return;
+    if (v < 0.5) return "rgba(173,216,230,0.35)";
+    if (v < 1.0) return "rgba(100,149,237,0.45)";
+    if (v < 2.0) return "rgba(65,105,225,0.55)";
+    if (v < 3.0) return "rgba(30,144,255,0.65)";
+    if (v < 5.0) return "rgba(0,90,255,0.72)";
+    return "rgba(0,50,180,0.82)";
+  }
 
-      document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
-      document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
-      document.getElementById("stageText").textContent =
-        `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
-      document.getElementById("matchedText").textContent =
-        `Matched layer: ${h.matchedStageKey} ft NAVD88`;
+  async function loadForecast() {
+    forecastData = await fetchJson(FORECAST_URL);
 
-      if (h.wasClamped) {
-        setWarn(
-          `Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`
-        );
-      } else {
-        setWarn("");
+    document.getElementById("issuedText").textContent =
+      `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
+    document.getElementById("sourceText").textContent =
+      `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
+    document.getElementById("catalogText").textContent =
+      "Catalog mode: deterministic TIFF names in R2";
+    document.getElementById("serviceModeText").textContent =
+      "Layer mode: direct GeoTIFF from Cloudflare R2";
+
+    const slider = document.getElementById("hourSlider");
+    const count = forecastData.hours ? forecastData.hours.length : 0;
+    slider.max = String(Math.max(0, count - 1));
+    slider.value = "0";
+  }
+
+  function getPeakHourIndex() {
+    if (!forecastData?.hours?.length) return 0;
+
+    let maxIndex = 0;
+    let maxVal = -Infinity;
+
+    forecastData.hours.forEach((h, i) => {
+      const v = Number(h.navd88StageFt);
+      if (v > maxVal) {
+        maxVal = v;
+        maxIndex = i;
       }
-
-      const token = ++lastRenderToken;
-      await setFloodLayerFromStage(h.matchedStageKey, token);
-    }
-
-    async function loadManualStage() {
-      const raw = document.getElementById("manualStageInput").value.trim();
-      const normalized = normalizeStageKey(raw);
-
-      if (!normalized) {
-        setWarn("Enter a valid numeric stage, like 5.0");
-        return;
-      }
-
-      document.getElementById("hourText").textContent = "Manual stage";
-      document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
-      document.getElementById("stageText").textContent =
-        `Water level: ${normalized} ft NAVD88`;
-      document.getElementById("matchedText").textContent =
-        `Matched layer: ${normalized} ft NAVD88`;
-
-      setWarn("");
-
-      const token = ++lastRenderToken;
-      await setFloodLayerFromStage(normalized, token);
-    }
-
-    function stopPlayback() {
-      if (playTimer) {
-        clearInterval(playTimer);
-        playTimer = null;
-      }
-    }
-
-    function startPlayback() {
-      stopPlayback();
-
-      const slider = document.getElementById("hourSlider");
-      let i = Number(slider.value);
-
-      playTimer = setInterval(() => {
-        renderHour(i).catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-          stopPlayback();
-        });
-
-        slider.value = String(i);
-        i += 1;
-        if (i >= forecastData.hours.length) i = 0;
-      }, 1200);
-    }
-
-    async function reloadAll() {
-      stopPlayback();
-      clearFloodLayer();
-      setStatus("Reloading forecast...");
-
-      await loadForecast();
-
-      const peakIndex = getPeakHourIndex();
-      document.getElementById("hourSlider").value = String(peakIndex);
-      await renderHour(peakIndex);
-    }
-
-    async function main() {
-      setOpacityText();
-
-      document.getElementById("hourSlider").addEventListener("input", async (e) => {
-        stopPlayback();
-        await renderHour(Number(e.target.value));
-      });
-
-      document.getElementById("opacitySlider").addEventListener("input", (e) => {
-        overlayOpacity = Number(e.target.value) / 100;
-        setOpacityText();
-        applyOverlayOpacity();
-      });
-
-      document.getElementById("playBtn").addEventListener("click", startPlayback);
-      document.getElementById("stopBtn").addEventListener("click", stopPlayback);
-      document.getElementById("reloadBtn").addEventListener("click", () => {
-        reloadAll().catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
-      });
-      document.getElementById("showUrlsBtn").addEventListener("click", () => {
-        const text = document.getElementById("loadedUrlText").textContent || "";
-        showStageUrl(text);
-      });
-      document.getElementById("manualStageBtn").addEventListener("click", () => {
-        loadManualStage().catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
-      });
-
-      await reloadAll();
-    }
-
-    main().catch(err => {
-      console.error(err);
-      setStatus(err.message);
-      setWarn(err.message);
     });
-  </script>
-</body>
-</html>
+
+    return maxIndex;
+  }
+
+  async function setFloodLayerFromStage(stageKey, token) {
+    clearFloodLayer();
+    setHardWarn("");
+
+    const normalized = normalizeStageKey(stageKey);
+    if (!normalized) {
+      setWarn("Invalid stage value.");
+      return;
+    }
+
+    const fileName = stageKeyToFileName(normalized);
+    const rasterUrl = stageKeyToRasterUrl(normalized);
+
+    document.getElementById("serviceNameText").textContent =
+      `Raster file: ${fileName}`;
+    document.getElementById("loadedUrlText").textContent =
+      `Raster URL: ${rasterUrl}`;
+    showStageUrl(rasterUrl);
+
+    setStatus(`Loading ${fileName}...`);
+
+    let georaster;
+    try {
+      georaster = await getRaster(normalized);
+    } catch (err) {
+      if (token !== lastRenderToken) return;
+      setWarn(`Could not load raster for ${normalized} ft.`);
+      setStatus(err.message);
+      return;
+    }
+
+    if (token !== lastRenderToken) return;
+
+    ensureMap();
+
+    currentFloodLayer = new GeoRasterLayer({
+      georaster,
+      opacity: overlayOpacity,
+      resolution: 128,
+      pixelValuesToColorFn: function (values) {
+        if (!values || !values.length) return null;
+        const v = Number(values[0]);
+        return getDepthColor(v);
+      }
+    });
+
+    currentFloodLayer.addTo(map);
+
+    if (!mapHasFit) {
+      try {
+        map.fitBounds(currentFloodLayer.getBounds());
+        mapHasFit = true;
+      } catch (err) {
+        console.warn("Could not fit map to raster bounds", err);
+      }
+    }
+
+    setStatus(`Loaded ${fileName}`);
+
+    setHardWarn(
+      "This version loads full TIFFs directly from R2. It is the simplest setup, but large files may load slowly during playback."
+    );
+  }
+
+  async function renderHour(index) {
+    if (!forecastData?.hours?.length) return;
+
+    const h = forecastData.hours[index];
+    if (!h) return;
+
+    document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
+    document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
+    document.getElementById("stageText").textContent =
+      `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
+    document.getElementById("matchedText").textContent =
+      `Matched raster: ${h.matchedStageKey} ft NAVD88`;
+
+    if (h.wasClamped) {
+      setWarn(
+        `Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`
+      );
+    } else {
+      setWarn("");
+    }
+
+    const token = ++lastRenderToken;
+    await setFloodLayerFromStage(h.matchedStageKey, token);
+  }
+
+  async function loadManualStage() {
+    const raw = document.getElementById("manualStageInput").value.trim();
+    const normalized = normalizeStageKey(raw);
+
+    if (!normalized) {
+      setWarn("Enter a valid numeric stage, like 5.0");
+      return;
+    }
+
+    document.getElementById("hourText").textContent = "Manual stage";
+    document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
+    document.getElementById("stageText").textContent =
+      `Water level: ${normalized} ft NAVD88`;
+    document.getElementById("matchedText").textContent =
+      `Matched raster: ${normalized} ft NAVD88`;
+
+    setWarn("");
+
+    const token = ++lastRenderToken;
+    await setFloodLayerFromStage(normalized, token);
+  }
+
+  function stopPlayback() {
+    if (playTimer) {
+      clearInterval(playTimer);
+      playTimer = null;
+    }
+  }
+
+  function startPlayback() {
+    stopPlayback();
+
+    const slider = document.getElementById("hourSlider");
+    let i = Number(slider.value);
+
+    playTimer = setInterval(() => {
+      renderHour(i).catch(err => {
+        console.error(err);
+        setStatus(err.message);
+        setWarn(err.message);
+        stopPlayback();
+      });
+
+      slider.value = String(i);
+      i += 1;
+      if (i >= forecastData.hours.length) i = 0;
+    }, 1500);
+  }
+
+  async function reloadAll() {
+    stopPlayback();
+    clearFloodLayer();
+    setStatus("Reloading forecast...");
+
+    await loadForecast();
+
+    const peakIndex = getPeakHourIndex();
+    document.getElementById("hourSlider").value = String(peakIndex);
+    await renderHour(peakIndex);
+  }
+
+  async function main() {
+    setOpacityText();
+
+    document.getElementById("hourSlider").addEventListener("input", async (e) => {
+      stopPlayback();
+      await renderHour(Number(e.target.value));
+    });
+
+    document.getElementById("opacitySlider").addEventListener("input", (e) => {
+      overlayOpacity = Number(e.target.value) / 100;
+      setOpacityText();
+      applyOverlayOpacity();
+    });
+
+    document.getElementById("playBtn").addEventListener("click", startPlayback);
+    document.getElementById("stopBtn").addEventListener("click", stopPlayback);
+    document.getElementById("reloadBtn").addEventListener("click", () => {
+      reloadAll().catch(err => {
+        console.error(err);
+        setStatus(err.message);
+        setWarn(err.message);
+      });
+    });
+    document.getElementById("showUrlsBtn").addEventListener("click", () => {
+      const text = document.getElementById("loadedUrlText").textContent || "";
+      showStageUrl(text);
+    });
+    document.getElementById("manualStageBtn").addEventListener("click", () => {
+      loadManualStage().catch(err => {
+        console.error(err);
+        setStatus(err.message);
+        setWarn(err.message);
+      });
+    });
+
+    await reloadAll();
+  }
+
+  main().catch(err => {
+    console.error(err);
+    setStatus(err.message);
+    setWarn(err.message);
+  });
+</script>
