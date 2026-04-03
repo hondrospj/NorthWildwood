@@ -136,8 +136,8 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Raster source mode: direct GeoTIFF from Cloudflare R2</div>
-      <div class="muted">Raster base: rasters.rasterrepo.com</div>
+      <div class="muted">Overlay source mode: Cloudflare R2 static WebP overlays</div>
+      <div class="muted">Overlay base: https://rasters.rasterrepo.com/overlays</div>
 
       <div class="section">
         <div id="issuedText" class="muted">Forecast issued: loading…</div>
@@ -162,9 +162,9 @@
 
       <div class="section">
         <div id="stageText">Water level: --</div>
-        <div id="matchedText">Matched raster: --</div>
-        <div id="serviceNameText" class="muted">Raster file: --</div>
-        <div id="loadedUrlText" class="muted">Raster URL: --</div>
+        <div id="matchedText">Matched overlay: --</div>
+        <div id="serviceNameText" class="muted">Overlay file: --</div>
+        <div id="loadedUrlText" class="muted">Overlay URL: --</div>
         <div id="warn"></div>
         <div id="hardWarn"></div>
       </div>
@@ -173,21 +173,21 @@
         <button id="playBtn">Play</button>
         <button id="stopBtn">Stop</button>
         <button id="reloadBtn">Reload</button>
-        <button id="showUrlsBtn">Show raster URL</button>
+        <button id="showUrlsBtn">Show overlay URL</button>
         <textarea id="urlBox" readonly></textarea>
       </div>
 
       <div class="section">
-        <div class="muted">Manual raster test</div>
+        <div class="muted">Manual overlay test</div>
         <input id="manualStageInput" type="text" placeholder="e.g. 5.0" />
         <button id="manualStageBtn">Load stage</button>
       </div>
 
       <div class="section">
         <div class="muted">
-          This version loads each flood raster directly from Cloudflare R2 instead of ArcGIS hosted tile services.
+          This version loads pre-rendered WebP flood overlays from Cloudflare R2 instead of loading GeoTIFF rasters in the browser.
         </div>
-        <div class="pill">Direct TIFF mode</div>
+        <div class="pill">Cloudflare WebP overlay mode</div>
       </div>
 
       <div class="section">
@@ -199,16 +199,24 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/georaster/dist/georaster.browser.bundle.min.js"></script>
-  <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
 
   <script>
-    const RASTER_BASE = "https://rasters.rasterrepo.com";
+    const RASTER_BASE = "https://rasters.rasterrepo.com/overlays";
     const FORECAST_URL = "./forecast.json";
     const MIN_STAGE = -2.0;
     const MAX_STAGE = 14.0;
     const DEFAULT_CENTER = [39.0007, -74.8089];
     const DEFAULT_ZOOM = 13;
+
+    /*
+      These bounds are based on the raster corner coordinates from your earlier GDAL output.
+      Southwest first, then northeast.
+      If the overlay is offset, only edit these four numbers.
+    */
+    const OVERLAY_BOUNDS = [
+      [38.9851833, -74.8524056],
+      [39.0486111, -74.7730000]
+    ];
 
     let map = null;
     let currentFloodLayer = null;
@@ -217,8 +225,6 @@
     let overlayOpacity = 1.0;
     let lastRenderToken = 0;
     let mapHasFit = false;
-
-    const rasterCache = new Map();
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -278,7 +284,7 @@
       return (Math.round(clipped * 10) / 10).toFixed(1);
     }
 
-    function stageKeyToFileName(stageKey) {
+    function stageKeyToFileStem(stageKey) {
       const num = Number(stageKey);
       const sign = num < 0 ? "m" : "p";
       let absVal = Math.abs(num);
@@ -290,33 +296,11 @@
         tenth = 0;
       }
 
-      return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88.tif`;
+      return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88`;
     }
 
-    function stageKeyToRasterUrl(stageKey) {
-      return `${RASTER_BASE}/${stageKeyToFileName(stageKey)}`;
-    }
-
-    async function getRaster(stageKey) {
-      const key = String(stageKey);
-      if (rasterCache.has(key)) return rasterCache.get(key);
-
-      const url = stageKeyToRasterUrl(key);
-
-      const promise = fetch(url, { cache: "force-cache" })
-        .then(async (r) => {
-          if (!r.ok) {
-            throw new Error(`Raster not found: ${url}`);
-          }
-          const arrayBuffer = await r.arrayBuffer();
-          const georaster = await parseGeoraster(arrayBuffer);
-          georaster.__url = url;
-          georaster.__fileName = stageKeyToFileName(key);
-          return georaster;
-        });
-
-      rasterCache.set(key, promise);
-      return promise;
+    function stageKeyToOverlayUrl(stageKey) {
+      return `${RASTER_BASE}/${stageKeyToFileStem(stageKey)}.webp`;
     }
 
     function ensureMap() {
@@ -348,16 +332,6 @@
       }
     }
 
-    function getDepthColor(v) {
-      if (v == null || !Number.isFinite(v) || v <= 0) return null;
-      if (v < 0.5) return "rgba(173,216,230,0.35)";
-      if (v < 1.0) return "rgba(100,149,237,0.45)";
-      if (v < 2.0) return "rgba(65,105,225,0.55)";
-      if (v < 3.0) return "rgba(30,144,255,0.65)";
-      if (v < 5.0) return "rgba(0,90,255,0.72)";
-      return "rgba(0,50,180,0.82)";
-    }
-
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
 
@@ -366,9 +340,9 @@
       document.getElementById("sourceText").textContent =
         `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
       document.getElementById("catalogText").textContent =
-        "Catalog mode: deterministic TIFF names in R2";
+        "Catalog mode: static WebP overlays in Cloudflare R2";
       document.getElementById("serviceModeText").textContent =
-        "Layer mode: direct GeoTIFF from Cloudflare R2";
+        "Layer mode: Cloudflare R2 WebP image overlay";
 
       const slider = document.getElementById("hourSlider");
       const count = forecastData.hours ? forecastData.hours.length : 0;
@@ -403,58 +377,41 @@
         return;
       }
 
-      const fileName = stageKeyToFileName(normalized);
-      const rasterUrl = stageKeyToRasterUrl(normalized);
+      const fileStem = stageKeyToFileStem(normalized);
+      const overlayUrl = stageKeyToOverlayUrl(normalized);
 
       document.getElementById("serviceNameText").textContent =
-        `Raster file: ${fileName}`;
+        `Overlay file: ${fileStem}.webp`;
       document.getElementById("loadedUrlText").textContent =
-        `Raster URL: ${rasterUrl}`;
-      showStageUrl(rasterUrl);
+        `Overlay URL: ${overlayUrl}`;
+      showStageUrl(overlayUrl);
 
-      setStatus(`Loading ${fileName}...`);
-
-      let georaster;
-      try {
-        georaster = await getRaster(normalized);
-      } catch (err) {
-        if (token !== lastRenderToken) return;
-        setWarn(`Could not load raster for ${normalized} ft.`);
-        setStatus(err.message);
-        return;
-      }
-
-      if (token !== lastRenderToken) return;
+      setStatus(`Loading ${fileStem}.webp...`);
 
       ensureMap();
 
-      currentFloodLayer = new GeoRasterLayer({
-        georaster,
+      currentFloodLayer = L.imageOverlay(overlayUrl, OVERLAY_BOUNDS, {
         opacity: overlayOpacity,
-        resolution: 128,
-        pixelValuesToColorFn: function (values) {
-          if (!values || !values.length) return null;
-          const v = Number(values[0]);
-          return getDepthColor(v);
-        }
+        interactive: false
+      });
+
+      currentFloodLayer.on("load", () => {
+        if (token !== lastRenderToken) return;
+        setStatus(`Loaded ${fileStem}.webp`);
+      });
+
+      currentFloodLayer.on("error", () => {
+        if (token !== lastRenderToken) return;
+        setWarn(`Could not load overlay for ${normalized} ft.`);
+        setStatus(`Overlay load failed for ${fileStem}.webp`);
       });
 
       currentFloodLayer.addTo(map);
 
       if (!mapHasFit) {
-        try {
-          map.fitBounds(currentFloodLayer.getBounds());
-          mapHasFit = true;
-        } catch (err) {
-          console.warn("Could not fit map to raster bounds", err);
-        }
+        map.fitBounds(OVERLAY_BOUNDS);
+        mapHasFit = true;
       }
-
-      setStatus(`Loaded ${fileName}`);
-
-      setHardWarn(
-        "This version loads full TIFFs directly from R2. It is the simplest setup, but large files may load slowly."
-      );
     }
 
     async function renderHour(index) {
@@ -468,11 +425,11 @@
       document.getElementById("stageText").textContent =
         `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
       document.getElementById("matchedText").textContent =
-        `Matched raster: ${h.matchedStageKey} ft NAVD88`;
+        `Matched overlay: ${h.matchedStageKey} ft NAVD88`;
 
       if (h.wasClamped) {
         setWarn(
-          `Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`
+          `Value was outside your published overlay range, so it was clamped to ${h.matchedStageKey} ft.`
         );
       } else {
         setWarn("");
@@ -496,7 +453,7 @@
       document.getElementById("stageText").textContent =
         `Water level: ${normalized} ft NAVD88`;
       document.getElementById("matchedText").textContent =
-        `Matched raster: ${normalized} ft NAVD88`;
+        `Matched overlay: ${normalized} ft NAVD88`;
 
       setWarn("");
 
