@@ -140,7 +140,7 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Overlay source mode: GitHub Pages static WebP overlays + matching PGW world files</div>
+      <div class="muted">Overlay source mode: GitHub Pages static WebP overlays</div>
       <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
 
       <div class="section">
@@ -189,9 +189,9 @@
 
       <div class="section">
         <div class="muted">
-          This version loads pre-rendered WebP flood overlays and uses each matching .pgw file to place the image correctly on the map.
+          This version uses one shared embedded world file for all overlays.
         </div>
-        <div class="pill">GitHub Pages WebP + PGW georeferencing mode</div>
+        <div class="pill">Shared world-file georeferencing mode</div>
       </div>
 
       <div class="section">
@@ -216,34 +216,27 @@
     const DEFAULT_ZOOM = 13;
 
     /*
-      Fallback only.
-      Used only if the .pgw cannot be read.
+      Shared world file values from your uploaded .pgw.
+      Because all WebPs have the same dimensions and same footprint,
+      one set of georeferencing values is used for all overlays.
     */
-    const FALLBACK_BOUNDS = [
-      [38.9851833, -74.8524056],
-      [39.0486111, -74.7730000]
-    ];
+    const SHARED_WORLD = {
+      A:  9.997136167181090,
+      D:  0.000000000000000,
+      B:  0.000000000000000,
+      E: -9.997136167181090,
+      C: 387160.425416319048963,
+      F:  79278.899915540285292
+    };
 
     /*
-      Try both common New Jersey State Plane variants and keep whichever
-      lands the overlay closest to North Wildwood.
+      NAD83 / New Jersey (ftUS)
+      This is the CRS that matches the uploaded world-file coordinates.
     */
-    const PROJ_CANDIDATES = [
-      {
-        name: "NAD83 / NJ State Plane (US survey feet)",
-        id: "NJSP_USFT",
-        def: "+proj=tmerc +lat_0=38.83333333333334 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
-      },
-      {
-        name: "NAD83 / NJ State Plane (meters)",
-        id: "NJSP_M",
-        def: "+proj=tmerc +lat_0=38.83333333333334 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +datum=NAD83 +units=m +no_defs"
-      }
-    ];
-
-    for (const p of PROJ_CANDIDATES) {
-      proj4.defs(p.id, p.def);
-    }
+    proj4.defs(
+      "EPSG:3424",
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
+    );
 
     let map = null;
     let currentFloodLayer = null;
@@ -252,8 +245,7 @@
     let overlayOpacity = 1.0;
     let lastRenderToken = 0;
     let mapHasFit = false;
-
-    const overlayBoundsCache = new Map();
+    let sharedOverlayBounds = null;
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -307,14 +299,6 @@
       return r.json();
     }
 
-    async function fetchText(url) {
-      const r = await fetch(url, { cache: "no-store" });
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status} for ${url}`);
-      }
-      return r.text();
-    }
-
     function normalizeStageKey(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
@@ -342,8 +326,33 @@
       return `${RASTER_BASE}/${stageKeyToFileStem(stageKey)}.webp`;
     }
 
-    function overlayUrlToWorldFileUrl(overlayUrl) {
-      return overlayUrl.replace(/\.webp(\?.*)?$/i, ".pgw");
+    function ensureMap() {
+      if (map) return;
+
+      map = L.map("map", {
+        zoomControl: true,
+        preferCanvas: false
+      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+
+      document.getElementById("crsText").textContent =
+        "Map CRS: Leaflet / OSM basemap | Overlay georef: shared world file";
+    }
+
+    function clearFloodLayer() {
+      if (currentFloodLayer && map) {
+        map.removeLayer(currentFloodLayer);
+        currentFloodLayer = null;
+      }
+    }
+
+    function applyOverlayOpacity() {
+      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
+        currentFloodLayer.setOpacity(overlayOpacity);
+      }
     }
 
     async function loadImageMeta(url) {
@@ -376,179 +385,42 @@
       });
     }
 
-    function ensureMap() {
-      if (map) return;
-
-      map = L.map("map", {
-        zoomControl: true,
-        preferCanvas: false
-      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors"
-      }).addTo(map);
-
-      document.getElementById("crsText").textContent =
-        "Map CRS: Leaflet / OSM basemap";
+    function projectToLatLng(x, y) {
+      const [lon, lat] = proj4("EPSG:3424", "EPSG:4326", [x, y]);
+      return [lat, lon];
     }
 
-    function clearFloodLayer() {
-      if (currentFloodLayer && map) {
-        map.removeLayer(currentFloodLayer);
-        currentFloodLayer = null;
-      }
-    }
-
-    function applyOverlayOpacity() {
-      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
-        currentFloodLayer.setOpacity(overlayOpacity);
-      }
-    }
-
-    function projectPoint(projId, x, y) {
-      const out = proj4(projId, "EPSG:4326", [x, y]);
-      return {
-        lon: out[0],
-        lat: out[1]
-      };
-    }
-
-    function buildLatLngBoundsFromCorners(corners) {
-      const lats = corners.map(c => c.lat);
-      const lons = corners.map(c => c.lon);
-
-      return {
-        south: Math.min(...lats),
-        north: Math.max(...lats),
-        west: Math.min(...lons),
-        east: Math.max(...lons)
-      };
-    }
-
-    function scoreBounds(bounds) {
-      const centerLat = (bounds.south + bounds.north) / 2;
-      const centerLon = (bounds.west + bounds.east) / 2;
-
-      const dLat = centerLat - DEFAULT_CENTER[0];
-      const dLon = centerLon - DEFAULT_CENTER[1];
-      let score = dLat * dLat + dLon * dLon;
-
-      const width = Math.abs(bounds.east - bounds.west);
-      const height = Math.abs(bounds.north - bounds.south);
-
-      if (
-        centerLat < 35 || centerLat > 42 ||
-        centerLon < -77 || centerLon > -72
-      ) {
-        score += 100000;
-      }
-
-      if (width <= 0 || height <= 0) {
-        score += 100000;
-      }
-
-      if (width > 1.5 || height > 1.5) {
-        score += 1000;
-      }
-
-      if (width < 0.00001 || height < 0.00001) {
-        score += 1000;
-      }
-
-      return score;
-    }
-
-    function worldFileToProjectedCorners(lines, width, height) {
-      const [A, D, B, E, C, F] = lines;
-
-      /*
-        Convert from world-file "center of upper-left pixel" to outer edges.
-        This works for unrotated rasters and still gives a bounding box for
-        slightly rotated rasters.
-      */
-      const x0 = C - (A / 2) - (B / 2);
-      const y0 = F - (D / 2) - (E / 2);
-
-      return [
-        { x: x0,               y: y0 },                // UL edge
-        { x: x0 + A * width,   y: y0 + D * width },    // UR edge
-        { x: x0 + B * height,  y: y0 + E * height },   // LL edge
-        { x: x0 + A * width + B * height, y: y0 + D * width + E * height } // LR edge
-      ];
-    }
-
-    function chooseBestProjection(projectedCorners) {
-      const candidates = PROJ_CANDIDATES.map(p => {
-        const llCorners = projectedCorners.map(pt => projectPoint(p.id, pt.x, pt.y));
-        const bounds = buildLatLngBoundsFromCorners(llCorners);
-        const score = scoreBounds(bounds);
-
-        return {
-          name: p.name,
-          id: p.id,
-          bounds,
-          score
-        };
-      });
-
-      candidates.sort((a, b) => a.score - b.score);
-      return candidates[0];
-    }
-
-    async function getOverlayBoundsFromWorldFile(overlayUrl) {
-      if (overlayBoundsCache.has(overlayUrl)) {
-        return overlayBoundsCache.get(overlayUrl);
-      }
-
-      const worldFileUrl = overlayUrlToWorldFileUrl(overlayUrl);
-
-      const [pgwText, imageMeta] = await Promise.all([
-        fetchText(`${worldFileUrl}?v=${Date.now()}`),
-        loadImageMeta(overlayUrl)
-      ]);
-
-      const lines = pgwText
-        .trim()
-        .split(/\r?\n/)
-        .map(s => Number(s.trim()));
-
-      if (lines.length < 6 || lines.some(v => !Number.isFinite(v))) {
-        throw new Error(`Invalid world file: ${worldFileUrl}`);
-      }
-
-      const [A, D, B, E] = lines;
+    function computeBoundsFromWorld(width, height) {
+      const { A, D, B, E, C, F } = SHARED_WORLD;
 
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        setWarn("World file contains rotation/skew terms. Leaflet imageOverlay cannot truly rotate the image, so this will use the bounding box only.");
+        throw new Error("Shared world file contains rotation/skew terms. This HTML assumes north-up rasters.");
       }
 
-      const width = imageMeta.width;
-      const height = imageMeta.height;
+      const west  = C - (A / 2);
+      const north = F - (E / 2);
+      const east  = C + A * (width  - 0.5);
+      const south = F + E * (height - 0.5);
 
-      if (!width || !height) {
-        throw new Error(`Could not read image size for ${overlayUrl}`);
+      const sw = projectToLatLng(west, south);
+      const ne = projectToLatLng(east, north);
+
+      return [sw, ne];
+    }
+
+    async function getSharedOverlayBounds(sampleOverlayUrl) {
+      if (sharedOverlayBounds) {
+        return sharedOverlayBounds;
       }
 
-      if (!Number.isFinite(A) || !Number.isFinite(E)) {
-        throw new Error(`Invalid pixel size in world file: ${worldFileUrl}`);
+      const meta = await loadImageMeta(sampleOverlayUrl);
+
+      if (!meta.width || !meta.height) {
+        throw new Error(`Could not read image size for ${sampleOverlayUrl}`);
       }
 
-      const projectedCorners = worldFileToProjectedCorners(lines, width, height);
-      const best = chooseBestProjection(projectedCorners);
-
-      const leafletBounds = [
-        [best.bounds.south, best.bounds.west],
-        [best.bounds.north, best.bounds.east]
-      ];
-
-      const result = {
-        bounds: leafletBounds,
-        projectionName: best.name,
-        worldFileUrl
-      };
-
-      overlayBoundsCache.set(overlayUrl, result);
-      return result;
+      sharedOverlayBounds = computeBoundsFromWorld(meta.width, meta.height);
+      return sharedOverlayBounds;
     }
 
     async function loadForecast() {
@@ -622,7 +494,7 @@
       if (!exists.ok) {
         setWarn(`Could not load overlay for ${normalized} ft.`);
         setHardWarn(
-          `GitHub Pages could not find or serve this file:\n${overlayUrl}\n\nMake sure BOTH of these exist in assets/overlays:\n${fileStem}.webp\n${fileStem}.pgw`
+          `GitHub Pages could not find or serve this file:\n${overlayUrl}\n\nCheck that the file exists in assets/overlays and that GitHub Pages is publishing the repo/branch you expect.`
         );
         setStatus(`Overlay load failed for ${fileStem}.webp`);
         return;
@@ -630,25 +502,19 @@
 
       ensureMap();
 
-      let overlayBounds = FALLBACK_BOUNDS;
-      let projectionName = "fallback hard-coded bounds";
-
+      let overlayBounds;
       try {
-        const georef = await getOverlayBoundsFromWorldFile(overlayUrl);
-        overlayBounds = georef.bounds;
-        projectionName = georef.projectionName;
+        overlayBounds = await getSharedOverlayBounds(overlayUrl);
       } catch (err) {
-        console.error(err);
-        setWarn("Could not read the .pgw file, so fallback bounds are being used.");
+        setWarn(err.message);
         setHardWarn(
-          `World file read failed for:\n${overlayUrlToWorldFileUrl(overlayUrl)}\n\n${err.message}`
+          `Shared georeferencing failed.\n\n${err.message}`
         );
+        setStatus("Shared georeferencing failed");
+        return;
       }
 
       if (token !== lastRenderToken) return;
-
-      document.getElementById("crsText").textContent =
-        `Map CRS: Leaflet / OSM basemap | Overlay georef: ${projectionName}`;
 
       currentFloodLayer = L.imageOverlay(
         `${overlayUrl}?v=${Date.now()}`,
