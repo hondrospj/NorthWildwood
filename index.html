@@ -1,386 +1,591 @@
-<script>
-  const RASTER_BASE = "https://rasters.rasterrepo.com";
-  const FORECAST_URL = "./forecast.json";
-  const MIN_STAGE = -2.0;
-  const MAX_STAGE = 14.0;
-  const DEFAULT_CENTER = [39.0007, -74.8089];
-  const DEFAULT_ZOOM = 13;
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>North Wildwood Flood Forecast</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  let map = null;
-  let currentFloodLayer = null;
-  let forecastData = null;
-  let playTimer = null;
-  let overlayOpacity = 1.0;
-  let lastRenderToken = 0;
-  let mapHasFit = false;
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
 
-  const rasterCache = new Map();
-
-  function setStatus(msg) {
-    document.getElementById("status").textContent = msg;
-  }
-
-  function setWarn(msg) {
-    const el = document.getElementById("warn");
-    if (!msg) {
-      el.style.display = "none";
-      el.textContent = "";
-    } else {
-      el.style.display = "block";
-      el.textContent = msg;
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      font-family: Arial, Helvetica, sans-serif;
     }
-  }
 
-  function setHardWarn(msg) {
-    const el = document.getElementById("hardWarn");
-    if (!msg) {
-      el.style.display = "none";
-      el.textContent = "";
-    } else {
-      el.style.display = "block";
-      el.textContent = msg;
+    #app {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      height: 100%;
     }
-  }
 
-  function setOpacityText() {
-    document.getElementById("opacityText").textContent =
-      `${Math.round(overlayOpacity * 100)}%`;
-  }
+    #panel {
+      padding: 16px;
+      border-right: 1px solid #ddd;
+      overflow: auto;
+      background: #fff;
+    }
 
-  function showStageUrl(text) {
-    const box = document.getElementById("urlBox");
-    box.style.display = "block";
-    box.value = text;
-  }
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #eef3f8;
+    }
 
-  async function fetchJson(url, params = null) {
-    const u = new URL(url, window.location.href);
-    if (params) {
-      for (const [k, v] of Object.entries(params)) {
-        u.searchParams.set(k, v);
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+    }
+
+    .muted {
+      color: #555;
+      font-size: 14px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #ececec;
+    }
+
+    .big {
+      font-size: 22px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    button {
+      padding: 9px 12px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+    }
+
+    #status {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #f6f8fa;
+      border: 1px solid #e1e4e8;
+      border-radius: 8px;
+      font-size: 14px;
+      white-space: pre-wrap;
+      color: #111;
+    }
+
+    #warn {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #fff3e0;
+      border: 1px solid #ffd8a8;
+      border-radius: 8px;
+      color: #8a4b00;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    #hardWarn {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: #fee2e2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #991b1b;
+      display: none;
+      white-space: pre-wrap;
+    }
+
+    #urlBox {
+      width: 100%;
+      height: 220px;
+      display: none;
+      margin-top: 8px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    #manualStageInput {
+      width: 120px;
+      padding: 6px;
+      margin-right: 8px;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #1e40af;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <aside id="panel">
+      <h1>North Wildwood Flood Forecast</h1>
+      <div class="muted">Driver station: Stone Harbor (8535581)</div>
+      <div class="muted">Raster source mode: direct GeoTIFF from Cloudflare R2</div>
+      <div class="muted">Raster base: rasters.rasterrepo.com</div>
+
+      <div class="section">
+        <div id="issuedText" class="muted">Forecast issued: loading…</div>
+        <div id="sourceText" class="muted">Source: loading…</div>
+        <div id="catalogText" class="muted">Catalog mode: loading…</div>
+        <div id="crsText" class="muted">Map CRS: loading…</div>
+        <div id="serviceModeText" class="muted">Layer mode: loading…</div>
+      </div>
+
+      <div class="section">
+        <label for="hourSlider">Forecast hour</label>
+        <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
+        <div id="hourText" class="big">Hour 0</div>
+        <div id="timeText" class="muted">Time: --</div>
+      </div>
+
+      <div class="section">
+        <label for="opacitySlider">Overlay opacity</label>
+        <input id="opacitySlider" type="range" min="0" max="100" value="100" step="1" />
+        <div id="opacityText" class="muted">100%</div>
+      </div>
+
+      <div class="section">
+        <div id="stageText">Water level: --</div>
+        <div id="matchedText">Matched raster: --</div>
+        <div id="serviceNameText" class="muted">Raster file: --</div>
+        <div id="loadedUrlText" class="muted">Raster URL: --</div>
+        <div id="warn"></div>
+        <div id="hardWarn"></div>
+      </div>
+
+      <div class="section">
+        <button id="playBtn">Play</button>
+        <button id="stopBtn">Stop</button>
+        <button id="reloadBtn">Reload</button>
+        <button id="showUrlsBtn">Show raster URL</button>
+        <textarea id="urlBox" readonly></textarea>
+      </div>
+
+      <div class="section">
+        <div class="muted">Manual raster test</div>
+        <input id="manualStageInput" type="text" placeholder="e.g. 5.0" />
+        <button id="manualStageBtn">Load stage</button>
+      </div>
+
+      <div class="section">
+        <div class="muted">
+          This version loads each flood raster directly from Cloudflare R2 instead of ArcGIS hosted tile services.
+        </div>
+        <div class="pill">Direct TIFF mode</div>
+      </div>
+
+      <div class="section">
+        <div id="status">Starting…</div>
+      </div>
+    </aside>
+
+    <main id="map"></main>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/georaster/dist/georaster.browser.bundle.min.js"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet/dist/georaster-layer-for-leaflet.min.js"></script>
+
+  <script>
+    const RASTER_BASE = "https://rasters.rasterrepo.com";
+    const FORECAST_URL = "./forecast.json";
+    const MIN_STAGE = -2.0;
+    const MAX_STAGE = 14.0;
+    const DEFAULT_CENTER = [39.0007, -74.8089];
+    const DEFAULT_ZOOM = 13;
+
+    let map = null;
+    let currentFloodLayer = null;
+    let forecastData = null;
+    let playTimer = null;
+    let overlayOpacity = 1.0;
+    let lastRenderToken = 0;
+    let mapHasFit = false;
+
+    const rasterCache = new Map();
+
+    function setStatus(msg) {
+      document.getElementById("status").textContent = msg;
+    }
+
+    function setWarn(msg) {
+      const el = document.getElementById("warn");
+      if (!msg) {
+        el.style.display = "none";
+        el.textContent = "";
+      } else {
+        el.style.display = "block";
+        el.textContent = msg;
       }
     }
-    const r = await fetch(u.toString(), { cache: "no-store" });
-    if (!r.ok) {
-      throw new Error(`HTTP ${r.status} for ${u.toString()}`);
-    }
-    return r.json();
-  }
 
-  function normalizeStageKey(value) {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return null;
-    const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
-    return (Math.round(clipped * 10) / 10).toFixed(1);
-  }
-
-  function stageKeyToFileName(stageKey) {
-    const num = Number(stageKey);
-    const sign = num < 0 ? "m" : "p";
-    let absVal = Math.abs(num);
-    let whole = Math.floor(absVal + 1e-9);
-    let tenth = Math.round((absVal - whole) * 10);
-
-    if (tenth === 10) {
-      whole += 1;
-      tenth = 0;
+    function setHardWarn(msg) {
+      const el = document.getElementById("hardWarn");
+      if (!msg) {
+        el.style.display = "none";
+        el.textContent = "";
+      } else {
+        el.style.display = "block";
+        el.textContent = msg;
+      }
     }
 
-    return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88.tif`;
-  }
+    function setOpacityText() {
+      document.getElementById("opacityText").textContent =
+        `${Math.round(overlayOpacity * 100)}%`;
+    }
 
-  function stageKeyToRasterUrl(stageKey) {
-    return `${RASTER_BASE}/${stageKeyToFileName(stageKey)}`;
-  }
+    function showStageUrl(text) {
+      const box = document.getElementById("urlBox");
+      box.style.display = "block";
+      box.value = text;
+    }
 
-  async function getRaster(stageKey) {
-    const key = String(stageKey);
-    if (rasterCache.has(key)) return rasterCache.get(key);
-
-    const url = stageKeyToRasterUrl(key);
-
-    const promise = fetch(url, { cache: "force-cache" })
-      .then(async (r) => {
-        if (!r.ok) {
-          throw new Error(`Raster not found: ${url}`);
+    async function fetchJson(url, params = null) {
+      const u = new URL(url, window.location.href);
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          u.searchParams.set(k, v);
         }
-        const arrayBuffer = await r.arrayBuffer();
-        const georaster = await parseGeoraster(arrayBuffer);
-        georaster.__url = url;
-        georaster.__fileName = stageKeyToFileName(key);
-        return georaster;
+      }
+      const r = await fetch(u.toString(), { cache: "no-store" });
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
+      }
+      return r.json();
+    }
+
+    function normalizeStageKey(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+      const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
+      return (Math.round(clipped * 10) / 10).toFixed(1);
+    }
+
+    function stageKeyToFileName(stageKey) {
+      const num = Number(stageKey);
+      const sign = num < 0 ? "m" : "p";
+      let absVal = Math.abs(num);
+      let whole = Math.floor(absVal + 1e-9);
+      let tenth = Math.round((absVal - whole) * 10);
+
+      if (tenth === 10) {
+        whole += 1;
+        tenth = 0;
+      }
+
+      return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88.tif`;
+    }
+
+    function stageKeyToRasterUrl(stageKey) {
+      return `${RASTER_BASE}/${stageKeyToFileName(stageKey)}`;
+    }
+
+    async function getRaster(stageKey) {
+      const key = String(stageKey);
+      if (rasterCache.has(key)) return rasterCache.get(key);
+
+      const url = stageKeyToRasterUrl(key);
+
+      const promise = fetch(url, { cache: "force-cache" })
+        .then(async (r) => {
+          if (!r.ok) {
+            throw new Error(`Raster not found: ${url}`);
+          }
+          const arrayBuffer = await r.arrayBuffer();
+          const georaster = await parseGeoraster(arrayBuffer);
+          georaster.__url = url;
+          georaster.__fileName = stageKeyToFileName(key);
+          return georaster;
+        });
+
+      rasterCache.set(key, promise);
+      return promise;
+    }
+
+    function ensureMap() {
+      if (map) return;
+
+      map = L.map("map", {
+        zoomControl: true,
+        preferCanvas: false
+      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+
+      document.getElementById("crsText").textContent =
+        "Map CRS: Leaflet / OSM basemap";
+    }
+
+    function clearFloodLayer() {
+      if (currentFloodLayer && map) {
+        map.removeLayer(currentFloodLayer);
+        currentFloodLayer = null;
+      }
+    }
+
+    function applyOverlayOpacity() {
+      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
+        currentFloodLayer.setOpacity(overlayOpacity);
+      }
+    }
+
+    function getDepthColor(v) {
+      if (v == null || !Number.isFinite(v) || v <= 0) return null;
+      if (v < 0.5) return "rgba(173,216,230,0.35)";
+      if (v < 1.0) return "rgba(100,149,237,0.45)";
+      if (v < 2.0) return "rgba(65,105,225,0.55)";
+      if (v < 3.0) return "rgba(30,144,255,0.65)";
+      if (v < 5.0) return "rgba(0,90,255,0.72)";
+      return "rgba(0,50,180,0.82)";
+    }
+
+    async function loadForecast() {
+      forecastData = await fetchJson(FORECAST_URL);
+
+      document.getElementById("issuedText").textContent =
+        `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
+      document.getElementById("sourceText").textContent =
+        `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
+      document.getElementById("catalogText").textContent =
+        "Catalog mode: deterministic TIFF names in R2";
+      document.getElementById("serviceModeText").textContent =
+        "Layer mode: direct GeoTIFF from Cloudflare R2";
+
+      const slider = document.getElementById("hourSlider");
+      const count = forecastData.hours ? forecastData.hours.length : 0;
+      slider.max = String(Math.max(0, count - 1));
+      slider.value = "0";
+    }
+
+    function getPeakHourIndex() {
+      if (!forecastData?.hours?.length) return 0;
+
+      let maxIndex = 0;
+      let maxVal = -Infinity;
+
+      forecastData.hours.forEach((h, i) => {
+        const v = Number(h.navd88StageFt);
+        if (v > maxVal) {
+          maxVal = v;
+          maxIndex = i;
+        }
       });
 
-    rasterCache.set(key, promise);
-    return promise;
-  }
-
-  function ensureMap() {
-    if (map) return;
-
-    map = L.map("map", {
-      zoomControl: true,
-      preferCanvas: false
-    }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
-
-    document.getElementById("crsText").textContent =
-      "Map CRS: Leaflet / OSM basemap";
-  }
-
-  function clearFloodLayer() {
-    if (currentFloodLayer && map) {
-      map.removeLayer(currentFloodLayer);
-      currentFloodLayer = null;
+      return maxIndex;
     }
-  }
 
-  function applyOverlayOpacity() {
-    if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
-      currentFloodLayer.setOpacity(overlayOpacity);
-    }
-  }
+    async function setFloodLayerFromStage(stageKey, token) {
+      clearFloodLayer();
+      setHardWarn("");
 
-  function getDepthColor(v) {
-    if (v == null || !Number.isFinite(v) || v <= 0) return null;
-
-    if (v < 0.5) return "rgba(173,216,230,0.35)";
-    if (v < 1.0) return "rgba(100,149,237,0.45)";
-    if (v < 2.0) return "rgba(65,105,225,0.55)";
-    if (v < 3.0) return "rgba(30,144,255,0.65)";
-    if (v < 5.0) return "rgba(0,90,255,0.72)";
-    return "rgba(0,50,180,0.82)";
-  }
-
-  async function loadForecast() {
-    forecastData = await fetchJson(FORECAST_URL);
-
-    document.getElementById("issuedText").textContent =
-      `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
-    document.getElementById("sourceText").textContent =
-      `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
-    document.getElementById("catalogText").textContent =
-      "Catalog mode: deterministic TIFF names in R2";
-    document.getElementById("serviceModeText").textContent =
-      "Layer mode: direct GeoTIFF from Cloudflare R2";
-
-    const slider = document.getElementById("hourSlider");
-    const count = forecastData.hours ? forecastData.hours.length : 0;
-    slider.max = String(Math.max(0, count - 1));
-    slider.value = "0";
-  }
-
-  function getPeakHourIndex() {
-    if (!forecastData?.hours?.length) return 0;
-
-    let maxIndex = 0;
-    let maxVal = -Infinity;
-
-    forecastData.hours.forEach((h, i) => {
-      const v = Number(h.navd88StageFt);
-      if (v > maxVal) {
-        maxVal = v;
-        maxIndex = i;
+      const normalized = normalizeStageKey(stageKey);
+      if (!normalized) {
+        setWarn("Invalid stage value.");
+        return;
       }
-    });
 
-    return maxIndex;
-  }
+      const fileName = stageKeyToFileName(normalized);
+      const rasterUrl = stageKeyToRasterUrl(normalized);
 
-  async function setFloodLayerFromStage(stageKey, token) {
-    clearFloodLayer();
-    setHardWarn("");
+      document.getElementById("serviceNameText").textContent =
+        `Raster file: ${fileName}`;
+      document.getElementById("loadedUrlText").textContent =
+        `Raster URL: ${rasterUrl}`;
+      showStageUrl(rasterUrl);
 
-    const normalized = normalizeStageKey(stageKey);
-    if (!normalized) {
-      setWarn("Invalid stage value.");
-      return;
-    }
+      setStatus(`Loading ${fileName}...`);
 
-    const fileName = stageKeyToFileName(normalized);
-    const rasterUrl = stageKeyToRasterUrl(normalized);
-
-    document.getElementById("serviceNameText").textContent =
-      `Raster file: ${fileName}`;
-    document.getElementById("loadedUrlText").textContent =
-      `Raster URL: ${rasterUrl}`;
-    showStageUrl(rasterUrl);
-
-    setStatus(`Loading ${fileName}...`);
-
-    let georaster;
-    try {
-      georaster = await getRaster(normalized);
-    } catch (err) {
-      if (token !== lastRenderToken) return;
-      setWarn(`Could not load raster for ${normalized} ft.`);
-      setStatus(err.message);
-      return;
-    }
-
-    if (token !== lastRenderToken) return;
-
-    ensureMap();
-
-    currentFloodLayer = new GeoRasterLayer({
-      georaster,
-      opacity: overlayOpacity,
-      resolution: 128,
-      pixelValuesToColorFn: function (values) {
-        if (!values || !values.length) return null;
-        const v = Number(values[0]);
-        return getDepthColor(v);
-      }
-    });
-
-    currentFloodLayer.addTo(map);
-
-    if (!mapHasFit) {
+      let georaster;
       try {
-        map.fitBounds(currentFloodLayer.getBounds());
-        mapHasFit = true;
+        georaster = await getRaster(normalized);
       } catch (err) {
-        console.warn("Could not fit map to raster bounds", err);
+        if (token !== lastRenderToken) return;
+        setWarn(`Could not load raster for ${normalized} ft.`);
+        setStatus(err.message);
+        return;
+      }
+
+      if (token !== lastRenderToken) return;
+
+      ensureMap();
+
+      currentFloodLayer = new GeoRasterLayer({
+        georaster,
+        opacity: overlayOpacity,
+        resolution: 128,
+        pixelValuesToColorFn: function (values) {
+          if (!values || !values.length) return null;
+          const v = Number(values[0]);
+          return getDepthColor(v);
+        }
+      });
+
+      currentFloodLayer.addTo(map);
+
+      if (!mapHasFit) {
+        try {
+          map.fitBounds(currentFloodLayer.getBounds());
+          mapHasFit = true;
+        } catch (err) {
+          console.warn("Could not fit map to raster bounds", err);
+        }
+      }
+
+      setStatus(`Loaded ${fileName}`);
+
+      setHardWarn(
+        "This version loads full TIFFs directly from R2. It is the simplest setup, but large files may load slowly."
+      );
+    }
+
+    async function renderHour(index) {
+      if (!forecastData?.hours?.length) return;
+
+      const h = forecastData.hours[index];
+      if (!h) return;
+
+      document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
+      document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
+      document.getElementById("stageText").textContent =
+        `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
+      document.getElementById("matchedText").textContent =
+        `Matched raster: ${h.matchedStageKey} ft NAVD88`;
+
+      if (h.wasClamped) {
+        setWarn(
+          `Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`
+        );
+      } else {
+        setWarn("");
+      }
+
+      const token = ++lastRenderToken;
+      await setFloodLayerFromStage(h.matchedStageKey, token);
+    }
+
+    async function loadManualStage() {
+      const raw = document.getElementById("manualStageInput").value.trim();
+      const normalized = normalizeStageKey(raw);
+
+      if (!normalized) {
+        setWarn("Enter a valid numeric stage, like 5.0");
+        return;
+      }
+
+      document.getElementById("hourText").textContent = "Manual stage";
+      document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
+      document.getElementById("stageText").textContent =
+        `Water level: ${normalized} ft NAVD88`;
+      document.getElementById("matchedText").textContent =
+        `Matched raster: ${normalized} ft NAVD88`;
+
+      setWarn("");
+
+      const token = ++lastRenderToken;
+      await setFloodLayerFromStage(normalized, token);
+    }
+
+    function stopPlayback() {
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
       }
     }
 
-    setStatus(`Loaded ${fileName}`);
-
-    setHardWarn(
-      "This version loads full TIFFs directly from R2. It is the simplest setup, but large files may load slowly during playback."
-    );
-  }
-
-  async function renderHour(index) {
-    if (!forecastData?.hours?.length) return;
-
-    const h = forecastData.hours[index];
-    if (!h) return;
-
-    document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
-    document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
-    document.getElementById("stageText").textContent =
-      `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
-    document.getElementById("matchedText").textContent =
-      `Matched raster: ${h.matchedStageKey} ft NAVD88`;
-
-    if (h.wasClamped) {
-      setWarn(
-        `Value was outside your published raster range, so it was clamped to ${h.matchedStageKey} ft.`
-      );
-    } else {
-      setWarn("");
-    }
-
-    const token = ++lastRenderToken;
-    await setFloodLayerFromStage(h.matchedStageKey, token);
-  }
-
-  async function loadManualStage() {
-    const raw = document.getElementById("manualStageInput").value.trim();
-    const normalized = normalizeStageKey(raw);
-
-    if (!normalized) {
-      setWarn("Enter a valid numeric stage, like 5.0");
-      return;
-    }
-
-    document.getElementById("hourText").textContent = "Manual stage";
-    document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
-    document.getElementById("stageText").textContent =
-      `Water level: ${normalized} ft NAVD88`;
-    document.getElementById("matchedText").textContent =
-      `Matched raster: ${normalized} ft NAVD88`;
-
-    setWarn("");
-
-    const token = ++lastRenderToken;
-    await setFloodLayerFromStage(normalized, token);
-  }
-
-  function stopPlayback() {
-    if (playTimer) {
-      clearInterval(playTimer);
-      playTimer = null;
-    }
-  }
-
-  function startPlayback() {
-    stopPlayback();
-
-    const slider = document.getElementById("hourSlider");
-    let i = Number(slider.value);
-
-    playTimer = setInterval(() => {
-      renderHour(i).catch(err => {
-        console.error(err);
-        setStatus(err.message);
-        setWarn(err.message);
-        stopPlayback();
-      });
-
-      slider.value = String(i);
-      i += 1;
-      if (i >= forecastData.hours.length) i = 0;
-    }, 1500);
-  }
-
-  async function reloadAll() {
-    stopPlayback();
-    clearFloodLayer();
-    setStatus("Reloading forecast...");
-
-    await loadForecast();
-
-    const peakIndex = getPeakHourIndex();
-    document.getElementById("hourSlider").value = String(peakIndex);
-    await renderHour(peakIndex);
-  }
-
-  async function main() {
-    setOpacityText();
-
-    document.getElementById("hourSlider").addEventListener("input", async (e) => {
+    function startPlayback() {
       stopPlayback();
-      await renderHour(Number(e.target.value));
-    });
 
-    document.getElementById("opacitySlider").addEventListener("input", (e) => {
-      overlayOpacity = Number(e.target.value) / 100;
+      const slider = document.getElementById("hourSlider");
+      let i = Number(slider.value);
+
+      playTimer = setInterval(() => {
+        renderHour(i).catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+          stopPlayback();
+        });
+
+        slider.value = String(i);
+        i += 1;
+        if (i >= forecastData.hours.length) i = 0;
+      }, 1500);
+    }
+
+    async function reloadAll() {
+      stopPlayback();
+      clearFloodLayer();
+      setStatus("Reloading forecast...");
+
+      await loadForecast();
+
+      const peakIndex = getPeakHourIndex();
+      document.getElementById("hourSlider").value = String(peakIndex);
+      await renderHour(peakIndex);
+    }
+
+    async function main() {
       setOpacityText();
-      applyOverlayOpacity();
-    });
 
-    document.getElementById("playBtn").addEventListener("click", startPlayback);
-    document.getElementById("stopBtn").addEventListener("click", stopPlayback);
-    document.getElementById("reloadBtn").addEventListener("click", () => {
-      reloadAll().catch(err => {
-        console.error(err);
-        setStatus(err.message);
-        setWarn(err.message);
+      document.getElementById("hourSlider").addEventListener("input", async (e) => {
+        stopPlayback();
+        await renderHour(Number(e.target.value));
       });
-    });
-    document.getElementById("showUrlsBtn").addEventListener("click", () => {
-      const text = document.getElementById("loadedUrlText").textContent || "";
-      showStageUrl(text);
-    });
-    document.getElementById("manualStageBtn").addEventListener("click", () => {
-      loadManualStage().catch(err => {
-        console.error(err);
-        setStatus(err.message);
-        setWarn(err.message);
+
+      document.getElementById("opacitySlider").addEventListener("input", (e) => {
+        overlayOpacity = Number(e.target.value) / 100;
+        setOpacityText();
+        applyOverlayOpacity();
       });
+
+      document.getElementById("playBtn").addEventListener("click", startPlayback);
+      document.getElementById("stopBtn").addEventListener("click", stopPlayback);
+      document.getElementById("reloadBtn").addEventListener("click", () => {
+        reloadAll().catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
+      document.getElementById("showUrlsBtn").addEventListener("click", () => {
+        const text = document.getElementById("loadedUrlText").textContent || "";
+        showStageUrl(text);
+      });
+      document.getElementById("manualStageBtn").addEventListener("click", () => {
+        loadManualStage().catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
+
+      await reloadAll();
+    }
+
+    main().catch(err => {
+      console.error(err);
+      setStatus(err.message);
+      setWarn(err.message);
     });
-
-    await reloadAll();
-  }
-
-  main().catch(err => {
-    console.error(err);
-    setStatus(err.message);
-    setWarn(err.message);
-  });
-</script>
+  </script>
+</body>
+</html>
