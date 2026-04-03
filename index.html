@@ -136,8 +136,8 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Overlay source mode: Cloudflare R2 static WebP overlays</div>
-      <div class="muted">Overlay base: https://rasters.rasterrepo.com/overlays</div>
+      <div class="muted">Overlay source mode: GitHub Pages static WebP overlays</div>
+      <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
 
       <div class="section">
         <div id="issuedText" class="muted">Forecast issued: loading…</div>
@@ -185,9 +185,9 @@
 
       <div class="section">
         <div class="muted">
-          This version loads pre-rendered WebP flood overlays from Cloudflare R2 instead of loading GeoTIFF rasters in the browser.
+          This version loads pre-rendered WebP flood overlays from the same GitHub Pages site as the app.
         </div>
-        <div class="pill">Cloudflare WebP overlay mode</div>
+        <div class="pill">GitHub Pages WebP overlay mode</div>
       </div>
 
       <div class="section">
@@ -201,15 +201,16 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    const RASTER_BASE = "https://rasters.rasterrepo.com/overlays";
-    const FORECAST_URL = "./forecast.json";
+    const APP_BASE = new URL(".", window.location.href);
+    const RASTER_BASE = new URL("./assets/overlays/", APP_BASE).href.replace(/\/$/, "");
+    const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
+
     const MIN_STAGE = -2.0;
     const MAX_STAGE = 14.0;
     const DEFAULT_CENTER = [39.0007, -74.8089];
     const DEFAULT_ZOOM = 13;
 
     /*
-      These bounds are based on the raster corner coordinates from your earlier GDAL output.
       Southwest first, then northeast.
       If the overlay is offset, only edit these four numbers.
     */
@@ -264,12 +265,13 @@
     }
 
     async function fetchJson(url, params = null) {
-      const u = new URL(url, window.location.href);
+      const u = new URL(url);
       if (params) {
         for (const [k, v] of Object.entries(params)) {
           u.searchParams.set(k, v);
         }
       }
+
       const r = await fetch(u.toString(), { cache: "no-store" });
       if (!r.ok) {
         throw new Error(`HTTP ${r.status} for ${u.toString()}`);
@@ -280,6 +282,7 @@
     function normalizeStageKey(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
+
       const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
       return (Math.round(clipped * 10) / 10).toFixed(1);
     }
@@ -335,14 +338,20 @@
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
 
+      document.getElementById("overlayBaseText").textContent =
+        `Overlay base: ${RASTER_BASE}`;
+
       document.getElementById("issuedText").textContent =
         `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
+
       document.getElementById("sourceText").textContent =
         `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
+
       document.getElementById("catalogText").textContent =
-        "Catalog mode: static WebP overlays in Cloudflare R2";
+        "Catalog mode: static WebP overlays in GitHub Pages";
+
       document.getElementById("serviceModeText").textContent =
-        "Layer mode: Cloudflare R2 WebP image overlay";
+        "Layer mode: GitHub Pages WebP image overlay";
 
       const slider = document.getElementById("hourSlider");
       const count = forecastData.hours ? forecastData.hours.length : 0;
@@ -367,8 +376,20 @@
       return maxIndex;
     }
 
+    async function testImageUrl(url) {
+      return new Promise((resolve) => {
+        const img = new Image();
+
+        img.onload = () => resolve({ ok: true });
+        img.onerror = () => resolve({ ok: false });
+
+        img.src = `${url}?v=${Date.now()}`;
+      });
+    }
+
     async function setFloodLayerFromStage(stageKey, token) {
       clearFloodLayer();
+      setWarn("");
       setHardWarn("");
 
       const normalized = normalizeStageKey(stageKey);
@@ -382,17 +403,32 @@
 
       document.getElementById("serviceNameText").textContent =
         `Overlay file: ${fileStem}.webp`;
+
       document.getElementById("loadedUrlText").textContent =
         `Overlay URL: ${overlayUrl}`;
+
       showStageUrl(overlayUrl);
 
-      setStatus(`Loading ${fileStem}.webp...`);
+      setStatus(`Checking ${fileStem}.webp...`);
+
+      const exists = await testImageUrl(overlayUrl);
+      if (token !== lastRenderToken) return;
+
+      if (!exists.ok) {
+        setWarn(`Could not load overlay for ${normalized} ft.`);
+        setHardWarn(
+          `GitHub Pages could not find or serve this file:\n${overlayUrl}\n\nCheck that the file exists in assets/overlays and that GitHub Pages is publishing the repo/branch you expect.`
+        );
+        setStatus(`Overlay load failed for ${fileStem}.webp`);
+        return;
+      }
 
       ensureMap();
 
-      currentFloodLayer = L.imageOverlay(overlayUrl, OVERLAY_BOUNDS, {
+      currentFloodLayer = L.imageOverlay(`${overlayUrl}?v=${Date.now()}`, OVERLAY_BOUNDS, {
         opacity: overlayOpacity,
-        interactive: false
+        interactive: false,
+        crossOrigin: true
       });
 
       currentFloodLayer.on("load", () => {
@@ -402,8 +438,9 @@
 
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        setWarn(`Could not load overlay for ${normalized} ft.`);
-        setStatus(`Overlay load failed for ${fileStem}.webp`);
+        setWarn(`Could not draw overlay for ${normalized} ft.`);
+        setHardWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
+        setStatus(`Overlay draw failed for ${fileStem}.webp`);
       });
 
       currentFloodLayer.addTo(map);
@@ -471,6 +508,8 @@
     function startPlayback() {
       stopPlayback();
 
+      if (!forecastData?.hours?.length) return;
+
       const slider = document.getElementById("hourSlider");
       let i = Number(slider.value);
 
@@ -516,6 +555,7 @@
 
       document.getElementById("playBtn").addEventListener("click", startPlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
+
       document.getElementById("reloadBtn").addEventListener("click", () => {
         reloadAll().catch(err => {
           console.error(err);
@@ -523,10 +563,12 @@
           setWarn(err.message);
         });
       });
+
       document.getElementById("showUrlsBtn").addEventListener("click", () => {
         const text = document.getElementById("loadedUrlText").textContent || "";
         showStageUrl(text);
       });
+
       document.getElementById("manualStageBtn").addEventListener("click", () => {
         loadManualStage().catch(err => {
           console.error(err);
