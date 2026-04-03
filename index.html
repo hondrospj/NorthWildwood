@@ -1,204 +1,5 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>North Wildwood Flood Forecast</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
-
-  <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      font-family: Arial, Helvetica, sans-serif;
-    }
-
-    #app {
-      display: grid;
-      grid-template-columns: 390px 1fr;
-      height: 100%;
-    }
-
-    #panel {
-      padding: 16px;
-      border-right: 1px solid #ddd;
-      overflow: auto;
-      background: #fff;
-    }
-
-    #map {
-      width: 100%;
-      height: 100%;
-      background: #eef3f8;
-    }
-
-    h1 {
-      margin: 0 0 8px 0;
-      font-size: 24px;
-    }
-
-    .muted {
-      color: #555;
-      font-size: 14px;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-
-    .section {
-      margin-top: 18px;
-      padding-top: 14px;
-      border-top: 1px solid #ececec;
-    }
-
-    .big {
-      font-size: 22px;
-      font-weight: 700;
-      margin-top: 8px;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      margin-top: 8px;
-    }
-
-    button {
-      padding: 9px 12px;
-      margin-right: 8px;
-      margin-bottom: 8px;
-      cursor: pointer;
-    }
-
-    #status {
-      margin-top: 8px;
-      padding: 10px 12px;
-      background: #f6f8fa;
-      border: 1px solid #e1e4e8;
-      border-radius: 8px;
-      font-size: 14px;
-      white-space: pre-wrap;
-      color: #111;
-    }
-
-    #warn {
-      margin-top: 8px;
-      padding: 10px 12px;
-      background: #fff3e0;
-      border: 1px solid #ffd8a8;
-      border-radius: 8px;
-      color: #8a4b00;
-      display: none;
-      white-space: pre-wrap;
-    }
-
-    #hardWarn {
-      margin-top: 8px;
-      padding: 10px 12px;
-      background: #fee2e2;
-      border: 1px solid #fca5a5;
-      border-radius: 8px;
-      color: #991b1b;
-      display: none;
-      white-space: pre-wrap;
-    }
-
-    #urlBox {
-      width: 100%;
-      height: 220px;
-      display: none;
-      margin-top: 8px;
-      font-family: monospace;
-      font-size: 12px;
-    }
-
-    #manualStageInput {
-      width: 120px;
-      padding: 6px;
-      margin-right: 8px;
-    }
-
-    .pill {
-      display: inline-block;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: #eef4ff;
-      color: #1e40af;
-      font-size: 13px;
-      margin-top: 8px;
-    }
-  </style>
-</head>
-<body>
-  <div id="app">
-    <aside id="panel">
-      <h1>North Wildwood Flood Forecast</h1>
-      <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Overlay source mode: GitHub Pages static WebP overlays</div>
-      <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
-
-      <div class="section">
-        <div id="issuedText" class="muted">Forecast issued: loading…</div>
-        <div id="sourceText" class="muted">Source: loading…</div>
-        <div id="catalogText" class="muted">Catalog mode: loading…</div>
-        <div id="crsText" class="muted">Map CRS: loading…</div>
-        <div id="serviceModeText" class="muted">Layer mode: loading…</div>
-      </div>
-
-      <div class="section">
-        <label for="hourSlider">Forecast hour</label>
-        <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
-        <div id="hourText" class="big">Hour 0</div>
-        <div id="timeText" class="muted">Time: --</div>
-      </div>
-
-      <div class="section">
-        <label for="opacitySlider">Overlay opacity</label>
-        <input id="opacitySlider" type="range" min="0" max="100" value="100" step="1" />
-        <div id="opacityText" class="muted">100%</div>
-      </div>
-
-      <div class="section">
-        <div id="stageText">Water level: --</div>
-        <div id="matchedText">Matched overlay: --</div>
-        <div id="serviceNameText" class="muted">Overlay file: --</div>
-        <div id="loadedUrlText" class="muted">Overlay URL: --</div>
-        <div id="warn"></div>
-        <div id="hardWarn"></div>
-      </div>
-
-      <div class="section">
-        <button id="playBtn">Play</button>
-        <button id="stopBtn">Stop</button>
-        <button id="reloadBtn">Reload</button>
-        <button id="showUrlsBtn">Show overlay URL</button>
-        <textarea id="urlBox" readonly></textarea>
-      </div>
-
-      <div class="section">
-        <div class="muted">Manual overlay test</div>
-        <input id="manualStageInput" type="text" placeholder="e.g. 5.0" />
-        <button id="manualStageBtn">Load stage</button>
-      </div>
-
-      <div class="section">
-        <div class="muted">
-          This version loads pre-rendered WebP flood overlays from the same GitHub Pages site as the app.
-        </div>
-        <div class="pill">GitHub Pages WebP overlay mode</div>
-      </div>
-
-      <div class="section">
-        <div id="status">Starting…</div>
-      </div>
-    </aside>
-
-    <main id="map"></main>
-  </div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
@@ -211,13 +12,22 @@
     const DEFAULT_ZOOM = 13;
 
     /*
-      Southwest first, then northeast.
-      If the overlay is offset, only edit these four numbers.
+      Fallback only.
+      The app now tries to read the real bounds from each .pgw file.
     */
-    const OVERLAY_BOUNDS = [
+    const FALLBACK_BOUNDS = [
       [38.9851833, -74.8524056],
       [39.0486111, -74.7730000]
     ];
+
+    /*
+      NAD83 / New Jersey (ftUS)
+      This matches your State Plane-style world file numbers.
+    */
+    proj4.defs(
+      "EPSG:3424",
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
+    );
 
     let map = null;
     let currentFloodLayer = null;
@@ -226,6 +36,8 @@
     let overlayOpacity = 1.0;
     let lastRenderToken = 0;
     let mapHasFit = false;
+
+    const boundsCache = new Map();
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -279,6 +91,14 @@
       return r.json();
     }
 
+    async function fetchText(url) {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status} for ${url}`);
+      }
+      return r.text();
+    }
+
     function normalizeStageKey(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
@@ -306,6 +126,40 @@
       return `${RASTER_BASE}/${stageKeyToFileStem(stageKey)}.webp`;
     }
 
+    function overlayUrlToWorldFileUrl(overlayUrl) {
+      return overlayUrl.replace(/\.webp(\?.*)?$/i, ".pgw");
+    }
+
+    async function loadImageMeta(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+
+        img.onload = () => {
+          resolve({
+            width: img.naturalWidth,
+            height: img.naturalHeight
+          });
+        };
+
+        img.onerror = () => {
+          reject(new Error(`Could not load image: ${url}`));
+        };
+
+        img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+      });
+    }
+
+    async function testImageUrl(url) {
+      return new Promise((resolve) => {
+        const img = new Image();
+
+        img.onload = () => resolve({ ok: true });
+        img.onerror = () => resolve({ ok: false });
+
+        img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+      });
+    }
+
     function ensureMap() {
       if (map) return;
 
@@ -319,7 +173,7 @@
       }).addTo(map);
 
       document.getElementById("crsText").textContent =
-        "Map CRS: Leaflet / OSM basemap";
+        "Map CRS: Leaflet / OSM basemap with .pgw-derived bounds";
     }
 
     function clearFloodLayer() {
@@ -333,6 +187,64 @@
       if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
         currentFloodLayer.setOpacity(overlayOpacity);
       }
+    }
+
+    function projectStatePlaneToLatLng(x, y) {
+      const [lon, lat] = proj4("EPSG:3424", "EPSG:4326", [x, y]);
+      return [lat, lon];
+    }
+
+    async function getOverlayBoundsFromWorldFile(overlayUrl) {
+      if (boundsCache.has(overlayUrl)) {
+        return boundsCache.get(overlayUrl);
+      }
+
+      const worldFileUrl = overlayUrlToWorldFileUrl(overlayUrl);
+
+      const [pgwText, imageMeta] = await Promise.all([
+        fetchText(`${worldFileUrl}?v=${Date.now()}`),
+        loadImageMeta(overlayUrl)
+      ]);
+
+      const lines = pgwText
+        .trim()
+        .split(/\r?\n/)
+        .map(s => Number(s.trim()));
+
+      if (lines.length < 6 || lines.some(v => !Number.isFinite(v))) {
+        throw new Error(`Invalid world file: ${worldFileUrl}`);
+      }
+
+      const [A, D, B, E, C, F] = lines;
+
+      if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
+        setWarn("World file has rotation terms. This app assumes north-up rasters.");
+      }
+
+      const width = imageMeta.width;
+      const height = imageMeta.height;
+
+      if (!width || !height) {
+        throw new Error(`Could not read image size for ${overlayUrl}`);
+      }
+
+      /*
+        World file:
+        A = pixel width
+        E = pixel height (negative for north-up)
+        C,F = center of upper-left pixel
+      */
+      const west = C - (A / 2);
+      const north = F - (E / 2);
+      const east = C + A * (width - 0.5);
+      const south = F + E * (height - 0.5);
+
+      const sw = projectStatePlaneToLatLng(west, south);
+      const ne = projectStatePlaneToLatLng(east, north);
+
+      const bounds = [sw, ne];
+      boundsCache.set(overlayUrl, bounds);
+      return bounds;
     }
 
     async function loadForecast() {
@@ -376,17 +288,6 @@
       return maxIndex;
     }
 
-    async function testImageUrl(url) {
-      return new Promise((resolve) => {
-        const img = new Image();
-
-        img.onload = () => resolve({ ok: true });
-        img.onerror = () => resolve({ ok: false });
-
-        img.src = `${url}?v=${Date.now()}`;
-      });
-    }
-
     async function setFloodLayerFromStage(stageKey, token) {
       clearFloodLayer();
       setWarn("");
@@ -425,11 +326,30 @@
 
       ensureMap();
 
-      currentFloodLayer = L.imageOverlay(`${overlayUrl}?v=${Date.now()}`, OVERLAY_BOUNDS, {
-        opacity: overlayOpacity,
-        interactive: false,
-        crossOrigin: true
-      });
+      let overlayBounds = FALLBACK_BOUNDS;
+
+      try {
+        overlayBounds = await getOverlayBoundsFromWorldFile(overlayUrl);
+      } catch (err) {
+        console.error(err);
+        setWarn("Could not read the .pgw world file, so fallback bounds are being used.");
+        setHardWarn(
+          `World file read failed for:\n${overlayUrlToWorldFileUrl(overlayUrl)}\n\n${err.message}`
+        );
+      }
+
+      if (token !== lastRenderToken) return;
+
+      currentFloodLayer = L.imageOverlay(
+        `${overlayUrl}?v=${Date.now()}`,
+        overlayBounds,
+        {
+          opacity: overlayOpacity,
+          interactive: false,
+          crossOrigin: true,
+          zIndex: 500
+        }
+      );
 
       currentFloodLayer.on("load", () => {
         if (token !== lastRenderToken) return;
@@ -446,7 +366,7 @@
       currentFloodLayer.addTo(map);
 
       if (!mapHasFit) {
-        map.fitBounds(OVERLAY_BOUNDS);
+        map.fitBounds(overlayBounds);
         mapHasFit = true;
       }
     }
@@ -586,5 +506,3 @@
       setWarn(err.message);
     });
   </script>
-</body>
-</html>
