@@ -140,7 +140,7 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Overlay source mode: GitHub Pages static WebP overlays</div>
+      <div class="muted">Basemap: NJ OGIS 2015 Orthophoto (EPSG:3424)</div>
       <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
 
       <div class="section">
@@ -189,9 +189,9 @@
 
       <div class="section">
         <div class="muted">
-          This version uses one shared embedded world file for all overlays.
+          This version uses a New Jersey State Plane basemap and draws the flood overlay in projected coordinates.
         </div>
-        <div class="pill">Shared world-file georeferencing mode</div>
+        <div class="pill">NJ State Plane basemap mode</div>
       </div>
 
       <div class="section">
@@ -203,22 +203,28 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
+  <script src="https://unpkg.com/proj4@2.11.0/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
     const RASTER_BASE = new URL("./assets/overlays/", APP_BASE).href.replace(/\/$/, "");
     const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
 
+    /*
+      NJ OGIS 2015 orthophoto cache in NJ State Plane feet.
+      ArcGIS tile path = /tile/{z}/{y}/{x}
+    */
+    const NJ_BASEMAP_URL =
+      "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
+
     const MIN_STAGE = -2.0;
     const MAX_STAGE = 14.0;
-    const DEFAULT_CENTER = [39.0007, -74.8089];
-    const DEFAULT_ZOOM = 13;
 
     /*
-      Shared world file values from your uploaded .pgw.
-      Because all WebPs have the same dimensions and same footprint,
-      one set of georeferencing values is used for all overlays.
+      Shared world file values.
+      Since your overlays all have the same dimensions and footprint,
+      one georeference works for all of them.
     */
     const SHARED_WORLD = {
       A:  9.997136167181090,
@@ -230,22 +236,44 @@
     };
 
     /*
-      NAD83 / New Jersey (ftUS)
-      This is the CRS that matches the uploaded world-file coordinates.
+      EPSG:3424 / NAD83 New Jersey (ftUS)
+      Important: false easting is 492125 ftUS.
     */
-    proj4.defs(
-      "EPSG:3424",
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +datum=NAD83 +units=us-ft +no_defs"
-    );
+    const NJSP_PROJ4 =
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +datum=NAD83 +units=us-ft +no_defs";
+
+    /*
+      Tile scheme from the NJ OGIS cached service metadata.
+      512 px tiles, custom origin, custom resolutions.
+    */
+    const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
+      origin: [-17954600, 18705699.999999993],
+      resolutions: [
+        2006.2172023914932,
+        1003.1086011953124,
+        501.55430059809026,
+        250.7771502986111,
+        125.38857514930555,
+        62.694287574652776,
+        31.347143787326388,
+        15.673571894097222,
+        7.836785947048611,
+        3.9183929730902776,
+        1.9591964843749998,
+        0.9795982430555555,
+        0.48979912152777777
+      ]
+    });
 
     let map = null;
     let currentFloodLayer = null;
+    let floodProjectedBounds = null;
+    let floodLatLngBounds = null;
     let forecastData = null;
     let playTimer = null;
     let overlayOpacity = 1.0;
     let lastRenderToken = 0;
     let mapHasFit = false;
-    let sharedOverlayBounds = null;
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -326,33 +354,28 @@
       return `${RASTER_BASE}/${stageKeyToFileStem(stageKey)}.webp`;
     }
 
-    function ensureMap() {
-      if (map) return;
-
-      map = L.map("map", {
-        zoomControl: true,
-        preferCanvas: false
-      }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors"
-      }).addTo(map);
-
-      document.getElementById("crsText").textContent =
-        "Map CRS: Leaflet / OSM basemap | Overlay georef: shared world file";
+    function projectedPointToLatLng(x, y) {
+      return NJSP_CRS.unproject(L.point(x, y));
     }
 
-    function clearFloodLayer() {
-      if (currentFloodLayer && map) {
-        map.removeLayer(currentFloodLayer);
-        currentFloodLayer = null;
-      }
-    }
+    function computeProjectedBounds(width, height) {
+      const { A, D, B, E, C, F } = SHARED_WORLD;
 
-    function applyOverlayOpacity() {
-      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
-        currentFloodLayer.setOpacity(overlayOpacity);
+      if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
+        throw new Error("Shared world file contains rotation/skew terms. This version assumes north-up rasters.");
       }
+
+      const west  = C - (A / 2);
+      const north = F - (E / 2);
+      const east  = C + A * (width  - 0.5);
+      const south = F + E * (height - 0.5);
+
+      return {
+        west,
+        south,
+        east,
+        north
+      };
     }
 
     async function loadImageMeta(url) {
@@ -385,33 +408,8 @@
       });
     }
 
-    function projectToLatLng(x, y) {
-      const [lon, lat] = proj4("EPSG:3424", "EPSG:4326", [x, y]);
-      return [lat, lon];
-    }
-
-    function computeBoundsFromWorld(width, height) {
-      const { A, D, B, E, C, F } = SHARED_WORLD;
-
-      if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Shared world file contains rotation/skew terms. This HTML assumes north-up rasters.");
-      }
-
-      const west  = C - (A / 2);
-      const north = F - (E / 2);
-      const east  = C + A * (width  - 0.5);
-      const south = F + E * (height - 0.5);
-
-      const sw = projectToLatLng(west, south);
-      const ne = projectToLatLng(east, north);
-
-      return [sw, ne];
-    }
-
-    async function getSharedOverlayBounds(sampleOverlayUrl) {
-      if (sharedOverlayBounds) {
-        return sharedOverlayBounds;
-      }
+    async function ensureOverlayBounds(sampleOverlayUrl) {
+      if (floodProjectedBounds && floodLatLngBounds) return;
 
       const meta = await loadImageMeta(sampleOverlayUrl);
 
@@ -419,8 +417,58 @@
         throw new Error(`Could not read image size for ${sampleOverlayUrl}`);
       }
 
-      sharedOverlayBounds = computeBoundsFromWorld(meta.width, meta.height);
-      return sharedOverlayBounds;
+      const b = computeProjectedBounds(meta.width, meta.height);
+
+      floodProjectedBounds = L.bounds(
+        [b.west, b.south],
+        [b.east, b.north]
+      );
+
+      floodLatLngBounds = L.latLngBounds(
+        projectedPointToLatLng(b.west, b.south),
+        projectedPointToLatLng(b.east, b.north)
+      );
+    }
+
+    function ensureMap() {
+      if (map) return;
+
+      map = L.map("map", {
+        crs: NJSP_CRS,
+        zoomControl: true,
+        minZoom: 0,
+        maxZoom: 12,
+        continuousWorld: true,
+        worldCopyJump: false,
+        zoomSnap: 1,
+        zoomDelta: 1
+      });
+
+      L.tileLayer(NJ_BASEMAP_URL, {
+        attribution: "NJ OGIS Orthophoto 2015",
+        tileSize: 512,
+        minZoom: 0,
+        maxZoom: 12,
+        noWrap: true,
+        updateWhenIdle: true,
+        keepBuffer: 2
+      }).addTo(map);
+
+      document.getElementById("crsText").textContent =
+        "Map CRS: EPSG:3424 / NJ State Plane (ftUS)";
+    }
+
+    function clearFloodLayer() {
+      if (currentFloodLayer && map) {
+        map.removeLayer(currentFloodLayer);
+        currentFloodLayer = null;
+      }
+    }
+
+    function applyOverlayOpacity() {
+      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
+        currentFloodLayer.setOpacity(overlayOpacity);
+      }
     }
 
     async function loadForecast() {
@@ -436,10 +484,10 @@
         `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
 
       document.getElementById("catalogText").textContent =
-        "Catalog mode: static WebP overlays in GitHub Pages";
+        "Catalog mode: static WebP overlays";
 
       document.getElementById("serviceModeText").textContent =
-        "Layer mode: GitHub Pages WebP image overlay";
+        "Layer mode: projected image overlay in NJ State Plane";
 
       const slider = document.getElementById("hourSlider");
       const count = forecastData.hours ? forecastData.hours.length : 0;
@@ -494,7 +542,7 @@
       if (!exists.ok) {
         setWarn(`Could not load overlay for ${normalized} ft.`);
         setHardWarn(
-          `GitHub Pages could not find or serve this file:\n${overlayUrl}\n\nCheck that the file exists in assets/overlays and that GitHub Pages is publishing the repo/branch you expect.`
+          `GitHub Pages could not find or serve this file:\n${overlayUrl}`
         );
         setStatus(`Overlay load failed for ${fileStem}.webp`);
         return;
@@ -502,23 +550,20 @@
 
       ensureMap();
 
-      let overlayBounds;
       try {
-        overlayBounds = await getSharedOverlayBounds(overlayUrl);
+        await ensureOverlayBounds(overlayUrl);
       } catch (err) {
         setWarn(err.message);
-        setHardWarn(
-          `Shared georeferencing failed.\n\n${err.message}`
-        );
-        setStatus("Shared georeferencing failed");
+        setHardWarn(`Projected overlay setup failed.\n\n${err.message}`);
+        setStatus("Projected overlay setup failed");
         return;
       }
 
       if (token !== lastRenderToken) return;
 
-      currentFloodLayer = L.imageOverlay(
+      currentFloodLayer = L.Proj.imageOverlay(
         `${overlayUrl}?v=${Date.now()}`,
-        overlayBounds,
+        floodProjectedBounds,
         {
           opacity: overlayOpacity,
           interactive: false,
@@ -541,8 +586,8 @@
 
       currentFloodLayer.addTo(map);
 
-      if (!mapHasFit) {
-        map.fitBounds(overlayBounds);
+      if (!mapHasFit && floodLatLngBounds) {
+        map.fitBounds(floodLatLngBounds, { padding: [10, 10] });
         mapHasFit = true;
       }
     }
