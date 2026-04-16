@@ -4,21 +4,19 @@
   <meta charset="utf-8" />
   <title>North Wildwood Flood Forecast</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
     :root{
-      --bg:#f4f6f8;
-      --panel:#ffffffee;
-      --panel-solid:#ffffff;
-      --text:#111827;
-      --muted:#6b7280;
+      --bg:#f3f4f6;
+      --panel:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
       --line:#e5e7eb;
       --accent:#2563eb;
       --accent-soft:#dbeafe;
-      --shadow:0 18px 40px rgba(17,24,39,.10);
-      --radius:20px;
+      --shadow:0 18px 42px rgba(15,23,42,.08);
+      --radius:22px;
     }
 
     * { box-sizing: border-box; }
@@ -33,12 +31,12 @@
 
     #app {
       display: grid;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 340px 1fr;
       height: 100%;
     }
 
     #panel {
-      padding: 18px;
+      padding: 16px;
       background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
       border-right: 1px solid var(--line);
       overflow: auto;
@@ -57,15 +55,15 @@
 
     .brand {
       display: grid;
-      gap: 4px;
-      padding: 4px 2px 2px;
+      gap: 2px;
+      padding: 2px 2px 0;
     }
 
     .brand h1 {
       margin: 0;
-      font-size: 31px;
-      line-height: 1.02;
-      letter-spacing: -0.03em;
+      font-size: 29px;
+      line-height: 0.98;
+      letter-spacing: -0.04em;
       font-weight: 800;
     }
 
@@ -76,10 +74,10 @@
     }
 
     .card {
-      background: var(--panel-solid);
-      border: 1px solid rgba(229,231,235,.85);
+      background: var(--panel);
+      border: 1px solid rgba(229,231,235,.9);
       border-radius: var(--radius);
-      padding: 14px;
+      padding: 12px;
       box-shadow: var(--shadow);
     }
 
@@ -96,9 +94,9 @@
       border-radius: 14px;
       padding: 11px 12px;
       font-size: 14px;
-      font-weight: 600;
+      font-weight: 650;
       cursor: pointer;
-      transition: .18s ease;
+      transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease;
     }
 
     button:hover {
@@ -122,6 +120,7 @@
       border: 1px solid var(--line);
       border-radius: 16px;
       background: #fff;
+      min-height: 86px;
     }
 
     .metric-label {
@@ -133,7 +132,7 @@
     .metric-value {
       font-size: 20px;
       font-weight: 800;
-      line-height: 1.1;
+      line-height: 1.12;
       letter-spacing: -0.02em;
     }
 
@@ -164,7 +163,7 @@
     .control-value {
       font-size: 13px;
       color: var(--text);
-      font-weight: 700;
+      font-weight: 750;
     }
 
     input[type="range"] {
@@ -179,11 +178,12 @@
       gap: 8px;
     }
 
-    .footer-mini {
+    .status {
       color: var(--muted);
       font-size: 12px;
       text-align: center;
-      padding: 2px 0 6px;
+      padding-top: 2px;
+      min-height: 18px;
     }
 
     .leaflet-image-layer {
@@ -204,10 +204,6 @@
       #panel {
         border-right: 0;
         border-bottom: 1px solid var(--line);
-      }
-
-      .brand h1 {
-        font-size: 28px;
       }
     }
   </style>
@@ -270,7 +266,7 @@
           </div>
         </div>
 
-        <div class="footer-mini" id="status">Loading…</div>
+        <div class="status" id="status">Starting…</div>
       </div>
     </aside>
 
@@ -351,8 +347,7 @@
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
-      hour12: true,
-      timeZoneName: "short"
+      hour12: true
     });
 
     function setStatus(msg) {
@@ -362,9 +357,34 @@
     function updateModeButtons() {
       const depthBtn = document.getElementById("depthModeBtn");
       const dynamicBtn = document.getElementById("dynamicModeBtn");
-
       depthBtn.classList.toggle("activeMode", currentOverlayMode === "depth");
       dynamicBtn.classList.toggle("activeMode", currentOverlayMode === "dynamic");
+    }
+
+    function ensureMap() {
+      if (map) return;
+
+      map = L.map("map", {
+        crs: NJSP_CRS,
+        zoomControl: true,
+        minZoom: 0,
+        maxZoom: 12,
+        continuousWorld: true,
+        worldCopyJump: false,
+        zoomSnap: 1,
+        zoomDelta: 1
+      });
+
+      L.tileLayer(NJ_BASEMAP_URL, {
+        attribution: "NJ OGIS Orthophoto 2015",
+        tileSize: 512,
+        minZoom: 0,
+        maxZoom: 12,
+        noWrap: true,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        className: "grayscale-tiles"
+      }).addTo(map);
     }
 
     async function fetchJson(url, params = null) {
@@ -377,7 +397,7 @@
 
       const r = await fetch(u.toString(), { cache: "no-store" });
       if (!r.ok) {
-        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
+        throw new Error(`HTTP ${r.status}`);
       }
       return r.json();
     }
@@ -413,7 +433,7 @@
       const code = stageToCode(stageValue);
       if (mode === "depth") return `Depth${code}.png`;
       if (mode === "dynamic") return `DynamicFlood_${code}.png`;
-      throw new Error(`Unknown overlay mode: ${mode}`);
+      throw new Error("Unknown overlay mode");
     }
 
     function getOverlayUrl(mode, stageValue) {
@@ -446,7 +466,7 @@
           width: img.naturalWidth,
           height: img.naturalHeight
         });
-        img.onerror = () => reject(new Error(`Could not load image: ${url}`));
+        img.onerror = () => reject(new Error("Could not load image"));
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
     }
@@ -465,69 +485,17 @@
       return result;
     }
 
-    function preloadImage(url) {
-      const img = new Image();
-      img.src = url;
-    }
-
-    function preloadAroundHour(index) {
-      if (!forecastData?.hours?.length) return;
-
-      const offsets = [0, 1, -1];
-
-      for (const offset of offsets) {
-        const i = index + offset;
-        if (i < 0 || i >= forecastData.hours.length) continue;
-
-        const stage = getForecastOverlayStage(forecastData.hours[i].navd88StageFt);
-        if (stage === null) continue;
-
-        preloadImage(getOverlayUrl("depth", stage));
-        preloadImage(getOverlayUrl("dynamic", stage));
-      }
-    }
-
     async function ensureOverlayBounds(sampleOverlayUrl) {
       if (floodProjectedBounds && floodLatLngBounds) return;
 
       const meta = await loadImageMeta(sampleOverlayUrl);
       const b = computeProjectedBounds(meta.width, meta.height);
 
-      floodProjectedBounds = L.bounds(
-        [b.west, b.south],
-        [b.east, b.north]
-      );
-
+      floodProjectedBounds = L.bounds([b.west, b.south], [b.east, b.north]);
       floodLatLngBounds = L.latLngBounds(
         projectedPointToLatLng(b.west, b.south),
         projectedPointToLatLng(b.east, b.north)
       );
-    }
-
-    function ensureMap() {
-      if (map) return;
-
-      map = L.map("map", {
-        crs: NJSP_CRS,
-        zoomControl: true,
-        minZoom: 0,
-        maxZoom: 12,
-        continuousWorld: true,
-        worldCopyJump: false,
-        zoomSnap: 1,
-        zoomDelta: 1
-      });
-
-      L.tileLayer(NJ_BASEMAP_URL, {
-        attribution: "NJ OGIS Orthophoto 2015",
-        tileSize: 512,
-        minZoom: 0,
-        maxZoom: 12,
-        noWrap: true,
-        updateWhenIdle: true,
-        keepBuffer: 2,
-        className: "grayscale-tiles"
-      }).addTo(map);
     }
 
     function clearFloodLayer() {
@@ -550,14 +518,30 @@
       return easternFormatter.format(date);
     }
 
+    function preloadAroundHour(index) {
+      if (!forecastData?.hours?.length) return;
+      for (const offset of [0, 1, -1]) {
+        const i = index + offset;
+        if (i < 0 || i >= forecastData.hours.length) continue;
+        const stage = getForecastOverlayStage(forecastData.hours[i].navd88StageFt);
+        if (stage === null) continue;
+        new Image().src = getOverlayUrl("depth", stage);
+        new Image().src = getOverlayUrl("dynamic", stage);
+      }
+    }
+
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
-      updateModeButtons();
+      if (!forecastData || !Array.isArray(forecastData.hours)) {
+        throw new Error("Bad forecast data");
+      }
 
       document.getElementById("issuedText").textContent =
-        forecastData?.issuedUtc ? `Updated ${formatEasternTime(forecastData.issuedUtc)}` : "";
-      document.getElementById("hourSlider").max = String(Math.max(0, (forecastData.hours?.length || 1) - 1));
-      document.getElementById("hourSlider").value = "0";
+        forecastData.issuedUtc ? `Updated ${formatEasternTime(forecastData.issuedUtc)}` : "";
+
+      const slider = document.getElementById("hourSlider");
+      slider.max = String(Math.max(0, forecastData.hours.length - 1));
+      slider.value = "0";
     }
 
     function getPeakHourIndex() {
@@ -583,8 +567,6 @@
       const filename = getOverlayFilename(mode, stageValue);
       const overlayUrl = getOverlayUrl(mode, stageValue);
 
-      setStatus(`Loading ${filename}...`);
-
       const exists = await testImageUrl(overlayUrl);
       if (token !== lastRenderToken) return;
 
@@ -593,20 +575,12 @@
         return;
       }
 
-      ensureMap();
-
-      try {
-        await ensureOverlayBounds(overlayUrl);
-      } catch (err) {
-        setStatus("Placement error");
-        return;
-      }
-
+      await ensureOverlayBounds(overlayUrl);
       if (token !== lastRenderToken) return;
 
-      currentFloodLayer = L.Proj.imageOverlay(
+      currentFloodLayer = L.imageOverlay(
         `${overlayUrl}?v=${Date.now()}`,
-        floodProjectedBounds,
+        floodLatLngBounds,
         {
           opacity: overlayOpacity,
           interactive: false,
@@ -643,7 +617,10 @@
 
       const rawStage = Number(h.navd88StageFt);
       const displayStage = getForecastOverlayStage(rawStage);
-      if (displayStage === null) return;
+      if (displayStage === null) {
+        setStatus("Stage unavailable");
+        return;
+      }
 
       document.getElementById("hourText").textContent = `Hour ${h.hourIndex ?? index}`;
       document.getElementById("timeText").textContent = formatEasternTime(h.timeUtc);
@@ -685,7 +662,10 @@
       if (mode === currentOverlayMode) return;
       currentOverlayMode = mode;
       updateModeButtons();
-      await renderHour(currentHourIndex);
+
+      if (forecastData?.hours?.length) {
+        await renderHour(currentHourIndex);
+      }
     }
 
     async function reloadAll() {
@@ -702,8 +682,10 @@
     }
 
     async function main() {
+      ensureMap();
       setOpacityText();
       updateModeButtons();
+      setStatus("Loading...");
 
       document.getElementById("hourSlider").addEventListener("input", async (e) => {
         stopPlayback();
@@ -727,15 +709,21 @@
       document.getElementById("playBtn").addEventListener("click", startPlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
       document.getElementById("reloadBtn").addEventListener("click", () => {
-        reloadAll().catch(() => setStatus("Refresh failed"));
+        reloadAll().catch((err) => {
+          console.error(err);
+          setStatus("Refresh failed");
+        });
       });
 
-      await reloadAll();
+      try {
+        await reloadAll();
+      } catch (err) {
+        console.error(err);
+        setStatus("Forecast unavailable");
+      }
     }
 
-    main().catch(() => {
-      setStatus("Load failed");
-    });
+    main();
   </script>
 </body>
 </html>
