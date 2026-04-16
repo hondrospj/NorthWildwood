@@ -144,7 +144,7 @@
       image-rendering: auto;
     }
 
-    .grayscale-tiles {
+    .grayscale-basemap {
       filter: grayscale(100%);
       -webkit-filter: grayscale(100%);
     }
@@ -155,7 +155,7 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Basemap: NJ OGIS 2015 Orthophoto (EPSG:3424), shown in greyscale</div>
+      <div class="muted">Basemap: NJ 2015 orthophoto exported dynamically in the same flood CRS and shown in greyscale</div>
       <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
 
       <div class="section">
@@ -214,7 +214,7 @@
         <div class="muted">
           Flood Depth is the default catalog. Any forecast stage below 1.5 ft uses the 1.6 ft raster. Otherwise, forecast values are rounded down to the next lower 0.2 ft PNG.
         </div>
-        <div class="pill">NJ State Plane basemap mode</div>
+        <div class="pill">Flood map CRS mode</div>
       </div>
 
       <div class="section">
@@ -246,8 +246,23 @@
     const FORECAST_MIN_VISIBLE_STAGE = 1.5;
     const FORECAST_FORCED_STAGE = 1.6;
 
-    const NJ_BASEMAP_URL =
-      "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
+    const ORTHO_MAPSERVER_URL =
+      "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer";
+
+    /*
+      Flood rasters come from the DEM workflow in New Jersey State Plane
+      NAD83(2011) US Survey Feet (EPSG:6527). The proj definition below uses
+      the same State Plane grid parameters for browser-side projection.
+    */
+    const FLOOD_PROJ4 =
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
+
+    const FLOOD_CRS = new L.Proj.CRS("EPSG:6527", FLOOD_PROJ4, {
+      origin: [0, 0],
+      resolutions: [
+        2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25
+      ]
+    });
 
     /*
       Shared fallback georeference. This is only used if a per-PNG world file
@@ -262,30 +277,9 @@
       F:  79278.899915540285292
     };
 
-    const NJSP_PROJ4 =
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +datum=NAD83 +units=us-ft +no_defs";
-
-    const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
-      origin: [-17954600, 18705699.999999993],
-      resolutions: [
-        2006.2172023914932,
-        1003.1086011953124,
-        501.55430059809026,
-        250.7771502986111,
-        125.38857514930555,
-        62.694287574652776,
-        31.347143787326388,
-        15.673571894097222,
-        7.836785947048611,
-        3.9183929730902776,
-        1.9591964843749998,
-        0.9795982430555555,
-        0.48979912152777777
-      ]
-    });
-
     let map = null;
     let basemapLayer = null;
+    let basemapRefreshPending = false;
     let currentFloodLayer = null;
     let forecastData = null;
     let playTimer = null;
@@ -488,7 +482,7 @@
     }
 
     function projectedPointToLatLng(x, y) {
-      return NJSP_CRS.unproject(L.point(x, y));
+      return FLOOD_CRS.unproject(L.point(x, y));
     }
 
     function computeProjectedExtentFromWorld(world, width, height) {
@@ -578,10 +572,10 @@
 
       if (perFileWorld?.world) {
         extent = computeProjectedExtentFromWorld(perFileWorld.world, meta.width, meta.height);
-        sourceText = `Overlay placement: exact per-file world file (${perFileWorld.worldUrl.split("/").pop()})`;
+        sourceText = `Overlay placement: exact per-file world file (${perFileWorld.worldUrl.split("/").pop()}) in flood CRS`;
       } else {
         extent = computeProjectedExtentFromWorld(SHARED_WORLD, meta.width, meta.height);
-        sourceText = "Overlay placement: shared fallback world transform";
+        sourceText = "Overlay placement: shared fallback world transform in flood CRS";
       }
 
       const info = {
@@ -604,29 +598,21 @@
       if (map) return;
 
       map = L.map("map", {
-        crs: NJSP_CRS,
+        crs: FLOOD_CRS,
         zoomControl: true,
         minZoom: 0,
-        maxZoom: 12,
+        maxZoom: 13,
         continuousWorld: true,
         worldCopyJump: false,
         zoomSnap: 1,
-        zoomDelta: 1
+        zoomDelta: 1,
+        preferCanvas: false
       });
 
-      basemapLayer = L.tileLayer(NJ_BASEMAP_URL, {
-        attribution: "NJ OGIS Orthophoto 2015",
-        tileSize: 512,
-        minZoom: 0,
-        maxZoom: 12,
-        noWrap: true,
-        updateWhenIdle: true,
-        keepBuffer: 2,
-        className: "grayscale-tiles"
-      }).addTo(map);
-
       document.getElementById("crsText").textContent =
-        "Map CRS: EPSG:3424 / NJ State Plane (ftUS)";
+        "Map CRS: EPSG:6527 / NAD83(2011) NJ State Plane (ftUS)";
+
+      map.on("moveend zoomend resize", scheduleBasemapRefresh);
     }
 
     function clearFloodLayer() {
@@ -640,6 +626,54 @@
       if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
         currentFloodLayer.setOpacity(overlayOpacity);
       }
+    }
+
+    function buildBasemapExportUrl() {
+      const bounds = map.getBounds();
+      const sw = map.options.crs.project(bounds.getSouthWest());
+      const ne = map.options.crs.project(bounds.getNorthEast());
+      const size = map.getSize();
+
+      const url = new URL(`${ORTHO_MAPSERVER_URL}/export`);
+      url.searchParams.set("bbox", `${sw.x},${sw.y},${ne.x},${ne.y}`);
+      url.searchParams.set("bboxSR", "6527");
+      url.searchParams.set("imageSR", "6527");
+      url.searchParams.set("size", `${Math.max(1, Math.round(size.x))},${Math.max(1, Math.round(size.y))}`);
+      url.searchParams.set("format", "png32");
+      url.searchParams.set("transparent", "false");
+      url.searchParams.set("dpi", "96");
+      url.searchParams.set("f", "image");
+      url.searchParams.set("layers", "show:0");
+      return url.toString();
+    }
+
+    function refreshBasemapNow() {
+      if (!map) return;
+
+      const bounds = map.getBounds();
+      const url = buildBasemapExportUrl();
+
+      if (!basemapLayer) {
+        basemapLayer = L.imageOverlay(url, bounds, {
+          opacity: 1,
+          interactive: false,
+          crossOrigin: true,
+          className: "grayscale-basemap"
+        }).addTo(map);
+      } else {
+        basemapLayer.setBounds(bounds);
+        basemapLayer.setUrl(url);
+      }
+    }
+
+    function scheduleBasemapRefresh() {
+      if (basemapRefreshPending) return;
+      basemapRefreshPending = true;
+
+      window.requestAnimationFrame(() => {
+        basemapRefreshPending = false;
+        refreshBasemapNow();
+      });
     }
 
     async function loadForecast() {
@@ -657,7 +691,7 @@
         "Catalog mode: PNG overlays in 0.2 ft steps from -4.0 to +14.0. Forecast display floors to the next lower 0.2 ft stage, except anything below 1.5 ft uses the 1.6 ft raster.";
 
       document.getElementById("serviceModeText").textContent =
-        "Layer mode: projected image overlay in NJ State Plane";
+        "Layer mode: flood overlay in EPSG:6527 over a dynamic orthophoto export in EPSG:6527";
 
       const slider = document.getElementById("hourSlider");
       const count = forecastData.hours ? forecastData.hours.length : 0;
@@ -728,9 +762,9 @@
 
       document.getElementById("placementText").textContent = boundsInfo.sourceText;
 
-      currentFloodLayer = L.Proj.imageOverlay(
+      currentFloodLayer = L.imageOverlay(
         `${overlayUrl}?v=${Date.now()}`,
-        boundsInfo.projectedBounds,
+        boundsInfo.latLngBounds,
         {
           opacity: overlayOpacity,
           interactive: false,
@@ -755,8 +789,8 @@
 
       if (!mapHasFit) {
         map.fitBounds(boundsInfo.latLngBounds, { padding: [10, 10] });
-        map.setMaxBounds(boundsInfo.latLngBounds.pad(1.0));
         mapHasFit = true;
+        refreshBasemapNow();
       }
     }
 
