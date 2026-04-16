@@ -33,7 +33,7 @@
     #map {
       width: 100%;
       height: 100%;
-      background: #eef3f8;
+      background: #d7dbe0;
     }
 
     h1 {
@@ -143,6 +143,11 @@
     .leaflet-image-layer {
       image-rendering: auto;
     }
+
+    .grayscale-tiles {
+      filter: grayscale(100%);
+      -webkit-filter: grayscale(100%);
+    }
   </style>
 </head>
 <body>
@@ -150,7 +155,7 @@
     <aside id="panel">
       <h1>North Wildwood Flood Forecast</h1>
       <div class="muted">Driver station: Stone Harbor (8535581)</div>
-      <div class="muted">Basemap: NJ OGIS 2015 Orthophoto (EPSG:3424)</div>
+      <div class="muted">Basemap: NJ OGIS 2015 Orthophoto (EPSG:3424), shown in greyscale</div>
       <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
 
       <div class="section">
@@ -166,6 +171,7 @@
         <div id="catalogText" class="muted">Catalog mode: loading…</div>
         <div id="crsText" class="muted">Map CRS: loading…</div>
         <div id="serviceModeText" class="muted">Layer mode: loading…</div>
+        <div id="placementText" class="muted">Overlay placement: loading…</div>
       </div>
 
       <div class="section">
@@ -243,6 +249,10 @@
     const NJ_BASEMAP_URL =
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
 
+    /*
+      Shared fallback georeference. This is only used if a per-PNG world file
+      is not found next to the image.
+    */
     const SHARED_WORLD = {
       A:  9.997136167181090,
       D:  0.000000000000000,
@@ -275,9 +285,8 @@
     });
 
     let map = null;
+    let basemapLayer = null;
     let currentFloodLayer = null;
-    let floodProjectedBounds = null;
-    let floodLatLngBounds = null;
     let forecastData = null;
     let playTimer = null;
     let overlayOpacity = 1.0;
@@ -287,6 +296,7 @@
     let currentHourIndex = 0;
 
     const imageExistsCache = new Map();
+    const overlayBoundsCache = new Map();
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -354,6 +364,16 @@
       return r.json();
     }
 
+    async function fetchOptionalText(url) {
+      try {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) return null;
+        return await r.text();
+      } catch (err) {
+        return null;
+      }
+    }
+
     function clampStage(value) {
       return Math.max(MIN_STAGE, Math.min(MAX_STAGE, value));
     }
@@ -416,15 +436,66 @@
       return new URL(getOverlayFilename(mode, stageValue), OVERLAY_ROOTS[mode]).href;
     }
 
+    function getWorldFileCandidates(overlayUrl) {
+      if (/\.png$/i.test(overlayUrl)) {
+        return [
+          overlayUrl.replace(/\.png$/i, ".pgw"),
+          overlayUrl.replace(/\.png$/i, ".pngw"),
+          overlayUrl + ".wld"
+        ];
+      }
+      return [overlayUrl + ".wld"];
+    }
+
+    async function tryLoadWorldFile(overlayUrl) {
+      const candidates = getWorldFileCandidates(overlayUrl);
+
+      for (const candidate of candidates) {
+        const txt = await fetchOptionalText(candidate);
+        if (!txt) continue;
+
+        const parsed = parseWorldFile(txt);
+        if (parsed) {
+          return {
+            world: parsed,
+            worldUrl: candidate
+          };
+        }
+      }
+
+      return null;
+    }
+
+    function parseWorldFile(text) {
+      const lines = text
+        .split(/\r?\n/)
+        .map(x => x.trim())
+        .filter(Boolean);
+
+      if (lines.length < 6) return null;
+
+      const nums = lines.slice(0, 6).map(v => Number(v));
+      if (nums.some(v => !Number.isFinite(v))) return null;
+
+      return {
+        A: nums[0],
+        D: nums[1],
+        B: nums[2],
+        E: nums[3],
+        C: nums[4],
+        F: nums[5]
+      };
+    }
+
     function projectedPointToLatLng(x, y) {
       return NJSP_CRS.unproject(L.point(x, y));
     }
 
-    function computeProjectedBounds(width, height) {
-      const { A, D, B, E, C, F } = SHARED_WORLD;
+    function computeProjectedExtentFromWorld(world, width, height) {
+      const { A, D, B, E, C, F } = world;
 
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Shared world file contains rotation or skew. This page assumes north-up rasters.");
+        throw new Error("World file contains rotation or skew. This page assumes north-up rasters.");
       }
 
       const west  = C - (A / 2);
@@ -494,26 +565,39 @@
       }
     }
 
-    async function ensureOverlayBounds(sampleOverlayUrl) {
-      if (floodProjectedBounds && floodLatLngBounds) return;
-
-      const meta = await loadImageMeta(sampleOverlayUrl);
-
-      if (!meta.width || !meta.height) {
-        throw new Error(`Could not read image size for ${sampleOverlayUrl}`);
+    async function getOverlayBoundsInfo(overlayUrl) {
+      if (overlayBoundsCache.has(overlayUrl)) {
+        return overlayBoundsCache.get(overlayUrl);
       }
 
-      const b = computeProjectedBounds(meta.width, meta.height);
+      const meta = await loadImageMeta(overlayUrl);
+      const perFileWorld = await tryLoadWorldFile(overlayUrl);
 
-      floodProjectedBounds = L.bounds(
-        [b.west, b.south],
-        [b.east, b.north]
-      );
+      let extent;
+      let sourceText;
 
-      floodLatLngBounds = L.latLngBounds(
-        projectedPointToLatLng(b.west, b.south),
-        projectedPointToLatLng(b.east, b.north)
-      );
+      if (perFileWorld?.world) {
+        extent = computeProjectedExtentFromWorld(perFileWorld.world, meta.width, meta.height);
+        sourceText = `Overlay placement: exact per-file world file (${perFileWorld.worldUrl.split("/").pop()})`;
+      } else {
+        extent = computeProjectedExtentFromWorld(SHARED_WORLD, meta.width, meta.height);
+        sourceText = "Overlay placement: shared fallback world transform";
+      }
+
+      const info = {
+        projectedBounds: L.bounds(
+          [extent.west, extent.south],
+          [extent.east, extent.north]
+        ),
+        latLngBounds: L.latLngBounds(
+          projectedPointToLatLng(extent.west, extent.south),
+          projectedPointToLatLng(extent.east, extent.north)
+        ),
+        sourceText
+      };
+
+      overlayBoundsCache.set(overlayUrl, info);
+      return info;
     }
 
     function ensureMap() {
@@ -530,14 +614,15 @@
         zoomDelta: 1
       });
 
-      L.tileLayer(NJ_BASEMAP_URL, {
+      basemapLayer = L.tileLayer(NJ_BASEMAP_URL, {
         attribution: "NJ OGIS Orthophoto 2015",
         tileSize: 512,
         minZoom: 0,
         maxZoom: 12,
         noWrap: true,
         updateWhenIdle: true,
-        keepBuffer: 2
+        keepBuffer: 2,
+        className: "grayscale-tiles"
       }).addTo(map);
 
       document.getElementById("crsText").textContent =
@@ -629,8 +714,9 @@
 
       ensureMap();
 
+      let boundsInfo;
       try {
-        await ensureOverlayBounds(overlayUrl);
+        boundsInfo = await getOverlayBoundsInfo(overlayUrl);
       } catch (err) {
         setWarn(err.message);
         setHardWarn(`Projected overlay setup failed.\n\n${err.message}`);
@@ -640,9 +726,11 @@
 
       if (token !== lastRenderToken) return;
 
+      document.getElementById("placementText").textContent = boundsInfo.sourceText;
+
       currentFloodLayer = L.Proj.imageOverlay(
         `${overlayUrl}?v=${Date.now()}`,
-        floodProjectedBounds,
+        boundsInfo.projectedBounds,
         {
           opacity: overlayOpacity,
           interactive: false,
@@ -665,8 +753,9 @@
 
       currentFloodLayer.addTo(map);
 
-      if (!mapHasFit && floodLatLngBounds) {
-        map.fitBounds(floodLatLngBounds, { padding: [10, 10] });
+      if (!mapHasFit) {
+        map.fitBounds(boundsInfo.latLngBounds, { padding: [10, 10] });
+        map.setMaxBounds(boundsInfo.latLngBounds.pad(1.0));
         mapHasFit = true;
       }
     }
