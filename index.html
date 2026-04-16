@@ -70,6 +70,16 @@
       margin-right: 8px;
       margin-bottom: 8px;
       cursor: pointer;
+      border: 1px solid #cfcfcf;
+      background: #fff;
+      border-radius: 8px;
+    }
+
+    button.activeMode {
+      background: #e8f0ff;
+      border-color: #7aa2ff;
+      color: #1746a2;
+      font-weight: 700;
     }
 
     #status {
@@ -144,6 +154,13 @@
       <div id="overlayBaseText" class="muted">Overlay base: loading…</div>
 
       <div class="section">
+        <div class="muted">Overlay type</div>
+        <button id="depthModeBtn" class="activeMode">Flood Depth</button>
+        <button id="dynamicModeBtn">Dynamic Flood</button>
+        <div id="modeText" class="muted">Current overlay type: Flood Depth</div>
+      </div>
+
+      <div class="section">
         <div id="issuedText" class="muted">Forecast issued: loading…</div>
         <div id="sourceText" class="muted">Source: loading…</div>
         <div id="catalogText" class="muted">Catalog mode: loading…</div>
@@ -166,7 +183,7 @@
 
       <div class="section">
         <div id="stageText">Water level: --</div>
-        <div id="matchedText">Matched overlay: --</div>
+        <div id="matchedText">Matched overlay stage: --</div>
         <div id="serviceNameText" class="muted">Overlay file: --</div>
         <div id="loadedUrlText" class="muted">Overlay URL: --</div>
         <div id="warn"></div>
@@ -189,7 +206,7 @@
 
       <div class="section">
         <div class="muted">
-          This version uses a New Jersey State Plane basemap and draws the flood overlay in projected coordinates.
+          Flood Depth is the default catalog. Click Dynamic Flood to swap to the matching dynamic PNG for the same stage.
         </div>
         <div class="pill">NJ State Plane basemap mode</div>
       </div>
@@ -208,24 +225,21 @@
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
-    const RASTER_BASE = new URL("./assets/overlays/", APP_BASE).href.replace(/\/$/, "");
     const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
 
-    /*
-      NJ OGIS 2015 orthophoto cache in NJ State Plane feet.
-      ArcGIS tile path = /tile/{z}/{y}/{x}
-    */
+    const OVERLAY_ROOTS = {
+      depth: new URL("./assets/overlays/flooddepth/", APP_BASE).href,
+      dynamic: new URL("./assets/overlays/dynamicflood/", APP_BASE).href
+    };
+
+    const DEFAULT_OVERLAY_MODE = "depth";
+    const MIN_STAGE = -4.0;
+    const MAX_STAGE = 14.0;
+    const STAGE_STEP = 0.2;
+
     const NJ_BASEMAP_URL =
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
 
-    const MIN_STAGE = -2.0;
-    const MAX_STAGE = 14.0;
-
-    /*
-      Shared world file values.
-      Since your overlays all have the same dimensions and footprint,
-      one georeference works for all of them.
-    */
     const SHARED_WORLD = {
       A:  9.997136167181090,
       D:  0.000000000000000,
@@ -235,17 +249,9 @@
       F:  79278.899915540285292
     };
 
-    /*
-      EPSG:3424 / NAD83 New Jersey (ftUS)
-      Important: false easting is 492125 ftUS.
-    */
     const NJSP_PROJ4 =
       "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +datum=NAD83 +units=us-ft +no_defs";
 
-    /*
-      Tile scheme from the NJ OGIS cached service metadata.
-      512 px tiles, custom origin, custom resolutions.
-    */
     const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
       resolutions: [
@@ -274,6 +280,10 @@
     let overlayOpacity = 1.0;
     let lastRenderToken = 0;
     let mapHasFit = false;
+    let currentOverlayMode = DEFAULT_OVERLAY_MODE;
+    let currentHourIndex = 0;
+
+    const imageExistsCache = new Map();
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -312,6 +322,20 @@
       box.value = text;
     }
 
+    function updateModeButtons() {
+      const depthBtn = document.getElementById("depthModeBtn");
+      const dynamicBtn = document.getElementById("dynamicModeBtn");
+
+      depthBtn.classList.toggle("activeMode", currentOverlayMode === "depth");
+      dynamicBtn.classList.toggle("activeMode", currentOverlayMode === "dynamic");
+
+      document.getElementById("modeText").textContent =
+        `Current overlay type: ${currentOverlayMode === "depth" ? "Flood Depth" : "Dynamic Flood"}`;
+
+      document.getElementById("overlayBaseText").textContent =
+        `Overlay base: ${OVERLAY_ROOTS[currentOverlayMode]}`;
+    }
+
     async function fetchJson(url, params = null) {
       const u = new URL(url);
       if (params) {
@@ -327,31 +351,39 @@
       return r.json();
     }
 
-    function normalizeStageKey(value) {
+    function clampAndSnapStage(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
 
       const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
-      return (Math.round(clipped * 10) / 10).toFixed(1);
+      const snapped = Math.round(clipped / STAGE_STEP) * STAGE_STEP;
+      const normalized = Math.abs(snapped) < 1e-9 ? 0 : snapped;
+      return Number(normalized.toFixed(1));
     }
 
-    function stageKeyToFileStem(stageKey) {
-      const num = Number(stageKey);
-      const sign = num < 0 ? "m" : "p";
-      let absVal = Math.abs(num);
-      let whole = Math.floor(absVal + 1e-9);
-      let tenth = Math.round((absVal - whole) * 10);
+    function stageToCode(stageValue) {
+      const n = Number(stageValue);
+      const sign = n < 0 ? "n" : "p";
+      const tenths = Math.round(Math.abs(n) * 10);
+      return `${sign}${String(tenths).padStart(3, "0")}`;
+    }
 
-      if (tenth === 10) {
-        whole += 1;
-        tenth = 0;
+    function getOverlayFilename(mode, stageValue) {
+      const code = stageToCode(stageValue);
+
+      if (mode === "depth") {
+        return `Depth${code}.png`;
       }
 
-      return `NW_FloodDepth_${sign}${String(whole).padStart(2, "0")}_${tenth}_NAVD88`;
+      if (mode === "dynamic") {
+        return `DynamicFlood_${code}.png`;
+      }
+
+      throw new Error(`Unknown overlay mode: ${mode}`);
     }
 
-    function stageKeyToOverlayUrl(stageKey) {
-      return `${RASTER_BASE}/${stageKeyToFileStem(stageKey)}.webp`;
+    function getOverlayUrl(mode, stageValue) {
+      return new URL(getOverlayFilename(mode, stageValue), OVERLAY_ROOTS[mode]).href;
     }
 
     function projectedPointToLatLng(x, y) {
@@ -362,7 +394,7 @@
       const { A, D, B, E, C, F } = SHARED_WORLD;
 
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Shared world file contains rotation/skew terms. This version assumes north-up rasters.");
+        throw new Error("Shared world file contains rotation or skew. This page assumes north-up rasters.");
       }
 
       const west  = C - (A / 2);
@@ -370,12 +402,7 @@
       const east  = C + A * (width  - 0.5);
       const south = F + E * (height - 0.5);
 
-      return {
-        west,
-        south,
-        east,
-        north
-      };
+      return { west, south, east, north };
     }
 
     async function loadImageMeta(url) {
@@ -398,7 +425,11 @@
     }
 
     async function testImageUrl(url) {
-      return new Promise((resolve) => {
+      if (imageExistsCache.has(url)) {
+        return imageExistsCache.get(url);
+      }
+
+      const result = await new Promise((resolve) => {
         const img = new Image();
 
         img.onload = () => resolve({ ok: true });
@@ -406,6 +437,31 @@
 
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
+
+      imageExistsCache.set(url, result);
+      return result;
+    }
+
+    function preloadImage(url) {
+      const img = new Image();
+      img.src = url;
+    }
+
+    function preloadAroundHour(index) {
+      if (!forecastData?.hours?.length) return;
+
+      const offsets = [0, 1, -1, 2, -2];
+
+      for (const offset of offsets) {
+        const i = index + offset;
+        if (i < 0 || i >= forecastData.hours.length) continue;
+
+        const stage = clampAndSnapStage(forecastData.hours[i].navd88StageFt);
+        if (stage === null) continue;
+
+        preloadImage(getOverlayUrl("depth", stage));
+        preloadImage(getOverlayUrl("dynamic", stage));
+      }
     }
 
     async function ensureOverlayBounds(sampleOverlayUrl) {
@@ -474,8 +530,7 @@
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
 
-      document.getElementById("overlayBaseText").textContent =
-        `Overlay base: ${RASTER_BASE}`;
+      updateModeButtons();
 
       document.getElementById("issuedText").textContent =
         `Forecast issued: ${forecastData.issuedUtc || "not available"}`;
@@ -484,7 +539,7 @@
         `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
 
       document.getElementById("catalogText").textContent =
-        "Catalog mode: static WebP overlays";
+        "Catalog mode: PNG overlays in 0.2 ft steps from -4.0 to +14.0";
 
       document.getElementById("serviceModeText").textContent =
         "Layer mode: projected image overlay in NJ State Plane";
@@ -512,39 +567,39 @@
       return maxIndex;
     }
 
-    async function setFloodLayerFromStage(stageKey, token) {
+    async function setFloodLayer(mode, stageValue, token) {
       clearFloodLayer();
       setWarn("");
       setHardWarn("");
 
-      const normalized = normalizeStageKey(stageKey);
-      if (!normalized) {
+      const snappedStage = clampAndSnapStage(stageValue);
+      if (snappedStage === null) {
         setWarn("Invalid stage value.");
         return;
       }
 
-      const fileStem = stageKeyToFileStem(normalized);
-      const overlayUrl = stageKeyToOverlayUrl(normalized);
+      const filename = getOverlayFilename(mode, snappedStage);
+      const overlayUrl = getOverlayUrl(mode, snappedStage);
 
       document.getElementById("serviceNameText").textContent =
-        `Overlay file: ${fileStem}.webp`;
+        `Overlay file: ${filename}`;
 
       document.getElementById("loadedUrlText").textContent =
         `Overlay URL: ${overlayUrl}`;
 
       showStageUrl(overlayUrl);
 
-      setStatus(`Checking ${fileStem}.webp...`);
+      setStatus(`Checking ${filename}...`);
 
       const exists = await testImageUrl(overlayUrl);
       if (token !== lastRenderToken) return;
 
       if (!exists.ok) {
-        setWarn(`Could not load overlay for ${normalized} ft.`);
+        setWarn(`Could not load overlay for ${snappedStage.toFixed(1)} ft.`);
         setHardWarn(
           `GitHub Pages could not find or serve this file:\n${overlayUrl}`
         );
-        setStatus(`Overlay load failed for ${fileStem}.webp`);
+        setStatus(`Overlay load failed for ${filename}`);
         return;
       }
 
@@ -574,14 +629,14 @@
 
       currentFloodLayer.on("load", () => {
         if (token !== lastRenderToken) return;
-        setStatus(`Loaded ${fileStem}.webp`);
+        setStatus(`Loaded ${filename}`);
       });
 
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        setWarn(`Could not draw overlay for ${normalized} ft.`);
+        setWarn(`Could not draw overlay for ${snappedStage.toFixed(1)} ft.`);
         setHardWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
-        setStatus(`Overlay draw failed for ${fileStem}.webp`);
+        setStatus(`Overlay draw failed for ${filename}`);
       });
 
       currentFloodLayer.addTo(map);
@@ -598,30 +653,44 @@
       const h = forecastData.hours[index];
       if (!h) return;
 
-      document.getElementById("hourText").textContent = `Hour ${h.hourIndex}`;
-      document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc}`;
-      document.getElementById("stageText").textContent =
-        `Water level: ${Number(h.navd88StageFt).toFixed(1)} ft NAVD88`;
-      document.getElementById("matchedText").textContent =
-        `Matched overlay: ${h.matchedStageKey} ft NAVD88`;
+      currentHourIndex = index;
 
-      if (h.wasClamped) {
-        setWarn(
-          `Value was outside your published overlay range, so it was clamped to ${h.matchedStageKey} ft.`
-        );
-      } else {
-        setWarn("");
+      const rawStage = Number(h.navd88StageFt);
+      const snappedStage = clampAndSnapStage(rawStage);
+
+      if (snappedStage === null) {
+        setWarn("Forecast stage is not numeric.");
+        return;
       }
 
+      document.getElementById("hourText").textContent = `Hour ${h.hourIndex ?? index}`;
+      document.getElementById("timeText").textContent = `Time (UTC): ${h.timeUtc || "--"}`;
+      document.getElementById("stageText").textContent =
+        `Water level: ${rawStage.toFixed(2)} ft NAVD88`;
+      document.getElementById("matchedText").textContent =
+        `Matched overlay stage: ${snappedStage.toFixed(1)} ft NAVD88`;
+
+      const notes = [];
+
+      if (rawStage < MIN_STAGE || rawStage > MAX_STAGE) {
+        notes.push(`Value was outside the published range and was clamped to ${snappedStage.toFixed(1)} ft.`);
+      } else if (Math.abs(rawStage - snappedStage) > 0.0001) {
+        notes.push(`Value was snapped to the nearest published 0.2 ft overlay: ${snappedStage.toFixed(1)} ft.`);
+      }
+
+      setWarn(notes.join("\n"));
+
       const token = ++lastRenderToken;
-      await setFloodLayerFromStage(h.matchedStageKey, token);
+      await setFloodLayer(currentOverlayMode, snappedStage, token);
+
+      preloadAroundHour(index);
     }
 
     async function loadManualStage() {
       const raw = document.getElementById("manualStageInput").value.trim();
-      const normalized = normalizeStageKey(raw);
+      const snappedStage = clampAndSnapStage(raw);
 
-      if (!normalized) {
+      if (snappedStage === null) {
         setWarn("Enter a valid numeric stage, like 5.0");
         return;
       }
@@ -629,14 +698,20 @@
       document.getElementById("hourText").textContent = "Manual stage";
       document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
       document.getElementById("stageText").textContent =
-        `Water level: ${normalized} ft NAVD88`;
+        `Water level: ${Number(raw).toFixed(2)} ft NAVD88`;
       document.getElementById("matchedText").textContent =
-        `Matched overlay: ${normalized} ft NAVD88`;
+        `Matched overlay stage: ${snappedStage.toFixed(1)} ft NAVD88`;
 
-      setWarn("");
+      const notes = [];
+      if (Number(raw) < MIN_STAGE || Number(raw) > MAX_STAGE) {
+        notes.push(`Value was outside the published range and was clamped to ${snappedStage.toFixed(1)} ft.`);
+      } else if (Math.abs(Number(raw) - snappedStage) > 0.0001) {
+        notes.push(`Value was snapped to the nearest published 0.2 ft overlay: ${snappedStage.toFixed(1)} ft.`);
+      }
+      setWarn(notes.join("\n"));
 
       const token = ++lastRenderToken;
-      await setFloodLayerFromStage(normalized, token);
+      await setFloodLayer(currentOverlayMode, snappedStage, token);
     }
 
     function stopPlayback() {
@@ -668,6 +743,13 @@
       }, 1500);
     }
 
+    async function switchOverlayMode(mode) {
+      if (mode === currentOverlayMode) return;
+      currentOverlayMode = mode;
+      updateModeButtons();
+      await renderHour(currentHourIndex);
+    }
+
     async function reloadAll() {
       stopPlayback();
       clearFloodLayer();
@@ -676,12 +758,14 @@
       await loadForecast();
 
       const peakIndex = getPeakHourIndex();
+      currentHourIndex = peakIndex;
       document.getElementById("hourSlider").value = String(peakIndex);
       await renderHour(peakIndex);
     }
 
     async function main() {
       setOpacityText();
+      updateModeButtons();
 
       document.getElementById("hourSlider").addEventListener("input", async (e) => {
         stopPlayback();
@@ -692,6 +776,22 @@
         overlayOpacity = Number(e.target.value) / 100;
         setOpacityText();
         applyOverlayOpacity();
+      });
+
+      document.getElementById("depthModeBtn").addEventListener("click", () => {
+        switchOverlayMode("depth").catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
+
+      document.getElementById("dynamicModeBtn").addEventListener("click", () => {
+        switchOverlayMode("dynamic").catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
       });
 
       document.getElementById("playBtn").addEventListener("click", startPlayback);
