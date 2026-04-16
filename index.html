@@ -206,7 +206,7 @@
 
       <div class="section">
         <div class="muted">
-          Flood Depth is the default catalog. Click Dynamic Flood to swap to the matching dynamic PNG for the same stage.
+          Flood Depth is the default catalog. Any forecast stage below 1.5 ft uses the 1.6 ft raster. Otherwise, forecast values are rounded down to the next lower 0.2 ft PNG.
         </div>
         <div class="pill">NJ State Plane basemap mode</div>
       </div>
@@ -236,6 +236,9 @@
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
     const STAGE_STEP = 0.2;
+
+    const FORECAST_MIN_VISIBLE_STAGE = 1.5;
+    const FORECAST_FORCED_STAGE = 1.6;
 
     const NJ_BASEMAP_URL =
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
@@ -351,14 +354,41 @@
       return r.json();
     }
 
-    function clampAndSnapStage(value) {
+    function clampStage(value) {
+      return Math.max(MIN_STAGE, Math.min(MAX_STAGE, value));
+    }
+
+    function roundToOneDecimal(value) {
+      return Number(value.toFixed(1));
+    }
+
+    function floorToCatalogStep(value) {
+      const stepped = Math.floor((value + 1e-9) / STAGE_STEP) * STAGE_STEP;
+      return roundToOneDecimal(stepped);
+    }
+
+    function getForecastOverlayStage(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
 
-      const clipped = Math.max(MIN_STAGE, Math.min(MAX_STAGE, n));
-      const snapped = Math.round(clipped / STAGE_STEP) * STAGE_STEP;
-      const normalized = Math.abs(snapped) < 1e-9 ? 0 : snapped;
-      return Number(normalized.toFixed(1));
+      if (n < FORECAST_MIN_VISIBLE_STAGE) {
+        return FORECAST_FORCED_STAGE;
+      }
+
+      const clipped = clampStage(n);
+      return clampStage(floorToCatalogStep(clipped));
+    }
+
+    function getManualOverlayStage(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+
+      if (n < FORECAST_MIN_VISIBLE_STAGE) {
+        return FORECAST_FORCED_STAGE;
+      }
+
+      const clipped = clampStage(n);
+      return clampStage(floorToCatalogStep(clipped));
     }
 
     function stageToCode(stageValue) {
@@ -456,7 +486,7 @@
         const i = index + offset;
         if (i < 0 || i >= forecastData.hours.length) continue;
 
-        const stage = clampAndSnapStage(forecastData.hours[i].navd88StageFt);
+        const stage = getForecastOverlayStage(forecastData.hours[i].navd88StageFt);
         if (stage === null) continue;
 
         preloadImage(getOverlayUrl("depth", stage));
@@ -539,7 +569,7 @@
         `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
 
       document.getElementById("catalogText").textContent =
-        "Catalog mode: PNG overlays in 0.2 ft steps from -4.0 to +14.0";
+        "Catalog mode: PNG overlays in 0.2 ft steps from -4.0 to +14.0. Forecast display floors to the next lower 0.2 ft stage, except anything below 1.5 ft uses the 1.6 ft raster.";
 
       document.getElementById("serviceModeText").textContent =
         "Layer mode: projected image overlay in NJ State Plane";
@@ -572,14 +602,8 @@
       setWarn("");
       setHardWarn("");
 
-      const snappedStage = clampAndSnapStage(stageValue);
-      if (snappedStage === null) {
-        setWarn("Invalid stage value.");
-        return;
-      }
-
-      const filename = getOverlayFilename(mode, snappedStage);
-      const overlayUrl = getOverlayUrl(mode, snappedStage);
+      const filename = getOverlayFilename(mode, stageValue);
+      const overlayUrl = getOverlayUrl(mode, stageValue);
 
       document.getElementById("serviceNameText").textContent =
         `Overlay file: ${filename}`;
@@ -595,7 +619,7 @@
       if (token !== lastRenderToken) return;
 
       if (!exists.ok) {
-        setWarn(`Could not load overlay for ${snappedStage.toFixed(1)} ft.`);
+        setWarn(`Could not load overlay for ${stageValue.toFixed(1)} ft.`);
         setHardWarn(
           `GitHub Pages could not find or serve this file:\n${overlayUrl}`
         );
@@ -634,7 +658,7 @@
 
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        setWarn(`Could not draw overlay for ${snappedStage.toFixed(1)} ft.`);
+        setWarn(`Could not draw overlay for ${stageValue.toFixed(1)} ft.`);
         setHardWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
         setStatus(`Overlay draw failed for ${filename}`);
       });
@@ -647,6 +671,22 @@
       }
     }
 
+    function buildForecastNotes(rawStage, matchedStage) {
+      const notes = [];
+
+      if (rawStage < FORECAST_MIN_VISIBLE_STAGE) {
+        notes.push(`Any forecast stage below ${FORECAST_MIN_VISIBLE_STAGE.toFixed(1)} ft is forced to the ${FORECAST_FORCED_STAGE.toFixed(1)} ft raster.`);
+      } else if (Math.abs(rawStage - matchedStage) > 0.0001) {
+        notes.push(`Forecast was rounded down to the nearest published flood PNG: ${matchedStage.toFixed(1)} ft.`);
+      }
+
+      if (rawStage > MAX_STAGE) {
+        notes.push(`Value was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
+      }
+
+      return notes.join("\n");
+    }
+
     async function renderHour(index) {
       if (!forecastData?.hours?.length) return;
 
@@ -656,9 +696,9 @@
       currentHourIndex = index;
 
       const rawStage = Number(h.navd88StageFt);
-      const snappedStage = clampAndSnapStage(rawStage);
+      const displayStage = getForecastOverlayStage(rawStage);
 
-      if (snappedStage === null) {
+      if (displayStage === null) {
         setWarn("Forecast stage is not numeric.");
         return;
       }
@@ -668,29 +708,27 @@
       document.getElementById("stageText").textContent =
         `Water level: ${rawStage.toFixed(2)} ft NAVD88`;
       document.getElementById("matchedText").textContent =
-        `Matched overlay stage: ${snappedStage.toFixed(1)} ft NAVD88`;
+        `Matched overlay stage: ${displayStage.toFixed(1)} ft NAVD88`;
 
-      const notes = [];
-
-      if (rawStage < MIN_STAGE || rawStage > MAX_STAGE) {
-        notes.push(`Value was outside the published range and was clamped to ${snappedStage.toFixed(1)} ft.`);
-      } else if (Math.abs(rawStage - snappedStage) > 0.0001) {
-        notes.push(`Value was snapped to the nearest published 0.2 ft overlay: ${snappedStage.toFixed(1)} ft.`);
-      }
-
-      setWarn(notes.join("\n"));
+      setWarn(buildForecastNotes(rawStage, displayStage));
 
       const token = ++lastRenderToken;
-      await setFloodLayer(currentOverlayMode, snappedStage, token);
+      await setFloodLayer(currentOverlayMode, displayStage, token);
 
       preloadAroundHour(index);
     }
 
     async function loadManualStage() {
       const raw = document.getElementById("manualStageInput").value.trim();
-      const snappedStage = clampAndSnapStage(raw);
+      const n = Number(raw);
 
-      if (snappedStage === null) {
+      if (!Number.isFinite(n)) {
+        setWarn("Enter a valid numeric stage, like 5.0");
+        return;
+      }
+
+      const displayStage = getManualOverlayStage(n);
+      if (displayStage === null) {
         setWarn("Enter a valid numeric stage, like 5.0");
         return;
       }
@@ -698,20 +736,23 @@
       document.getElementById("hourText").textContent = "Manual stage";
       document.getElementById("timeText").textContent = "Time (UTC): not tied to forecast";
       document.getElementById("stageText").textContent =
-        `Water level: ${Number(raw).toFixed(2)} ft NAVD88`;
+        `Water level: ${n.toFixed(2)} ft NAVD88`;
       document.getElementById("matchedText").textContent =
-        `Matched overlay stage: ${snappedStage.toFixed(1)} ft NAVD88`;
+        `Matched overlay stage: ${displayStage.toFixed(1)} ft NAVD88`;
 
       const notes = [];
-      if (Number(raw) < MIN_STAGE || Number(raw) > MAX_STAGE) {
-        notes.push(`Value was outside the published range and was clamped to ${snappedStage.toFixed(1)} ft.`);
-      } else if (Math.abs(Number(raw) - snappedStage) > 0.0001) {
-        notes.push(`Value was snapped to the nearest published 0.2 ft overlay: ${snappedStage.toFixed(1)} ft.`);
+      if (n < FORECAST_MIN_VISIBLE_STAGE) {
+        notes.push(`Any stage below ${FORECAST_MIN_VISIBLE_STAGE.toFixed(1)} ft is forced to the ${FORECAST_FORCED_STAGE.toFixed(1)} ft raster.`);
+      } else if (Math.abs(n - displayStage) > 0.0001) {
+        notes.push(`Stage was rounded down to the nearest published flood PNG: ${displayStage.toFixed(1)} ft.`);
+      }
+      if (n > MAX_STAGE) {
+        notes.push(`Value was above the published range and was clamped to ${displayStage.toFixed(1)} ft.`);
       }
       setWarn(notes.join("\n"));
 
       const token = ++lastRenderToken;
-      await setFloodLayer(currentOverlayMode, snappedStage, token);
+      await setFloodLayer(currentOverlayMode, displayStage, token);
     }
 
     function stopPlayback() {
