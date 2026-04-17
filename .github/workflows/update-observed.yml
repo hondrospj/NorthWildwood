@@ -25,29 +25,177 @@ jobs:
         run: |
           python - <<'PY'
           import json
+          import math
+          from collections import defaultdict
+          from datetime import datetime, timedelta, timezone
           from pathlib import Path
 
-          observed = {
-              "site": "01411360",
-              "parameterCd": "72279",
-              "datum": "NAVD88",
-              "timeZone": "EST",
-              "method": "hourly_max_all_history_v1",
-              "lastProcessedISO": None,
-              "archiveStartDate": None,
-              "archiveEndDate": None,
-              "thresholdsNAVD88": {
-                  "minorLow": 3.25,
-                  "moderateLow": 4.25,
-                  "majorLow": 5.25
-              },
-              "days": []
+          import requests
+
+          SITE = "01411360"
+          PARAM = "72279"
+          DATUM = "NAVD88"
+          TZ_NAME = "EST"
+
+          THRESHOLDS = {
+              "minorLow": 3.25,
+              "moderateLow": 4.25,
+              "majorLow": 5.25
           }
 
-          Path("observed.json").write_text(
-              json.dumps(observed, indent=2) + "\n",
-              encoding="utf-8"
-          )
+          OUTFILE = Path("observed.json")
+
+          def classify(stage):
+              if stage is None:
+                  return "none"
+              if stage >= THRESHOLDS["majorLow"]:
+                  return "major"
+              if stage >= THRESHOLDS["moderateLow"]:
+                  return "moderate"
+              if stage >= THRESHOLDS["minorLow"]:
+                  return "minor"
+              return "none"
+
+          def parse_usgs_time(s):
+              # Handles timestamps like 2026-04-16T20:36:00.000-04:00
+              return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
+          def to_fixed_est(dt):
+              # force everything to UTC-5, no DST
+              return (dt.astimezone(timezone.utc) - timedelta(hours=5)).replace(tzinfo=timezone(timedelta(hours=-5)))
+
+          def est_iso_hour(dt_est):
+              dt_est = dt_est.replace(minute=0, second=0, microsecond=0)
+              return dt_est.isoformat()
+
+          def load_existing():
+              if not OUTFILE.exists():
+                  return {
+                      "site": SITE,
+                      "parameterCd": PARAM,
+                      "datum": DATUM,
+                      "timeZone": TZ_NAME,
+                      "method": "hourly_max_all_history_v1",
+                      "lastProcessedISO": None,
+                      "archiveStartDate": None,
+                      "archiveEndDate": None,
+                      "thresholdsNAVD88": THRESHOLDS,
+                      "days": []
+                  }
+
+              with OUTFILE.open("r", encoding="utf-8") as f:
+                  data = json.load(f)
+
+              if "days" not in data or not isinstance(data["days"], list):
+                  data["days"] = []
+
+              data["site"] = SITE
+              data["parameterCd"] = PARAM
+              data["datum"] = DATUM
+              data["timeZone"] = TZ_NAME
+              data["method"] = "hourly_max_all_history_v1"
+              data["thresholdsNAVD88"] = THRESHOLDS
+              return data
+
+          data = load_existing()
+
+          # If the file already has data, only refresh a rolling recent window.
+          # If empty, backfill the whole record.
+          if data["days"]:
+              latest_date = max(d["date"] for d in data["days"] if d.get("date"))
+              start_date = datetime.fromisoformat(latest_date) - timedelta(days=14)
+          else:
+              start_date = datetime(2007, 10, 1)
+
+          end_date = datetime.now(timezone.utc)
+
+          url = "https://waterservices.usgs.gov/nwis/iv/"
+          params = {
+              "format": "json",
+              "sites": SITE,
+              "parameterCd": PARAM,
+              "siteStatus": "all",
+              "startDT": start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "endDT": end_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+          }
+
+          r = requests.get(url, params=params, timeout=120)
+          r.raise_for_status()
+          payload = r.json()
+
+          time_series = payload.get("value", {}).get("timeSeries", [])
+          if not time_series:
+              raise RuntimeError("USGS returned no timeSeries data.")
+
+          values = time_series[0].get("values", [])
+          if not values or not values[0].get("value"):
+              raise RuntimeError("USGS returned no value records.")
+
+          records = values[0]["value"]
+
+          # Build hourly maxima in fixed EST
+          hourly_max = {}
+          for rec in records:
+              val_raw = rec.get("value")
+              t_raw = rec.get("dateTime")
+              if val_raw in (None, "") or not t_raw:
+                  continue
+
+              try:
+                  val = float(val_raw)
+              except Exception:
+                  continue
+
+              if not math.isfinite(val):
+                  continue
+
+              dt = parse_usgs_time(t_raw)
+              dt_est = to_fixed_est(dt)
+              hour_key = est_iso_hour(dt_est)
+
+              prev = hourly_max.get(hour_key)
+              if prev is None or val > prev["navd88StageFt"]:
+                  hourly_max[hour_key] = {
+                      "hourIndex": None,
+                      "timeEST": hour_key,
+                      "navd88StageFt": round(val, 2)
+                  }
+
+          # Group by day
+          grouped = defaultdict(list)
+          for hour_key in sorted(hourly_max.keys()):
+              entry = hourly_max[hour_key]
+              day_key = hour_key[:10]
+              grouped[day_key].append(entry)
+
+          # Build refreshed day records
+          refreshed = {}
+          for day_key, hours in grouped.items():
+              hours = sorted(hours, key=lambda x: x["timeEST"])
+              for i, h in enumerate(hours):
+                  h["hourIndex"] = i
+
+              peak = max(h["navd88StageFt"] for h in hours) if hours else None
+              refreshed[day_key] = {
+                  "date": day_key,
+                  "classification": classify(peak),
+                  "peakNAVD88": round(peak, 2) if peak is not None else None,
+                  "hours": hours
+              }
+
+          # Merge with existing days, replacing overlapping dates
+          existing_map = {d["date"]: d for d in data["days"] if d.get("date")}
+          existing_map.update(refreshed)
+
+          merged_days = [existing_map[k] for k in sorted(existing_map.keys())]
+
+          data["days"] = merged_days
+          data["lastProcessedISO"] = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+          data["archiveStartDate"] = merged_days[0]["date"] if merged_days else None
+          data["archiveEndDate"] = merged_days[-1]["date"] if merged_days else None
+
+          OUTFILE.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+          print(f"Wrote {OUTFILE} with {len(merged_days)} day records.")
           PY
 
       - name: Commit observed cache
