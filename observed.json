@@ -1,0 +1,16 @@
+{
+  "site": "01411360",
+  "parameterCd": "72279",
+  "datum": "NAVD88",
+  "timeZone": "EST",
+  "method": "hourly_max_all_history_v1",
+  "lastProcessedISO": null,
+  "archiveStartDate": null,
+  "archiveEndDate": null,
+  "thresholdsNAVD88": {
+    "minorLow": 3.25,
+    "moderateLow": 4.25,
+    "majorLow": 5.25
+  },
+  "days": []
+}
