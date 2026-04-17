@@ -4,7 +4,11 @@
   <meta charset="utf-8" />
   <title>North Wildwood Flood Forecast</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
 
   <style>
     :root{
@@ -186,13 +190,13 @@
       min-height: 18px;
     }
 
-    .leaflet-image-layer {
-      image-rendering: auto;
-    }
-
     .grayscale-tiles {
       filter: grayscale(100%);
       -webkit-filter: grayscale(100%);
+    }
+
+    .leaflet-image-layer {
+      image-rendering: auto;
     }
 
     @media (max-width: 980px) {
@@ -275,7 +279,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.11.0/dist/proj4.js"></script>
-  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
@@ -293,8 +296,18 @@
     const FORECAST_MIN_VISIBLE_STAGE = 1.5;
     const FORECAST_FORCED_STAGE = 1.6;
 
-    const NJ_BASEMAP_URL =
-      "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
+    /*
+      Use a standard Web Mercator basemap for reliability.
+      The flood overlay is placed from the shared TFW by converting the
+      raster corners from NJ State Plane feet to WGS84 lat/lon.
+    */
+    const ESRI_IMAGERY_URL =
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+    const NJSP_PROJ4 =
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
+
+    const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
 
     const SHARED_WORLD = {
       A: 7.5,
@@ -305,31 +318,8 @@
       F: 70421.25
     };
 
-    const NJSP_PROJ4 =
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
-
-    const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
-      origin: [-17954600, 18705699.999999993],
-      resolutions: [
-        2006.2172023914932,
-        1003.1086011953124,
-        501.55430059809026,
-        250.7771502986111,
-        125.38857514930555,
-        62.694287574652776,
-        31.347143787326388,
-        15.673571894097222,
-        7.836785947048611,
-        3.9183929730902776,
-        1.9591964843749998,
-        0.9795982430555555,
-        0.48979912152777777
-      ]
-    });
-
     let map = null;
     let currentFloodLayer = null;
-    let floodProjectedBounds = null;
     let floodLatLngBounds = null;
     let forecastData = null;
     let playTimer = null;
@@ -365,25 +355,18 @@
       if (map) return;
 
       map = L.map("map", {
-        crs: NJSP_CRS,
         zoomControl: true,
-        minZoom: 0,
-        maxZoom: 12,
-        continuousWorld: true,
-        worldCopyJump: false,
+        minZoom: 6,
+        maxZoom: 20,
         zoomSnap: 1,
         zoomDelta: 1
       });
 
-      L.tileLayer(NJ_BASEMAP_URL, {
-        attribution: "NJ OGIS Orthophoto 2015",
-        tileSize: 512,
-        minZoom: 0,
-        maxZoom: 12,
-        noWrap: true,
-        updateWhenIdle: true,
-        keepBuffer: 2,
-        className: "grayscale-tiles"
+      L.tileLayer(ESRI_IMAGERY_URL, {
+        attribution: "Esri World Imagery",
+        maxZoom: 20,
+        className: "grayscale-tiles",
+        crossOrigin: true
       }).addTo(map);
     }
 
@@ -440,10 +423,6 @@
       return new URL(getOverlayFilename(mode, stageValue), OVERLAY_ROOTS[mode]).href;
     }
 
-    function projectedPointToLatLng(x, y) {
-      return NJSP_CRS.unproject(L.point(x, y));
-    }
-
     function computeProjectedBounds(width, height) {
       const { A, D, B, E, C, F } = SHARED_WORLD;
 
@@ -457,6 +436,11 @@
       const south = F + E * (height - 0.5);
 
       return { west, south, east, north };
+    }
+
+    function projectedXYToLatLng(x, y) {
+      const [lon, lat] = proj4(NJSP_PROJ4, WGS84_PROJ4, [x, y]);
+      return L.latLng(lat, lon);
     }
 
     async function loadImageMeta(url) {
@@ -486,16 +470,15 @@
     }
 
     async function ensureOverlayBounds(sampleOverlayUrl) {
-      if (floodProjectedBounds && floodLatLngBounds) return;
+      if (floodLatLngBounds) return;
 
       const meta = await loadImageMeta(sampleOverlayUrl);
       const b = computeProjectedBounds(meta.width, meta.height);
 
-      floodProjectedBounds = L.bounds([b.west, b.south], [b.east, b.north]);
-      floodLatLngBounds = L.latLngBounds(
-        projectedPointToLatLng(b.west, b.south),
-        projectedPointToLatLng(b.east, b.north)
-      );
+      const sw = projectedXYToLatLng(b.west, b.south);
+      const ne = projectedXYToLatLng(b.east, b.north);
+
+      floodLatLngBounds = L.latLngBounds(sw, ne);
     }
 
     function clearFloodLayer() {
