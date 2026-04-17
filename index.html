@@ -383,9 +383,9 @@
 
       <div id="historySection" class="section">
         <div class="calendar-toolbar">
-          <button id="prevMonthBtn">‹</button>
+          <button id="prevMonthBtn" type="button" aria-label="Previous month">‹</button>
           <div id="monthLabel" class="calendar-title">--</div>
-          <button id="nextMonthBtn">›</button>
+          <button id="nextMonthBtn" type="button" aria-label="Next month">›</button>
         </div>
 
         <div class="calendar-legend">
@@ -439,9 +439,9 @@
 
       <div class="section">
         <div class="transport-row">
-          <button id="playBtn">Play</button>
-          <button id="stopBtn">Stop</button>
-          <button id="reloadBtn">Reload</button>
+          <button id="playBtn" type="button">Play</button>
+          <button id="stopBtn" type="button">Stop</button>
+          <button id="reloadBtn" type="button">Reload</button>
         </div>
       </div>
 
@@ -461,7 +461,7 @@
   <script>
     const APP_BASE = new URL(".", window.location.href);
     const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
-    const OBSERVED_INDEX_URL = new URL("./observed.json", APP_BASE).href;
+    const OBSERVED_URL = new URL("./observed.json", APP_BASE).href;
 
     const OVERLAY_ROOTS = {
       depth: new URL("./assets/overlays/flooddepth/", APP_BASE).href,
@@ -521,7 +521,7 @@
     let mapHasFit = false;
 
     let forecastData = null;
-    let observedIndex = null;
+    let observedData = null;
     let observedMonthKeys = [];
     let currentMonthKey = null;
     let selectedObservedDate = null;
@@ -538,7 +538,6 @@
     let lastRenderToken = 0;
 
     const imageExistsCache = new Map();
-    const observedChunkCache = new Map();
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -695,7 +694,7 @@
         const i = index + offset;
         if (i < 0 || i >= currentSeriesHours.length) continue;
 
-        const stage = getOverlayStage(currentSeriesHours[i].navd88StageFt);
+        const stage = getOverlayStage(getStageValue(currentSeriesHours[i]));
         if (stage === null) continue;
 
         preloadImage(getOverlayUrl("depth", stage));
@@ -804,8 +803,13 @@
     function formatHourEntryTime(entry) {
       if (!entry) return "--";
       if (entry.timeEST) return formatStoredEST(entry.timeEST);
+      if (entry.timeEst) return formatStoredEST(entry.timeEst);
       if (entry.timeUtc) return formatFixedESTFromUtc(entry.timeUtc);
       return "--";
+    }
+
+    function getStageValue(entry) {
+      return Number(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
     }
 
     function buildNotes(rawStage, matchedStage) {
@@ -831,7 +835,7 @@
       let maxVal = -Infinity;
 
       hours.forEach((h, i) => {
-        const v = Number(h.navd88StageFt);
+        const v = getStageValue(h);
         if (Number.isFinite(v) && v > maxVal) {
           maxVal = v;
           maxIndex = i;
@@ -839,6 +843,48 @@
       });
 
       return maxIndex;
+    }
+
+    function getObservedDays() {
+      return Array.isArray(observedData?.days) ? observedData.days : [];
+    }
+
+    function getMonthKeyFromDate(dateStr) {
+      return String(dateStr).slice(0, 7);
+    }
+
+    function buildObservedMonthKeysFromDays(days) {
+      const keys = new Set();
+      for (const day of days) {
+        if (day?.date) keys.add(getMonthKeyFromDate(day.date));
+      }
+      return Array.from(keys).sort();
+    }
+
+    function getObservedDayRecord(dateStr) {
+      return getObservedDays().find(d => d.date === dateStr) || null;
+    }
+
+    function getObservedDaysForMonth(monthKey) {
+      return getObservedDays().filter(d => getMonthKeyFromDate(d.date) === monthKey);
+    }
+
+    function getLatestObservedDate() {
+      const days = getObservedDays();
+      if (!days.length) return null;
+
+      const floodDays = days.filter(d => (d.classification || "none") !== "none");
+      if (floodDays.length) {
+        return floodDays[floodDays.length - 1].date;
+      }
+
+      return days[days.length - 1].date;
+    }
+
+    function prettyMonth(monthKey) {
+      if (!monthKey) return "--";
+      const [y, m] = monthKey.split("-");
+      return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
     }
 
     async function setFloodLayer(mode, stageValue, token) {
@@ -909,7 +955,7 @@
 
       currentHourIndex = index;
 
-      const rawStage = Number(h.navd88StageFt);
+      const rawStage = getStageValue(h);
       const displayStage = getOverlayStage(rawStage);
 
       if (displayStage === null) {
@@ -944,7 +990,9 @@
         forecastData.issuedUtc ? `Updated ${formatFixedESTFromUtc(forecastData.issuedUtc)}` : "--";
 
       document.getElementById("archiveText").textContent =
-        "Observed archive: root observed.json";
+        observedData?.archiveStartDate && observedData?.archiveEndDate
+          ? `Observed archive: ${observedData.archiveStartDate} to ${observedData.archiveEndDate} EST`
+          : "Observed archive: root observed.json";
 
       const slider = document.getElementById("hourSlider");
       slider.max = String(Math.max(0, currentSeriesHours.length - 1));
@@ -954,19 +1002,22 @@
       currentHourIndex = peakIndex;
     }
 
-    async function loadObservedIndex() {
-      observedIndex = await fetchJson(OBSERVED_INDEX_URL);
-      observedMonthKeys = Object.keys(observedIndex.months || {}).sort();
+    async function loadObserved() {
+      observedData = await fetchJson(OBSERVED_URL);
+
+      const days = getObservedDays();
+      observedMonthKeys = buildObservedMonthKeysFromDays(days);
 
       document.getElementById("archiveText").textContent =
-        observedIndex.archiveStartDate && observedIndex.archiveEndDate
-          ? `Observed archive: ${observedIndex.archiveStartDate} to ${observedIndex.archiveEndDate} EST`
+        observedData.archiveStartDate && observedData.archiveEndDate
+          ? `Observed archive: ${observedData.archiveStartDate} to ${observedData.archiveEndDate} EST`
           : "Observed archive loaded";
 
       if (!currentMonthKey) {
-        currentMonthKey = observedIndex.archiveEndDate
-          ? observedIndex.archiveEndDate.slice(0, 7)
-          : (observedMonthKeys[observedMonthKeys.length - 1] || null);
+        currentMonthKey =
+          observedData.archiveEndDate?.slice(0, 7) ||
+          (days.length ? days[days.length - 1].date.slice(0, 7) : null) ||
+          (observedMonthKeys.length ? observedMonthKeys[observedMonthKeys.length - 1] : null);
       }
 
       if (!currentMonthKey && observedMonthKeys.length) {
@@ -974,52 +1025,22 @@
       }
     }
 
-    function getObservedChunkRoot() {
-      const chunkRoot = observedIndex?.chunkRoot || "./observed_chunks/";
-      return new URL(chunkRoot, APP_BASE).href;
-    }
-
-    async function loadObservedChunk(filename) {
-      if (observedChunkCache.has(filename)) {
-        return observedChunkCache.get(filename);
-      }
-
-      const url = new URL(filename, getObservedChunkRoot()).href;
-      const data = await fetchJson(url);
-      observedChunkCache.set(filename, data);
-      return data;
-    }
-
-    function findObservedDayMeta(dateStr) {
-      const monthKey = dateStr.slice(0, 7);
-      const month = observedIndex?.months?.[monthKey];
-      if (!month?.days) return null;
-      return month.days.find(d => d.date === dateStr) || null;
-    }
-
-    function prettyMonth(monthKey) {
-      if (!monthKey) return "--";
-      const [y, m] = monthKey.split("-");
-      return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
-    }
-
     async function renderCalendar() {
-      if (!observedIndex || !currentMonthKey) return;
+      if (!observedData || !currentMonthKey) return;
 
-      const month = observedIndex.months?.[currentMonthKey];
       const grid = document.getElementById("calendarGrid");
       grid.innerHTML = "";
 
-      document.getElementById("monthLabel").textContent =
-        month?.label || prettyMonth(currentMonthKey);
+      document.getElementById("monthLabel").textContent = prettyMonth(currentMonthKey);
 
       const [year, monthNum] = currentMonthKey.split("-").map(Number);
       const first = new Date(Date.UTC(year, monthNum - 1, 1));
       const lastDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
       const firstWeekday = first.getUTCDay();
 
+      const monthDays = getObservedDaysForMonth(currentMonthKey);
       const daysByDate = new Map();
-      (month?.days || []).forEach(day => daysByDate.set(day.date, day));
+      monthDays.forEach(day => daysByDate.set(day.date, day));
 
       for (let i = 0; i < firstWeekday; i++) {
         const blank = document.createElement("div");
@@ -1033,6 +1054,7 @@
 
         const btn = document.createElement("button");
         btn.className = "calendar-day";
+        btn.type = "button";
 
         if (!meta) {
           btn.classList.add("day-none");
@@ -1073,30 +1095,19 @@
     }
 
     async function loadObservedDay(dateStr) {
-      const meta = findObservedDayMeta(dateStr);
-      if (!meta) {
-        throw new Error(`Observed day not found in observed.json: ${dateStr}`);
-      }
-
-      if (!meta.chunk) {
-        throw new Error(`No 5-day chunk file listed for ${dateStr}`);
-      }
-
-      const chunk = await loadObservedChunk(meta.chunk);
-      const dayRecord = Array.isArray(chunk.days)
-        ? chunk.days.find(d => d.date === dateStr)
-        : null;
+      const dayRecord = getObservedDayRecord(dateStr);
 
       if (!dayRecord) {
-        throw new Error(`Chunk ${meta.chunk} did not contain ${dateStr}`);
+        throw new Error(`Observed day not found in observed.json: ${dateStr}`);
       }
 
       currentSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
       selectedObservedDate = dateStr;
+      currentMonthKey = dateStr.slice(0, 7);
 
       currentSelectedLabel = dateStr;
       currentSelectedSubLabel =
-        `${dayRecord.classification || meta.classification || "none"}${dayRecord.peakNAVD88 != null ? ` • Peak ${Number(dayRecord.peakNAVD88).toFixed(2)} ft` : ""}`;
+        `${dayRecord.classification || "none"}${dayRecord.peakNAVD88 != null ? ` • Peak ${Number(dayRecord.peakNAVD88).toFixed(2)} ft` : ""}`;
 
       document.getElementById("issuedText").textContent = "Observed replay • Fixed EST";
 
@@ -1154,6 +1165,7 @@
       currentDataMode = mode;
       updateDataModeButtons();
       clearFloodLayer();
+      setWarn("");
 
       if (mode === "forecast") {
         await loadForecast();
@@ -1161,10 +1173,10 @@
         return;
       }
 
-      await loadObservedIndex();
+      await loadObserved();
       await renderCalendar();
 
-      const defaultDate = selectedObservedDate || observedIndex.archiveEndDate;
+      const defaultDate = selectedObservedDate || getLatestObservedDate();
       if (defaultDate) {
         await loadObservedDay(defaultDate);
       } else {
@@ -1185,16 +1197,17 @@
       }
 
       setStatus("Reloading observed archive...");
-      observedIndex = null;
+      observedData = null;
       observedMonthKeys = [];
-      observedChunkCache.clear();
 
-      await loadObservedIndex();
+      await loadObserved();
       await renderCalendar();
 
-      const defaultDate = selectedObservedDate || observedIndex.archiveEndDate;
+      const defaultDate = selectedObservedDate || getLatestObservedDate();
       if (defaultDate) {
         await loadObservedDay(defaultDate);
+      } else {
+        setStatus("No observed dates were found in observed.json");
       }
     }
 
