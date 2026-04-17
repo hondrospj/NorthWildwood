@@ -2,13 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>North Wildwood Flood Forecast</title>
+  <title>North Wildwood Flood Replay</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
     :root{
@@ -21,6 +18,14 @@
       --accent-soft:#dbeafe;
       --shadow:0 18px 42px rgba(15,23,42,.08);
       --radius:22px;
+
+      --none:#f8fafc;
+      --minor:#f59e0b;
+      --minor-soft:#fef3c7;
+      --moderate:#ef4444;
+      --moderate-soft:#fee2e2;
+      --major:#7c3aed;
+      --major-soft:#ede9fe;
     }
 
     * { box-sizing: border-box; }
@@ -35,7 +40,7 @@
 
     #app {
       display: grid;
-      grid-template-columns: 340px 1fr;
+      grid-template-columns: 380px 1fr;
       height: 100%;
     }
 
@@ -54,7 +59,7 @@
 
     .brand {
       display: grid;
-      gap: 2px;
+      gap: 3px;
       padding: 2px 2px 10px;
     }
 
@@ -82,10 +87,6 @@
       box-shadow: var(--shadow);
     }
 
-    .section.hidden-support {
-      display: none;
-    }
-
     .big {
       font-size: 20px;
       font-weight: 800;
@@ -102,8 +103,6 @@
 
     button {
       padding: 11px 12px;
-      margin-right: 8px;
-      margin-bottom: 8px;
       cursor: pointer;
       border: 1px solid var(--line);
       background: #fff;
@@ -124,21 +123,10 @@
       color: #1d4ed8;
     }
 
-    #status {
-      margin-top: 14px;
-      color: var(--muted);
-      font-size: 12px;
-      text-align: center;
-      padding: 2px 0 0;
-      background: transparent;
-      border: 0;
-      box-shadow: none;
-    }
-
-    #warn, #hardWarn, #urlBox, #manualStageInput, #manualStageBtn, #showUrlsBtn,
-    #overlayBaseText, #sourceText, #catalogText, #crsText, #serviceModeText,
-    #placementText, #serviceNameText, #loadedUrlText, .pill {
-      display: none !important;
+    button:disabled {
+      opacity: .45;
+      cursor: default;
+      transform: none;
     }
 
     .leaflet-image-layer {
@@ -150,21 +138,21 @@
       -webkit-filter: grayscale(100%);
     }
 
-    .transport-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-    }
-
     .mode-buttons {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
 
+    .transport-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
     .metric-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 10px;
     }
 
@@ -203,7 +191,155 @@
       font-weight: 750;
     }
 
-    @media (max-width: 980px) {
+    .calendar-toolbar {
+      display: grid;
+      grid-template-columns: 44px 1fr 44px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .calendar-title {
+      text-align: center;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+    }
+
+    .calendar-legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .legend-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: #fff;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+    }
+
+    .legend-dot.none { background: #cbd5e1; }
+    .legend-dot.minor { background: var(--minor); }
+    .legend-dot.moderate { background: var(--moderate); }
+    .legend-dot.major { background: var(--major); }
+
+    .calendar-head,
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+
+    .calendar-head {
+      margin-bottom: 6px;
+    }
+
+    .calendar-head div {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 4px 0;
+    }
+
+    .calendar-day {
+      min-height: 46px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #fff;
+      display: grid;
+      place-items: center;
+      font-weight: 800;
+      font-size: 13px;
+      position: relative;
+      padding: 0;
+    }
+
+    .calendar-day.empty {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .calendar-day.day-none {
+      background: var(--none);
+    }
+
+    .calendar-day.day-minor {
+      background: var(--minor-soft);
+      border-color: #fcd34d;
+    }
+
+    .calendar-day.day-moderate {
+      background: var(--moderate-soft);
+      border-color: #fca5a5;
+    }
+
+    .calendar-day.day-major {
+      background: var(--major-soft);
+      border-color: #c4b5fd;
+    }
+
+    .calendar-day.selected {
+      outline: 2px solid #1d4ed8;
+      outline-offset: 1px;
+    }
+
+    .calendar-day .tiny {
+      position: absolute;
+      right: 6px;
+      bottom: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    #historySection {
+      display: none;
+    }
+
+    #statusBox {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    #status,
+    #warn {
+      border-radius: 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 12px;
+      line-height: 1.35;
+      box-shadow: var(--shadow);
+    }
+
+    #status {
+      color: var(--muted);
+    }
+
+    #warn {
+      display: none;
+      color: #7c2d12;
+      background: #fff7ed;
+      border-color: #fed7aa;
+      white-space: pre-line;
+    }
+
+    @media (max-width: 1080px) {
       #app {
         grid-template-columns: 1fr;
         grid-template-rows: auto 1fr;
@@ -213,6 +349,10 @@
         border-right: 0;
         border-bottom: 1px solid var(--line);
       }
+
+      .metric-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -220,8 +360,17 @@
   <div id="app">
     <aside id="panel">
       <div class="brand">
-        <h1>North Wildwood<br>Flood Forecast</h1>
-        <div class="muted">Stone Harbor driver station</div>
+        <h1>North Wildwood<br>Flood Replay</h1>
+        <div class="muted">Stone Harbor USGS driver station</div>
+        <div id="archiveText" class="muted">Observed archive: --</div>
+      </div>
+
+      <div class="section">
+        <div class="mode-buttons">
+          <button id="forecastDataBtn" class="activeMode">Forecast</button>
+          <button id="observedDataBtn">Observed</button>
+        </div>
+        <div id="dataModeText" class="muted" style="margin-top:8px;">Current data mode: Forecast</div>
       </div>
 
       <div class="section">
@@ -229,7 +378,27 @@
           <button id="depthModeBtn" class="activeMode">Flood Depth</button>
           <button id="dynamicModeBtn">Dynamic Flood</button>
         </div>
-        <div id="modeText" class="muted" style="margin-top:8px;">Current overlay type: Flood Depth</div>
+        <div id="overlayModeText" class="muted" style="margin-top:8px;">Current overlay type: Flood Depth</div>
+      </div>
+
+      <div id="historySection" class="section">
+        <div class="calendar-toolbar">
+          <button id="prevMonthBtn">‹</button>
+          <div id="monthLabel" class="calendar-title">--</div>
+          <button id="nextMonthBtn">›</button>
+        </div>
+
+        <div class="calendar-legend">
+          <div class="legend-pill"><span class="legend-dot none"></span>None</div>
+          <div class="legend-pill"><span class="legend-dot minor"></span>Minor</div>
+          <div class="legend-pill"><span class="legend-dot moderate"></span>Moderate</div>
+          <div class="legend-pill"><span class="legend-dot major"></span>Major</div>
+        </div>
+
+        <div class="calendar-head">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div id="calendarGrid" class="calendar-grid"></div>
       </div>
 
       <div class="section">
@@ -244,15 +413,20 @@
             <div id="stageText" class="big">--</div>
             <div id="matchedText" class="muted">--</div>
           </div>
+          <div class="metric-box">
+            <div class="metric-label">Selected</div>
+            <div id="selectedText" class="big">--</div>
+            <div id="selectedSubText" class="muted">--</div>
+          </div>
         </div>
       </div>
 
       <div class="section">
         <div class="control-head">
-          <div class="control-label">Forecast hour</div>
+          <div id="hourLabel" class="control-label">Forecast hour</div>
           <div id="hourText" class="control-value">Hour 0</div>
         </div>
-        <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
+        <input id="hourSlider" type="range" min="0" max="0" value="0" step="1" />
       </div>
 
       <div class="section">
@@ -271,25 +445,9 @@
         </div>
       </div>
 
-      <div id="status">Starting…</div>
-
-      <!-- Hidden support elements kept so the original JS does not break -->
-      <div class="section hidden-support"><div id="overlayBaseText"></div></div>
-      <div class="section hidden-support">
-        <div id="sourceText"></div>
-        <div id="catalogText"></div>
-        <div id="crsText"></div>
-        <div id="serviceModeText"></div>
-        <div id="placementText"></div>
-        <div id="serviceNameText"></div>
-        <div id="loadedUrlText"></div>
+      <div id="statusBox">
+        <div id="status">Starting…</div>
         <div id="warn"></div>
-        <div id="hardWarn"></div>
-        <textarea id="urlBox" readonly></textarea>
-        <input id="manualStageInput" type="text" />
-        <button id="manualStageBtn">Load</button>
-        <button id="showUrlsBtn">Show overlay URL</button>
-        <div class="pill">Shared TFW mode</div>
       </div>
     </aside>
 
@@ -303,6 +461,7 @@
   <script>
     const APP_BASE = new URL(".", window.location.href);
     const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
+    const OBSERVED_INDEX_URL = new URL("./observed.json", APP_BASE).href;
 
     const OVERLAY_ROOTS = {
       depth: new URL("./assets/overlays/flooddepth/", APP_BASE).href,
@@ -310,11 +469,13 @@
     };
 
     const DEFAULT_OVERLAY_MODE = "depth";
+    const DEFAULT_DATA_MODE = "forecast";
+
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
     const STAGE_STEP = 0.2;
-    const FORECAST_MIN_VISIBLE_STAGE = 1.5;
-    const FORECAST_FORCED_STAGE = 1.6;
+    const MIN_VISIBLE_STAGE = 1.5;
+    const FORCED_STAGE = 1.6;
 
     const NJ_BASEMAP_URL =
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
@@ -350,29 +511,34 @@
       ]
     });
 
+    const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const EST_OFFSET_MS = 5 * 60 * 60 * 1000;
+
     let map = null;
     let currentFloodLayer = null;
     let floodProjectedBounds = null;
     let floodLatLngBounds = null;
+    let mapHasFit = false;
+
     let forecastData = null;
+    let observedIndex = null;
+    let observedMonthKeys = [];
+    let currentMonthKey = null;
+    let selectedObservedDate = null;
+
+    let currentDataMode = DEFAULT_DATA_MODE;
+    let currentOverlayMode = DEFAULT_OVERLAY_MODE;
+    let currentSeriesHours = [];
+    let currentHourIndex = 0;
+    let currentSelectedLabel = "Forecast";
+    let currentSelectedSubLabel = "--";
+
     let playTimer = null;
     let overlayOpacity = 1.0;
     let lastRenderToken = 0;
-    let mapHasFit = false;
-    let currentOverlayMode = DEFAULT_OVERLAY_MODE;
-    let currentHourIndex = 0;
 
     const imageExistsCache = new Map();
-
-    const easternFormatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: "America/New_York",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZoneName: "short"
-    });
+    const observedChunkCache = new Map();
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
@@ -380,7 +546,6 @@
 
     function setWarn(msg) {
       const el = document.getElementById("warn");
-      if (!el) return;
       if (!msg) {
         el.style.display = "none";
         el.textContent = "";
@@ -390,16 +555,12 @@
       }
     }
 
-    function setHardWarn(msg) {
-      const el = document.getElementById("hardWarn");
-      if (!el) return;
-      if (!msg) {
-        el.style.display = "none";
-        el.textContent = "";
-      } else {
-        el.style.display = "block";
-        el.textContent = msg;
+    async function fetchJson(url) {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status} for ${url}`);
       }
+      return r.json();
     }
 
     function setOpacityText() {
@@ -407,47 +568,22 @@
         `${Math.round(overlayOpacity * 100)}%`;
     }
 
-    function showStageUrl(text) {
-      const box = document.getElementById("urlBox");
-      if (!box) return;
-      box.style.display = "block";
-      box.value = text;
-    }
-
     function updateModeButtons() {
-      const depthBtn = document.getElementById("depthModeBtn");
-      const dynamicBtn = document.getElementById("dynamicModeBtn");
-
-      depthBtn.classList.toggle("activeMode", currentOverlayMode === "depth");
-      dynamicBtn.classList.toggle("activeMode", currentOverlayMode === "dynamic");
-
-      document.getElementById("modeText").textContent =
+      document.getElementById("depthModeBtn").classList.toggle("activeMode", currentOverlayMode === "depth");
+      document.getElementById("dynamicModeBtn").classList.toggle("activeMode", currentOverlayMode === "dynamic");
+      document.getElementById("overlayModeText").textContent =
         `Current overlay type: ${currentOverlayMode === "depth" ? "Flood Depth" : "Dynamic Flood"}`;
-
-      document.getElementById("overlayBaseText").textContent =
-        `Overlay base: ${OVERLAY_ROOTS[currentOverlayMode]}`;
     }
 
-    function formatEasternTime(isoString) {
-      if (!isoString) return "--";
-      const d = new Date(isoString);
-      if (Number.isNaN(d.getTime())) return "--";
-      return easternFormatter.format(d);
-    }
-
-    async function fetchJson(url, params = null) {
-      const u = new URL(url);
-      if (params) {
-        for (const [k, v] of Object.entries(params)) {
-          u.searchParams.set(k, v);
-        }
-      }
-
-      const r = await fetch(u.toString(), { cache: "no-store" });
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
-      }
-      return r.json();
+    function updateDataModeButtons() {
+      document.getElementById("forecastDataBtn").classList.toggle("activeMode", currentDataMode === "forecast");
+      document.getElementById("observedDataBtn").classList.toggle("activeMode", currentDataMode === "observed");
+      document.getElementById("dataModeText").textContent =
+        `Current data mode: ${currentDataMode === "forecast" ? "Forecast" : "Observed"}`;
+      document.getElementById("historySection").style.display =
+        currentDataMode === "observed" ? "block" : "none";
+      document.getElementById("hourLabel").textContent =
+        currentDataMode === "forecast" ? "Forecast hour" : "Replay hour";
     }
 
     function clampStage(value) {
@@ -463,25 +599,11 @@
       return roundToOneDecimal(stepped);
     }
 
-    function getForecastOverlayStage(value) {
+    function getOverlayStage(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
 
-      if (n < FORECAST_MIN_VISIBLE_STAGE) {
-        return FORECAST_FORCED_STAGE;
-      }
-
-      const clipped = clampStage(n);
-      return clampStage(floorToCatalogStep(clipped));
-    }
-
-    function getManualOverlayStage(value) {
-      const n = Number(value);
-      if (!Number.isFinite(n)) return null;
-
-      if (n < FORECAST_MIN_VISIBLE_STAGE) {
-        return FORECAST_FORCED_STAGE;
-      }
+      if (n < MIN_VISIBLE_STAGE) return FORCED_STAGE;
 
       const clipped = clampStage(n);
       return clampStage(floorToCatalogStep(clipped));
@@ -496,10 +618,8 @@
 
     function getOverlayFilename(mode, stageValue) {
       const code = stageToCode(stageValue);
-
       if (mode === "depth") return `Depth${code}.png`;
       if (mode === "dynamic") return `DynamicFlood_${code}.png`;
-
       throw new Error(`Unknown overlay mode: ${mode}`);
     }
 
@@ -515,7 +635,7 @@
       const { A, D, B, E, C, F } = SHARED_WORLD;
 
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Shared world file contains rotation or skew. This page assumes north-up rasters.");
+        throw new Error("Shared world file contains rotation or skew.");
       }
 
       const west  = C - (A / 2);
@@ -552,10 +672,8 @@
 
       const result = await new Promise((resolve) => {
         const img = new Image();
-
         img.onload = () => resolve({ ok: true });
         img.onerror = () => resolve({ ok: false });
-
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
 
@@ -569,15 +687,15 @@
     }
 
     function preloadAroundHour(index) {
-      if (!forecastData?.hours?.length) return;
+      if (!currentSeriesHours.length) return;
 
       const offsets = [0, 1, -1, 2, -2];
 
       for (const offset of offsets) {
         const i = index + offset;
-        if (i < 0 || i >= forecastData.hours.length) continue;
+        if (i < 0 || i >= currentSeriesHours.length) continue;
 
-        const stage = getForecastOverlayStage(forecastData.hours[i].navd88StageFt);
+        const stage = getOverlayStage(currentSeriesHours[i].navd88StageFt);
         if (stage === null) continue;
 
         preloadImage(getOverlayUrl("depth", stage));
@@ -589,7 +707,6 @@
       if (floodProjectedBounds && floodLatLngBounds) return;
 
       const meta = await loadImageMeta(sampleOverlayUrl);
-
       if (!meta.width || !meta.height) {
         throw new Error(`Could not read image size for ${sampleOverlayUrl}`);
       }
@@ -605,9 +722,6 @@
         projectedPointToLatLng(b.west, b.south),
         projectedPointToLatLng(b.east, b.north)
       );
-
-      document.getElementById("placementText").textContent =
-        "Overlay placement: shared Depthn002.tfw values applied to all PNGs";
     }
 
     function ensureMap() {
@@ -634,9 +748,6 @@
         keepBuffer: 2,
         className: "grayscale-tiles"
       }).addTo(map);
-
-      document.getElementById("crsText").textContent =
-        "Map CRS: NJ State Plane (ftUS) using the flood overlay transform";
     }
 
     function clearFloodLayer() {
@@ -652,38 +763,76 @@
       }
     }
 
-    async function loadForecast() {
-      forecastData = await fetchJson(FORECAST_URL);
-
-      updateModeButtons();
-
-      document.getElementById("issuedText").textContent =
-        forecastData.issuedUtc ? `Updated ${formatEasternTime(forecastData.issuedUtc)}` : "--";
-
-      document.getElementById("sourceText").textContent =
-        `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
-
-      document.getElementById("catalogText").textContent =
-        "Catalog mode: PNG overlays in 0.2 ft steps from -4.0 to +14.0. Forecast display floors to the next lower 0.2 ft stage, except anything below 1.5 ft uses the 1.6 ft raster.";
-
-      document.getElementById("serviceModeText").textContent =
-        "Layer mode: projected flood PNG overlay over a stable greyscale tile basemap";
-
-      const slider = document.getElementById("hourSlider");
-      const count = forecastData.hours ? forecastData.hours.length : 0;
-      slider.max = String(Math.max(0, count - 1));
-      slider.value = "0";
+    function pad2(n) {
+      return String(n).padStart(2, "0");
     }
 
-    function getPeakHourIndex() {
-      if (!forecastData?.hours?.length) return 0;
+    function formatFixedESTFromUtc(isoString) {
+      if (!isoString) return "--";
+      const d = new Date(isoString);
+      if (Number.isNaN(d.getTime())) return "--";
+
+      const est = new Date(d.getTime() - EST_OFFSET_MS);
+      const month = MONTH_NAMES[est.getUTCMonth()];
+      const day = est.getUTCDate();
+      let hour = est.getUTCHours();
+      const minute = pad2(est.getUTCMinutes());
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12;
+      if (hour === 0) hour = 12;
+
+      return `${month} ${day}, ${hour}:${minute} ${ampm} EST`;
+    }
+
+    function formatStoredEST(timeEST) {
+      if (!timeEST) return "--";
+
+      const match = String(timeEST).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!match) return String(timeEST);
+
+      const month = MONTH_NAMES[Number(match[2]) - 1];
+      const day = Number(match[3]);
+      let hour = Number(match[4]);
+      const minute = match[5];
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12;
+      if (hour === 0) hour = 12;
+
+      return `${month} ${day}, ${hour}:${minute} ${ampm} EST`;
+    }
+
+    function formatHourEntryTime(entry) {
+      if (!entry) return "--";
+      if (entry.timeEST) return formatStoredEST(entry.timeEST);
+      if (entry.timeUtc) return formatFixedESTFromUtc(entry.timeUtc);
+      return "--";
+    }
+
+    function buildNotes(rawStage, matchedStage) {
+      const notes = [];
+
+      if (rawStage < MIN_VISIBLE_STAGE) {
+        notes.push(`Any stage below ${MIN_VISIBLE_STAGE.toFixed(1)} ft is forced to the ${FORCED_STAGE.toFixed(1)} ft raster.`);
+      } else if (Math.abs(rawStage - matchedStage) > 0.0001) {
+        notes.push(`Stage was rounded down to the nearest published flood PNG: ${matchedStage.toFixed(1)} ft.`);
+      }
+
+      if (rawStage > MAX_STAGE) {
+        notes.push(`Value was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
+      }
+
+      return notes.join("\n");
+    }
+
+    function getPeakHourIndex(hours = currentSeriesHours) {
+      if (!hours.length) return 0;
 
       let maxIndex = 0;
       let maxVal = -Infinity;
 
-      forecastData.hours.forEach((h, i) => {
+      hours.forEach((h, i) => {
         const v = Number(h.navd88StageFt);
-        if (v > maxVal) {
+        if (Number.isFinite(v) && v > maxVal) {
           maxVal = v;
           maxIndex = i;
         }
@@ -695,18 +844,9 @@
     async function setFloodLayer(mode, stageValue, token) {
       clearFloodLayer();
       setWarn("");
-      setHardWarn("");
 
       const filename = getOverlayFilename(mode, stageValue);
       const overlayUrl = getOverlayUrl(mode, stageValue);
-
-      document.getElementById("serviceNameText").textContent =
-        `Overlay file: ${filename}`;
-
-      document.getElementById("loadedUrlText").textContent =
-        `Overlay URL: ${overlayUrl}`;
-
-      showStageUrl(overlayUrl);
 
       setStatus(`Checking ${filename}...`);
 
@@ -714,8 +854,7 @@
       if (token !== lastRenderToken) return;
 
       if (!exists.ok) {
-        setWarn(`Could not load overlay for ${stageValue.toFixed(1)} ft.`);
-        setHardWarn(`GitHub Pages could not find or serve this file:\n${overlayUrl}`);
+        setWarn(`Could not load overlay for ${stageValue.toFixed(1)} ft.\n${overlayUrl}`);
         setStatus(`Overlay load failed for ${filename}`);
         return;
       }
@@ -726,7 +865,6 @@
         await ensureOverlayBounds(overlayUrl);
       } catch (err) {
         setWarn(err.message);
-        setHardWarn(`Projected overlay setup failed.\n\n${err.message}`);
         setStatus("Projected overlay setup failed");
         return;
       }
@@ -751,8 +889,7 @@
 
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        setWarn(`Could not draw overlay for ${stageValue.toFixed(1)} ft.`);
-        setHardWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
+        setWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
         setStatus(`Overlay draw failed for ${filename}`);
       });
 
@@ -764,44 +901,31 @@
       }
     }
 
-    function buildForecastNotes(rawStage, matchedStage) {
-      const notes = [];
-
-      if (rawStage < FORECAST_MIN_VISIBLE_STAGE) {
-        notes.push(`Any forecast stage below ${FORECAST_MIN_VISIBLE_STAGE.toFixed(1)} ft is forced to the ${FORECAST_FORCED_STAGE.toFixed(1)} ft raster.`);
-      } else if (Math.abs(rawStage - matchedStage) > 0.0001) {
-        notes.push(`Forecast was rounded down to the nearest published flood PNG: ${matchedStage.toFixed(1)} ft.`);
-      }
-
-      if (rawStage > MAX_STAGE) {
-        notes.push(`Value was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
-      }
-
-      return notes.join("\n");
-    }
-
     async function renderHour(index) {
-      if (!forecastData?.hours?.length) return;
+      if (!currentSeriesHours.length) return;
 
-      const h = forecastData.hours[index];
+      const h = currentSeriesHours[index];
       if (!h) return;
 
       currentHourIndex = index;
 
       const rawStage = Number(h.navd88StageFt);
-      const displayStage = getForecastOverlayStage(rawStage);
+      const displayStage = getOverlayStage(rawStage);
 
       if (displayStage === null) {
-        setWarn("Forecast stage is not numeric.");
+        setWarn("Stage is not numeric.");
         return;
       }
 
-      document.getElementById("hourText").textContent = `Hour ${h.hourIndex ?? index}`;
-      document.getElementById("timeText").textContent = formatEasternTime(h.timeUtc);
+      document.getElementById("hourText").textContent = `Hour ${h.hourIndex ?? h.hour ?? index}`;
+      document.getElementById("timeText").textContent = formatHourEntryTime(h);
       document.getElementById("stageText").textContent = `${rawStage.toFixed(2)} ft`;
       document.getElementById("matchedText").textContent = `Showing ${displayStage.toFixed(1)} ft`;
 
-      setWarn(buildForecastNotes(rawStage, displayStage));
+      document.getElementById("selectedText").textContent = currentSelectedLabel;
+      document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
+
+      setWarn(buildNotes(rawStage, displayStage));
 
       const token = ++lastRenderToken;
       await setFloodLayer(currentOverlayMode, displayStage, token);
@@ -809,28 +933,182 @@
       preloadAroundHour(index);
     }
 
-    async function loadManualStage() {
-      const raw = document.getElementById("manualStageInput").value.trim();
-      const n = Number(raw);
+    async function loadForecast() {
+      forecastData = await fetchJson(FORECAST_URL);
 
-      if (!Number.isFinite(n)) {
-        setWarn("Enter a valid numeric stage, like 5.0");
-        return;
+      currentSeriesHours = Array.isArray(forecastData.hours) ? forecastData.hours : [];
+      currentSelectedLabel = "Forecast";
+      currentSelectedSubLabel = forecastData.sourceType || "Live forecast";
+
+      document.getElementById("issuedText").textContent =
+        forecastData.issuedUtc ? `Updated ${formatFixedESTFromUtc(forecastData.issuedUtc)}` : "--";
+
+      document.getElementById("archiveText").textContent =
+        "Observed archive: root observed.json";
+
+      const slider = document.getElementById("hourSlider");
+      slider.max = String(Math.max(0, currentSeriesHours.length - 1));
+
+      const peakIndex = getPeakHourIndex(currentSeriesHours);
+      slider.value = String(peakIndex);
+      currentHourIndex = peakIndex;
+    }
+
+    async function loadObservedIndex() {
+      observedIndex = await fetchJson(OBSERVED_INDEX_URL);
+      observedMonthKeys = Object.keys(observedIndex.months || {}).sort();
+
+      document.getElementById("archiveText").textContent =
+        observedIndex.archiveStartDate && observedIndex.archiveEndDate
+          ? `Observed archive: ${observedIndex.archiveStartDate} to ${observedIndex.archiveEndDate} EST`
+          : "Observed archive loaded";
+
+      if (!currentMonthKey) {
+        currentMonthKey = observedIndex.archiveEndDate
+          ? observedIndex.archiveEndDate.slice(0, 7)
+          : (observedMonthKeys[observedMonthKeys.length - 1] || null);
       }
 
-      const displayStage = getManualOverlayStage(n);
-      if (displayStage === null) {
-        setWarn("Enter a valid numeric stage, like 5.0");
-        return;
+      if (!currentMonthKey && observedMonthKeys.length) {
+        currentMonthKey = observedMonthKeys[observedMonthKeys.length - 1];
+      }
+    }
+
+    function getObservedChunkRoot() {
+      const chunkRoot = observedIndex?.chunkRoot || "./observed_chunks/";
+      return new URL(chunkRoot, APP_BASE).href;
+    }
+
+    async function loadObservedChunk(filename) {
+      if (observedChunkCache.has(filename)) {
+        return observedChunkCache.get(filename);
       }
 
-      document.getElementById("hourText").textContent = "Manual stage";
-      document.getElementById("timeText").textContent = "--";
-      document.getElementById("stageText").textContent = `${n.toFixed(2)} ft`;
-      document.getElementById("matchedText").textContent = `Showing ${displayStage.toFixed(1)} ft`;
+      const url = new URL(filename, getObservedChunkRoot()).href;
+      const data = await fetchJson(url);
+      observedChunkCache.set(filename, data);
+      return data;
+    }
 
-      const token = ++lastRenderToken;
-      await setFloodLayer(currentOverlayMode, displayStage, token);
+    function findObservedDayMeta(dateStr) {
+      const monthKey = dateStr.slice(0, 7);
+      const month = observedIndex?.months?.[monthKey];
+      if (!month?.days) return null;
+      return month.days.find(d => d.date === dateStr) || null;
+    }
+
+    function prettyMonth(monthKey) {
+      if (!monthKey) return "--";
+      const [y, m] = monthKey.split("-");
+      return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
+    }
+
+    async function renderCalendar() {
+      if (!observedIndex || !currentMonthKey) return;
+
+      const month = observedIndex.months?.[currentMonthKey];
+      const grid = document.getElementById("calendarGrid");
+      grid.innerHTML = "";
+
+      document.getElementById("monthLabel").textContent =
+        month?.label || prettyMonth(currentMonthKey);
+
+      const [year, monthNum] = currentMonthKey.split("-").map(Number);
+      const first = new Date(Date.UTC(year, monthNum - 1, 1));
+      const lastDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
+      const firstWeekday = first.getUTCDay();
+
+      const daysByDate = new Map();
+      (month?.days || []).forEach(day => daysByDate.set(day.date, day));
+
+      for (let i = 0; i < firstWeekday; i++) {
+        const blank = document.createElement("div");
+        blank.className = "calendar-day empty";
+        grid.appendChild(blank);
+      }
+
+      for (let day = 1; day <= lastDay; day++) {
+        const dateStr = `${year}-${pad2(monthNum)}-${pad2(day)}`;
+        const meta = daysByDate.get(dateStr);
+
+        const btn = document.createElement("button");
+        btn.className = "calendar-day";
+
+        if (!meta) {
+          btn.classList.add("day-none");
+          btn.disabled = true;
+          btn.textContent = String(day);
+          grid.appendChild(btn);
+          continue;
+        }
+
+        const cls = meta.classification || "none";
+        btn.classList.add(`day-${cls}`);
+        btn.textContent = String(day);
+
+        if (selectedObservedDate === dateStr) {
+          btn.classList.add("selected");
+        }
+
+        btn.title = `${dateStr} • ${cls}${meta.peakNAVD88 != null ? ` • Peak ${Number(meta.peakNAVD88).toFixed(2)} ft` : ""}`;
+        btn.addEventListener("click", () => {
+          loadObservedDay(dateStr).catch(err => {
+            console.error(err);
+            setStatus(err.message);
+            setWarn(err.message);
+          });
+        });
+
+        const tiny = document.createElement("span");
+        tiny.className = "tiny";
+        tiny.textContent = cls === "none" ? "" : cls.charAt(0).toUpperCase();
+        btn.appendChild(tiny);
+
+        grid.appendChild(btn);
+      }
+
+      const monthIndex = observedMonthKeys.indexOf(currentMonthKey);
+      document.getElementById("prevMonthBtn").disabled = monthIndex <= 0;
+      document.getElementById("nextMonthBtn").disabled = monthIndex === -1 || monthIndex >= observedMonthKeys.length - 1;
+    }
+
+    async function loadObservedDay(dateStr) {
+      const meta = findObservedDayMeta(dateStr);
+      if (!meta) {
+        throw new Error(`Observed day not found in observed.json: ${dateStr}`);
+      }
+
+      if (!meta.chunk) {
+        throw new Error(`No 5-day chunk file listed for ${dateStr}`);
+      }
+
+      const chunk = await loadObservedChunk(meta.chunk);
+      const dayRecord = Array.isArray(chunk.days)
+        ? chunk.days.find(d => d.date === dateStr)
+        : null;
+
+      if (!dayRecord) {
+        throw new Error(`Chunk ${meta.chunk} did not contain ${dateStr}`);
+      }
+
+      currentSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
+      selectedObservedDate = dateStr;
+
+      currentSelectedLabel = dateStr;
+      currentSelectedSubLabel =
+        `${dayRecord.classification || meta.classification || "none"}${dayRecord.peakNAVD88 != null ? ` • Peak ${Number(dayRecord.peakNAVD88).toFixed(2)} ft` : ""}`;
+
+      document.getElementById("issuedText").textContent = "Observed replay • Fixed EST";
+
+      const slider = document.getElementById("hourSlider");
+      slider.max = String(Math.max(0, currentSeriesHours.length - 1));
+
+      const peakIndex = getPeakHourIndex(currentSeriesHours);
+      slider.value = String(peakIndex);
+      currentHourIndex = peakIndex;
+
+      await renderCalendar();
+      await renderHour(peakIndex);
     }
 
     function stopPlayback() {
@@ -843,7 +1121,7 @@
     function startPlayback() {
       stopPlayback();
 
-      if (!forecastData?.hours?.length) return;
+      if (!currentSeriesHours.length) return;
 
       const slider = document.getElementById("hourSlider");
       let i = Number(slider.value);
@@ -858,7 +1136,7 @@
 
         slider.value = String(i);
         i += 1;
-        if (i >= forecastData.hours.length) i = 0;
+        if (i >= currentSeriesHours.length) i = 0;
       }, 1500);
     }
 
@@ -869,22 +1147,61 @@
       await renderHour(currentHourIndex);
     }
 
+    async function switchDataMode(mode) {
+      if (mode === currentDataMode) return;
+
+      stopPlayback();
+      currentDataMode = mode;
+      updateDataModeButtons();
+      clearFloodLayer();
+
+      if (mode === "forecast") {
+        await loadForecast();
+        await renderHour(currentHourIndex);
+        return;
+      }
+
+      await loadObservedIndex();
+      await renderCalendar();
+
+      const defaultDate = selectedObservedDate || observedIndex.archiveEndDate;
+      if (defaultDate) {
+        await loadObservedDay(defaultDate);
+      } else {
+        setStatus("No observed dates were found in observed.json");
+      }
+    }
+
     async function reloadAll() {
       stopPlayback();
       clearFloodLayer();
-      setStatus("Reloading forecast...");
+      setWarn("");
 
-      await loadForecast();
+      if (currentDataMode === "forecast") {
+        setStatus("Reloading forecast...");
+        await loadForecast();
+        await renderHour(currentHourIndex);
+        return;
+      }
 
-      const peakIndex = getPeakHourIndex();
-      currentHourIndex = peakIndex;
-      document.getElementById("hourSlider").value = String(peakIndex);
-      await renderHour(peakIndex);
+      setStatus("Reloading observed archive...");
+      observedIndex = null;
+      observedMonthKeys = [];
+      observedChunkCache.clear();
+
+      await loadObservedIndex();
+      await renderCalendar();
+
+      const defaultDate = selectedObservedDate || observedIndex.archiveEndDate;
+      if (defaultDate) {
+        await loadObservedDay(defaultDate);
+      }
     }
 
     async function main() {
       setOpacityText();
       updateModeButtons();
+      updateDataModeButtons();
 
       document.getElementById("hourSlider").addEventListener("input", async (e) => {
         stopPlayback();
@@ -913,6 +1230,22 @@
         });
       });
 
+      document.getElementById("forecastDataBtn").addEventListener("click", () => {
+        switchDataMode("forecast").catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
+
+      document.getElementById("observedDataBtn").addEventListener("click", () => {
+        switchDataMode("observed").catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
+
       document.getElementById("playBtn").addEventListener("click", startPlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
 
@@ -924,17 +1257,28 @@
         });
       });
 
-      document.getElementById("showUrlsBtn").addEventListener("click", () => {
-        const text = document.getElementById("loadedUrlText").textContent || "";
-        showStageUrl(text);
+      document.getElementById("prevMonthBtn").addEventListener("click", () => {
+        const idx = observedMonthKeys.indexOf(currentMonthKey);
+        if (idx > 0) {
+          currentMonthKey = observedMonthKeys[idx - 1];
+          renderCalendar().catch(err => {
+            console.error(err);
+            setStatus(err.message);
+            setWarn(err.message);
+          });
+        }
       });
 
-      document.getElementById("manualStageBtn").addEventListener("click", () => {
-        loadManualStage().catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
+      document.getElementById("nextMonthBtn").addEventListener("click", () => {
+        const idx = observedMonthKeys.indexOf(currentMonthKey);
+        if (idx >= 0 && idx < observedMonthKeys.length - 1) {
+          currentMonthKey = observedMonthKeys[idx + 1];
+          renderCalendar().catch(err => {
+            console.error(err);
+            setStatus(err.message);
+            setWarn(err.message);
+          });
+        }
       });
 
       await reloadAll();
