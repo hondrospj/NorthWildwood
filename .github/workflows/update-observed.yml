@@ -13,19 +13,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install requests
+      - run: pip install requests
 
-      - name: Update observed cache
-        run: python scripts/update_observed.py
+      - name: Build observed.json
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          observed = {
+              "site": "01411360",
+              "parameterCd": "72279",
+              "datum": "NAVD88",
+              "timeZone": "EST",
+              "method": "hourly_max_all_history_v1",
+              "lastProcessedISO": None,
+              "archiveStartDate": None,
+              "archiveEndDate": None,
+              "thresholdsNAVD88": {
+                  "minorLow": 3.25,
+                  "moderateLow": 4.25,
+                  "majorLow": 5.25
+              },
+              "days": []
+          }
+
+          Path("observed.json").write_text(
+              json.dumps(observed, indent=2) + "\n",
+              encoding="utf-8"
+          )
+          PY
 
       - name: Commit observed cache
         run: |
