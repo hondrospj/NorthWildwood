@@ -52,18 +52,13 @@
       background: #d7dbe0;
     }
 
-    .stack {
-      display: grid;
-      gap: 14px;
-    }
-
     .brand {
       display: grid;
       gap: 2px;
-      padding: 2px 2px 0;
+      padding: 2px 2px 10px;
     }
 
-    .brand h1 {
+    h1 {
       margin: 0;
       font-size: 29px;
       line-height: 0.98;
@@ -71,13 +66,15 @@
       font-weight: 800;
     }
 
-    .subtle {
+    .muted {
       color: var(--muted);
       font-size: 13px;
       line-height: 1.35;
+      word-break: break-word;
     }
 
-    .card {
+    .section {
+      margin-top: 14px;
       background: var(--panel);
       border: 1px solid rgba(229,231,235,.9);
       border-radius: var(--radius);
@@ -85,21 +82,35 @@
       box-shadow: var(--shadow);
     }
 
-    .segmented {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    .section.hidden-support {
+      display: none;
+    }
+
+    .big {
+      font-size: 20px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin-top: 4px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin-top: 8px;
+      accent-color: var(--accent);
     }
 
     button {
+      padding: 11px 12px;
+      margin-right: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
       border: 1px solid var(--line);
       background: #fff;
-      color: var(--text);
       border-radius: 14px;
-      padding: 11px 12px;
       font-size: 14px;
       font-weight: 650;
-      cursor: pointer;
+      color: var(--text);
       transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease;
     }
 
@@ -108,86 +119,30 @@
     }
 
     button.activeMode {
-      border-color: #bfdbfe;
       background: var(--accent-soft);
+      border-color: #bfdbfe;
       color: #1d4ed8;
     }
 
-    .metrics {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .metric {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      background: #fff;
-      min-height: 86px;
-    }
-
-    .metric-label {
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-
-    .metric-value {
-      font-size: 20px;
-      font-weight: 800;
-      line-height: 1.12;
-      letter-spacing: -0.02em;
-    }
-
-    .metric-sub {
-      color: var(--muted);
-      font-size: 12px;
-      margin-top: 4px;
-    }
-
-    .control {
-      display: grid;
-      gap: 8px;
-    }
-
-    .control-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .control-label {
-      font-size: 13px;
-      color: var(--muted);
-      font-weight: 600;
-    }
-
-    .control-value {
-      font-size: 13px;
-      color: var(--text);
-      font-weight: 750;
-    }
-
-    input[type="range"] {
-      width: 100%;
-      margin: 0;
-      accent-color: var(--accent);
-    }
-
-    .transport {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
-    }
-
-    .status {
+    #status {
+      margin-top: 14px;
       color: var(--muted);
       font-size: 12px;
       text-align: center;
-      padding-top: 2px;
-      min-height: 18px;
+      padding: 2px 0 0;
+      background: transparent;
+      border: 0;
+      box-shadow: none;
+    }
+
+    #warn, #hardWarn, #urlBox, #manualStageInput, #manualStageBtn, #showUrlsBtn,
+    #overlayBaseText, #sourceText, #catalogText, #crsText, #serviceModeText,
+    #placementText, #serviceNameText, #loadedUrlText, .pill {
+      display: none !important;
+    }
+
+    .leaflet-image-layer {
+      image-rendering: auto;
     }
 
     .grayscale-tiles {
@@ -195,8 +150,57 @@
       -webkit-filter: grayscale(100%);
     }
 
-    .leaflet-image-layer {
-      image-rendering: auto;
+    .transport-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .mode-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .metric-box {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      min-height: 84px;
+      background: #fff;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .control-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .control-label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .control-value {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 750;
     }
 
     @media (max-width: 980px) {
@@ -215,62 +219,77 @@
 <body>
   <div id="app">
     <aside id="panel">
-      <div class="stack">
-        <div class="brand">
-          <h1>North Wildwood<br>Flood Forecast</h1>
-          <div class="subtle">Stone Harbor driver station</div>
-        </div>
+      <div class="brand">
+        <h1>North Wildwood<br>Flood Forecast</h1>
+        <div class="muted">Stone Harbor driver station</div>
+      </div>
 
-        <div class="card">
-          <div class="segmented">
-            <button id="depthModeBtn" class="activeMode">Flood Depth</button>
-            <button id="dynamicModeBtn">Dynamic Flood</button>
+      <div class="section">
+        <div class="mode-buttons">
+          <button id="depthModeBtn" class="activeMode">Flood Depth</button>
+          <button id="dynamicModeBtn">Dynamic Flood</button>
+        </div>
+        <div id="modeText" class="muted" style="margin-top:8px;">Current overlay type: Flood Depth</div>
+      </div>
+
+      <div class="section">
+        <div class="metric-grid">
+          <div class="metric-box">
+            <div class="metric-label">Time</div>
+            <div id="timeText" class="big">--</div>
+            <div id="issuedText" class="muted">--</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Water level</div>
+            <div id="stageText" class="big">--</div>
+            <div id="matchedText" class="muted">--</div>
           </div>
         </div>
+      </div>
 
-        <div class="card">
-          <div class="metrics">
-            <div class="metric">
-              <div class="metric-label">Time</div>
-              <div class="metric-value" id="timeText">--</div>
-              <div class="metric-sub" id="issuedText">--</div>
-            </div>
-
-            <div class="metric">
-              <div class="metric-label">Water level</div>
-              <div class="metric-value" id="stageText">--</div>
-              <div class="metric-sub" id="matchedText">--</div>
-            </div>
-          </div>
+      <div class="section">
+        <div class="control-head">
+          <div class="control-label">Forecast hour</div>
+          <div id="hourText" class="control-value">Hour 0</div>
         </div>
+        <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
+      </div>
 
-        <div class="card stack">
-          <div class="control">
-            <div class="control-head">
-              <div class="control-label">Forecast hour</div>
-              <div class="control-value" id="hourText">Hour 0</div>
-            </div>
-            <input id="hourSlider" type="range" min="0" max="71" value="0" step="1" />
-          </div>
-
-          <div class="control">
-            <div class="control-head">
-              <div class="control-label">Overlay opacity</div>
-              <div class="control-value" id="opacityText">100%</div>
-            </div>
-            <input id="opacitySlider" type="range" min="0" max="100" value="100" step="1" />
-          </div>
+      <div class="section">
+        <div class="control-head">
+          <div class="control-label">Overlay opacity</div>
+          <div id="opacityText" class="control-value">100%</div>
         </div>
+        <input id="opacitySlider" type="range" min="0" max="100" value="100" step="1" />
+      </div>
 
-        <div class="card">
-          <div class="transport">
-            <button id="playBtn">Play</button>
-            <button id="stopBtn">Stop</button>
-            <button id="reloadBtn">Reload</button>
-          </div>
+      <div class="section">
+        <div class="transport-row">
+          <button id="playBtn">Play</button>
+          <button id="stopBtn">Stop</button>
+          <button id="reloadBtn">Reload</button>
         </div>
+      </div>
 
-        <div class="status" id="status">Starting…</div>
+      <div id="status">Starting…</div>
+
+      <!-- Hidden support elements kept so the original JS does not break -->
+      <div class="section hidden-support"><div id="overlayBaseText"></div></div>
+      <div class="section hidden-support">
+        <div id="sourceText"></div>
+        <div id="catalogText"></div>
+        <div id="crsText"></div>
+        <div id="serviceModeText"></div>
+        <div id="placementText"></div>
+        <div id="serviceNameText"></div>
+        <div id="loadedUrlText"></div>
+        <div id="warn"></div>
+        <div id="hardWarn"></div>
+        <textarea id="urlBox" readonly></textarea>
+        <input id="manualStageInput" type="text" />
+        <button id="manualStageBtn">Load</button>
+        <button id="showUrlsBtn">Show overlay URL</button>
+        <div class="pill">Shared TFW mode</div>
       </div>
     </aside>
 
@@ -279,6 +298,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.11.0/dist/proj4.js"></script>
+  <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
@@ -296,18 +316,8 @@
     const FORECAST_MIN_VISIBLE_STAGE = 1.5;
     const FORECAST_FORCED_STAGE = 1.6;
 
-    /*
-      Use a standard Web Mercator basemap for reliability.
-      The flood overlay is placed from the shared TFW by converting the
-      raster corners from NJ State Plane feet to WGS84 lat/lon.
-    */
-    const ESRI_IMAGERY_URL =
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-
-    const NJSP_PROJ4 =
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
-
-    const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
+    const NJ_BASEMAP_URL =
+      "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
 
     const SHARED_WORLD = {
       A: 7.5,
@@ -318,8 +328,31 @@
       F: 70421.25
     };
 
+    const NJSP_PROJ4 =
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
+
+    const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
+      origin: [-17954600, 18705699.999999993],
+      resolutions: [
+        2006.2172023914932,
+        1003.1086011953124,
+        501.55430059809026,
+        250.7771502986111,
+        125.38857514930555,
+        62.694287574652776,
+        31.347143787326388,
+        15.673571894097222,
+        7.836785947048611,
+        3.9183929730902776,
+        1.9591964843749998,
+        0.9795982430555555,
+        0.48979912152777777
+      ]
+    });
+
     let map = null;
     let currentFloodLayer = null;
+    let floodProjectedBounds = null;
     let floodLatLngBounds = null;
     let forecastData = null;
     let playTimer = null;
@@ -337,37 +370,69 @@
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
-      hour12: true
+      hour12: true,
+      timeZoneName: "short"
     });
 
     function setStatus(msg) {
       document.getElementById("status").textContent = msg;
     }
 
+    function setWarn(msg) {
+      const el = document.getElementById("warn");
+      if (!el) return;
+      if (!msg) {
+        el.style.display = "none";
+        el.textContent = "";
+      } else {
+        el.style.display = "block";
+        el.textContent = msg;
+      }
+    }
+
+    function setHardWarn(msg) {
+      const el = document.getElementById("hardWarn");
+      if (!el) return;
+      if (!msg) {
+        el.style.display = "none";
+        el.textContent = "";
+      } else {
+        el.style.display = "block";
+        el.textContent = msg;
+      }
+    }
+
+    function setOpacityText() {
+      document.getElementById("opacityText").textContent =
+        `${Math.round(overlayOpacity * 100)}%`;
+    }
+
+    function showStageUrl(text) {
+      const box = document.getElementById("urlBox");
+      if (!box) return;
+      box.style.display = "block";
+      box.value = text;
+    }
+
     function updateModeButtons() {
       const depthBtn = document.getElementById("depthModeBtn");
       const dynamicBtn = document.getElementById("dynamicModeBtn");
+
       depthBtn.classList.toggle("activeMode", currentOverlayMode === "depth");
       dynamicBtn.classList.toggle("activeMode", currentOverlayMode === "dynamic");
+
+      document.getElementById("modeText").textContent =
+        `Current overlay type: ${currentOverlayMode === "depth" ? "Flood Depth" : "Dynamic Flood"}`;
+
+      document.getElementById("overlayBaseText").textContent =
+        `Overlay base: ${OVERLAY_ROOTS[currentOverlayMode]}`;
     }
 
-    function ensureMap() {
-      if (map) return;
-
-      map = L.map("map", {
-        zoomControl: true,
-        minZoom: 6,
-        maxZoom: 20,
-        zoomSnap: 1,
-        zoomDelta: 1
-      });
-
-      L.tileLayer(ESRI_IMAGERY_URL, {
-        attribution: "Esri World Imagery",
-        maxZoom: 20,
-        className: "grayscale-tiles",
-        crossOrigin: true
-      }).addTo(map);
+    function formatEasternTime(isoString) {
+      if (!isoString) return "--";
+      const d = new Date(isoString);
+      if (Number.isNaN(d.getTime())) return "--";
+      return easternFormatter.format(d);
     }
 
     async function fetchJson(url, params = null) {
@@ -380,7 +445,7 @@
 
       const r = await fetch(u.toString(), { cache: "no-store" });
       if (!r.ok) {
-        throw new Error(`HTTP ${r.status}`);
+        throw new Error(`HTTP ${r.status} for ${u.toString()}`);
       }
       return r.json();
     }
@@ -401,8 +466,25 @@
     function getForecastOverlayStage(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
-      if (n < FORECAST_MIN_VISIBLE_STAGE) return FORECAST_FORCED_STAGE;
-      return clampStage(floorToCatalogStep(clampStage(n)));
+
+      if (n < FORECAST_MIN_VISIBLE_STAGE) {
+        return FORECAST_FORCED_STAGE;
+      }
+
+      const clipped = clampStage(n);
+      return clampStage(floorToCatalogStep(clipped));
+    }
+
+    function getManualOverlayStage(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+
+      if (n < FORECAST_MIN_VISIBLE_STAGE) {
+        return FORECAST_FORCED_STAGE;
+      }
+
+      const clipped = clampStage(n);
+      return clampStage(floorToCatalogStep(clipped));
     }
 
     function stageToCode(stageValue) {
@@ -414,20 +496,26 @@
 
     function getOverlayFilename(mode, stageValue) {
       const code = stageToCode(stageValue);
+
       if (mode === "depth") return `Depth${code}.png`;
       if (mode === "dynamic") return `DynamicFlood_${code}.png`;
-      throw new Error("Unknown overlay mode");
+
+      throw new Error(`Unknown overlay mode: ${mode}`);
     }
 
     function getOverlayUrl(mode, stageValue) {
       return new URL(getOverlayFilename(mode, stageValue), OVERLAY_ROOTS[mode]).href;
     }
 
+    function projectedPointToLatLng(x, y) {
+      return NJSP_CRS.unproject(L.point(x, y));
+    }
+
     function computeProjectedBounds(width, height) {
       const { A, D, B, E, C, F } = SHARED_WORLD;
 
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Shared world file contains rotation or skew.");
+        throw new Error("Shared world file contains rotation or skew. This page assumes north-up rasters.");
       }
 
       const west  = C - (A / 2);
@@ -438,30 +526,36 @@
       return { west, south, east, north };
     }
 
-    function projectedXYToLatLng(x, y) {
-      const [lon, lat] = proj4(NJSP_PROJ4, WGS84_PROJ4, [x, y]);
-      return L.latLng(lat, lon);
-    }
-
     async function loadImageMeta(url) {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve({
-          width: img.naturalWidth,
-          height: img.naturalHeight
-        });
-        img.onerror = () => reject(new Error("Could not load image"));
+
+        img.onload = () => {
+          resolve({
+            width: img.naturalWidth,
+            height: img.naturalHeight
+          });
+        };
+
+        img.onerror = () => {
+          reject(new Error(`Could not load image: ${url}`));
+        };
+
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
     }
 
     async function testImageUrl(url) {
-      if (imageExistsCache.has(url)) return imageExistsCache.get(url);
+      if (imageExistsCache.has(url)) {
+        return imageExistsCache.get(url);
+      }
 
       const result = await new Promise((resolve) => {
         const img = new Image();
+
         img.onload = () => resolve({ ok: true });
         img.onerror = () => resolve({ ok: false });
+
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
 
@@ -469,16 +563,80 @@
       return result;
     }
 
+    function preloadImage(url) {
+      const img = new Image();
+      img.src = url;
+    }
+
+    function preloadAroundHour(index) {
+      if (!forecastData?.hours?.length) return;
+
+      const offsets = [0, 1, -1, 2, -2];
+
+      for (const offset of offsets) {
+        const i = index + offset;
+        if (i < 0 || i >= forecastData.hours.length) continue;
+
+        const stage = getForecastOverlayStage(forecastData.hours[i].navd88StageFt);
+        if (stage === null) continue;
+
+        preloadImage(getOverlayUrl("depth", stage));
+        preloadImage(getOverlayUrl("dynamic", stage));
+      }
+    }
+
     async function ensureOverlayBounds(sampleOverlayUrl) {
-      if (floodLatLngBounds) return;
+      if (floodProjectedBounds && floodLatLngBounds) return;
 
       const meta = await loadImageMeta(sampleOverlayUrl);
+
+      if (!meta.width || !meta.height) {
+        throw new Error(`Could not read image size for ${sampleOverlayUrl}`);
+      }
+
       const b = computeProjectedBounds(meta.width, meta.height);
 
-      const sw = projectedXYToLatLng(b.west, b.south);
-      const ne = projectedXYToLatLng(b.east, b.north);
+      floodProjectedBounds = L.bounds(
+        [b.west, b.south],
+        [b.east, b.north]
+      );
 
-      floodLatLngBounds = L.latLngBounds(sw, ne);
+      floodLatLngBounds = L.latLngBounds(
+        projectedPointToLatLng(b.west, b.south),
+        projectedPointToLatLng(b.east, b.north)
+      );
+
+      document.getElementById("placementText").textContent =
+        "Overlay placement: shared Depthn002.tfw values applied to all PNGs";
+    }
+
+    function ensureMap() {
+      if (map) return;
+
+      map = L.map("map", {
+        crs: NJSP_CRS,
+        zoomControl: true,
+        minZoom: 0,
+        maxZoom: 12,
+        continuousWorld: true,
+        worldCopyJump: false,
+        zoomSnap: 1,
+        zoomDelta: 1
+      });
+
+      L.tileLayer(NJ_BASEMAP_URL, {
+        attribution: "NJ OGIS Orthophoto 2015",
+        tileSize: 512,
+        minZoom: 0,
+        maxZoom: 12,
+        noWrap: true,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        className: "grayscale-tiles"
+      }).addTo(map);
+
+      document.getElementById("crsText").textContent =
+        "Map CRS: NJ State Plane (ftUS) using the flood overlay transform";
     }
 
     function clearFloodLayer() {
@@ -494,36 +652,26 @@
       }
     }
 
-    function formatEasternTime(isoString) {
-      if (!isoString) return "--";
-      const date = new Date(isoString);
-      if (Number.isNaN(date.getTime())) return "--";
-      return easternFormatter.format(date);
-    }
-
-    function preloadAroundHour(index) {
-      if (!forecastData?.hours?.length) return;
-      for (const offset of [0, 1, -1]) {
-        const i = index + offset;
-        if (i < 0 || i >= forecastData.hours.length) continue;
-        const stage = getForecastOverlayStage(forecastData.hours[i].navd88StageFt);
-        if (stage === null) continue;
-        new Image().src = getOverlayUrl("depth", stage);
-        new Image().src = getOverlayUrl("dynamic", stage);
-      }
-    }
-
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
-      if (!forecastData || !Array.isArray(forecastData.hours)) {
-        throw new Error("Bad forecast data");
-      }
+
+      updateModeButtons();
 
       document.getElementById("issuedText").textContent =
-        forecastData.issuedUtc ? `Updated ${formatEasternTime(forecastData.issuedUtc)}` : "";
+        forecastData.issuedUtc ? `Updated ${formatEasternTime(forecastData.issuedUtc)}` : "--";
+
+      document.getElementById("sourceText").textContent =
+        `Source: ${forecastData.sourceType || "unknown"} | ${forecastData.sourceUrl || "not available"}`;
+
+      document.getElementById("catalogText").textContent =
+        "Catalog mode: PNG overlays in 0.2 ft steps from -4.0 to +14.0. Forecast display floors to the next lower 0.2 ft stage, except anything below 1.5 ft uses the 1.6 ft raster.";
+
+      document.getElementById("serviceModeText").textContent =
+        "Layer mode: projected flood PNG overlay over a stable greyscale tile basemap";
 
       const slider = document.getElementById("hourSlider");
-      slider.max = String(Math.max(0, forecastData.hours.length - 1));
+      const count = forecastData.hours ? forecastData.hours.length : 0;
+      slider.max = String(Math.max(0, count - 1));
       slider.value = "0";
     }
 
@@ -546,24 +694,48 @@
 
     async function setFloodLayer(mode, stageValue, token) {
       clearFloodLayer();
+      setWarn("");
+      setHardWarn("");
 
       const filename = getOverlayFilename(mode, stageValue);
       const overlayUrl = getOverlayUrl(mode, stageValue);
+
+      document.getElementById("serviceNameText").textContent =
+        `Overlay file: ${filename}`;
+
+      document.getElementById("loadedUrlText").textContent =
+        `Overlay URL: ${overlayUrl}`;
+
+      showStageUrl(overlayUrl);
+
+      setStatus(`Checking ${filename}...`);
 
       const exists = await testImageUrl(overlayUrl);
       if (token !== lastRenderToken) return;
 
       if (!exists.ok) {
-        setStatus("Overlay unavailable");
+        setWarn(`Could not load overlay for ${stageValue.toFixed(1)} ft.`);
+        setHardWarn(`GitHub Pages could not find or serve this file:\n${overlayUrl}`);
+        setStatus(`Overlay load failed for ${filename}`);
         return;
       }
 
-      await ensureOverlayBounds(overlayUrl);
+      ensureMap();
+
+      try {
+        await ensureOverlayBounds(overlayUrl);
+      } catch (err) {
+        setWarn(err.message);
+        setHardWarn(`Projected overlay setup failed.\n\n${err.message}`);
+        setStatus("Projected overlay setup failed");
+        return;
+      }
+
       if (token !== lastRenderToken) return;
 
-      currentFloodLayer = L.imageOverlay(
+      currentFloodLayer = L.Proj.imageOverlay(
         `${overlayUrl}?v=${Date.now()}`,
-        floodLatLngBounds,
+        floodProjectedBounds,
         {
           opacity: overlayOpacity,
           interactive: false,
@@ -574,20 +746,38 @@
 
       currentFloodLayer.on("load", () => {
         if (token !== lastRenderToken) return;
-        setStatus("Ready");
+        setStatus(`Loaded ${filename}`);
       });
 
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        setStatus("Overlay draw failed");
+        setWarn(`Could not draw overlay for ${stageValue.toFixed(1)} ft.`);
+        setHardWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
+        setStatus(`Overlay draw failed for ${filename}`);
       });
 
       currentFloodLayer.addTo(map);
 
       if (!mapHasFit && floodLatLngBounds) {
-        map.fitBounds(floodLatLngBounds, { padding: [16, 16] });
+        map.fitBounds(floodLatLngBounds, { padding: [10, 10] });
         mapHasFit = true;
       }
+    }
+
+    function buildForecastNotes(rawStage, matchedStage) {
+      const notes = [];
+
+      if (rawStage < FORECAST_MIN_VISIBLE_STAGE) {
+        notes.push(`Any forecast stage below ${FORECAST_MIN_VISIBLE_STAGE.toFixed(1)} ft is forced to the ${FORECAST_FORCED_STAGE.toFixed(1)} ft raster.`);
+      } else if (Math.abs(rawStage - matchedStage) > 0.0001) {
+        notes.push(`Forecast was rounded down to the nearest published flood PNG: ${matchedStage.toFixed(1)} ft.`);
+      }
+
+      if (rawStage > MAX_STAGE) {
+        notes.push(`Value was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
+      }
+
+      return notes.join("\n");
     }
 
     async function renderHour(index) {
@@ -600,8 +790,9 @@
 
       const rawStage = Number(h.navd88StageFt);
       const displayStage = getForecastOverlayStage(rawStage);
+
       if (displayStage === null) {
-        setStatus("Stage unavailable");
+        setWarn("Forecast stage is not numeric.");
         return;
       }
 
@@ -610,9 +801,36 @@
       document.getElementById("stageText").textContent = `${rawStage.toFixed(2)} ft`;
       document.getElementById("matchedText").textContent = `Showing ${displayStage.toFixed(1)} ft`;
 
+      setWarn(buildForecastNotes(rawStage, displayStage));
+
       const token = ++lastRenderToken;
       await setFloodLayer(currentOverlayMode, displayStage, token);
+
       preloadAroundHour(index);
+    }
+
+    async function loadManualStage() {
+      const raw = document.getElementById("manualStageInput").value.trim();
+      const n = Number(raw);
+
+      if (!Number.isFinite(n)) {
+        setWarn("Enter a valid numeric stage, like 5.0");
+        return;
+      }
+
+      const displayStage = getManualOverlayStage(n);
+      if (displayStage === null) {
+        setWarn("Enter a valid numeric stage, like 5.0");
+        return;
+      }
+
+      document.getElementById("hourText").textContent = "Manual stage";
+      document.getElementById("timeText").textContent = "--";
+      document.getElementById("stageText").textContent = `${n.toFixed(2)} ft`;
+      document.getElementById("matchedText").textContent = `Showing ${displayStage.toFixed(1)} ft`;
+
+      const token = ++lastRenderToken;
+      await setFloodLayer(currentOverlayMode, displayStage, token);
     }
 
     function stopPlayback() {
@@ -624,15 +842,18 @@
 
     function startPlayback() {
       stopPlayback();
+
       if (!forecastData?.hours?.length) return;
 
       const slider = document.getElementById("hourSlider");
       let i = Number(slider.value);
 
       playTimer = setInterval(() => {
-        renderHour(i).catch(() => {
+        renderHour(i).catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
           stopPlayback();
-          setStatus("Playback stopped");
         });
 
         slider.value = String(i);
@@ -645,16 +866,13 @@
       if (mode === currentOverlayMode) return;
       currentOverlayMode = mode;
       updateModeButtons();
-
-      if (forecastData?.hours?.length) {
-        await renderHour(currentHourIndex);
-      }
+      await renderHour(currentHourIndex);
     }
 
     async function reloadAll() {
       stopPlayback();
       clearFloodLayer();
-      setStatus("Refreshing...");
+      setStatus("Reloading forecast...");
 
       await loadForecast();
 
@@ -665,10 +883,8 @@
     }
 
     async function main() {
-      ensureMap();
       setOpacityText();
       updateModeButtons();
-      setStatus("Loading...");
 
       document.getElementById("hourSlider").addEventListener("input", async (e) => {
         stopPlayback();
@@ -682,31 +898,53 @@
       });
 
       document.getElementById("depthModeBtn").addEventListener("click", () => {
-        switchOverlayMode("depth").catch(() => setStatus("Mode change failed"));
+        switchOverlayMode("depth").catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
       });
 
       document.getElementById("dynamicModeBtn").addEventListener("click", () => {
-        switchOverlayMode("dynamic").catch(() => setStatus("Mode change failed"));
+        switchOverlayMode("dynamic").catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
       });
 
       document.getElementById("playBtn").addEventListener("click", startPlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
+
       document.getElementById("reloadBtn").addEventListener("click", () => {
-        reloadAll().catch((err) => {
+        reloadAll().catch(err => {
           console.error(err);
-          setStatus("Refresh failed");
+          setStatus(err.message);
+          setWarn(err.message);
         });
       });
 
-      try {
-        await reloadAll();
-      } catch (err) {
-        console.error(err);
-        setStatus("Forecast unavailable");
-      }
+      document.getElementById("showUrlsBtn").addEventListener("click", () => {
+        const text = document.getElementById("loadedUrlText").textContent || "";
+        showStageUrl(text);
+      });
+
+      document.getElementById("manualStageBtn").addEventListener("click", () => {
+        loadManualStage().catch(err => {
+          console.error(err);
+          setStatus(err.message);
+          setWarn(err.message);
+        });
+      });
+
+      await reloadAll();
     }
 
-    main();
+    main().catch(err => {
+      console.error(err);
+      setStatus(err.message);
+      setWarn(err.message);
+    });
   </script>
 </body>
 </html>
