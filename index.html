@@ -3,31 +3,31 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>North Wildwood Flood Replay</title>
+  <title>North Wildwood Flood Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    :root{
-      --bg:#eef2f7;
-      --panel:#ffffff;
-      --panel-soft:rgba(255,255,255,.84);
-      --text:#0f172a;
-      --muted:#64748b;
-      --line:#e2e8f0;
-      --line-strong:#cbd5e1;
-      --accent:#2563eb;
-      --accent-soft:#dbeafe;
-      --accent-strong:#1d4ed8;
-      --success:#157347;
-      --success-soft:#dcfce7;
-      --shadow:0 14px 36px rgba(15,23,42,.10);
-      --shadow-strong:0 22px 48px rgba(15,23,42,.16);
+     :root{
+      --bg:#0b1220;
+      --panel:rgba(255,255,255,.035);
+      --panel-soft:rgba(11,18,32,.84);
+      --text:#eaf0ff;
+      --muted:#a9b6d3;
+      --line:rgba(255,255,255,.085);
+      --line-strong:rgba(255,255,255,.16);
+      --accent:#60a5fa;
+      --accent-soft:rgba(96,165,250,.14);
+      --accent-strong:#bfdbfe;
+      --success:#2dd4bf;
+      --success-soft:rgba(45,212,191,.14);
+      --shadow:0 22px 70px rgba(0,0,0,.40);
+      --shadow-strong:0 22px 48px rgba(0,0,0,.34);
       --radius:22px;
 
-      --minor:#f59e0b;
-      --moderate:#ef4444;
-      --major:#7c3aed;
-      --below:#1d8f52;
+      --minor:#fbbf24;
+      --moderate:#fb7185;
+      --major:#a78bfa;
+      --below:#2dd4bf;
 
       --depth-0:#CFEFFF;
       --depth-1:#2769DB;
@@ -70,7 +70,7 @@
       gap:12px;
       padding:10px 14px;
       border-radius:999px;
-      background:rgba(15,23,42,.92);
+      background:rgba(11,18,32,.94);
       color:#fff;
       box-shadow:var(--shadow-strong);
       backdrop-filter:blur(12px);
@@ -105,7 +105,7 @@
 
     #topBanner .banner-meta{
       font-size:11px;
-      color:#dbeafe;
+      color:#c7d2fe;
       white-space:nowrap;
     }
 
@@ -121,7 +121,7 @@
       top:10px;
       left:10px;
       z-index:1250;
-      width:252px;
+      width:236px;
       max-height:calc(100vh - 108px);
       display:flex;
       flex-direction:column;
@@ -134,12 +134,12 @@
     }
 
     .panel-card{
-      background:rgba(255,255,255,.84);
-      border:1px solid rgba(226,232,240,.88);
+      background:rgba(11,18,32,.88);
+      border:1px solid var(--line);
       border-radius:18px;
       box-shadow:0 16px 32px rgba(15,23,42,.12);
       padding:10px;
-      backdrop-filter:blur(16px);
+      backdrop-filter:blur(14px);
       -webkit-backdrop-filter:blur(16px);
       pointer-events:auto;
     }
@@ -147,7 +147,7 @@
     .brand{
       padding:2px;
       display:grid;
-      gap:4px;
+      gap:2px;
     }
 
     .brand-top{
@@ -171,8 +171,8 @@
       gap:8px;
       padding:6px 10px;
       border-radius:999px;
-      background:#eff6ff;
-      color:#1d4ed8;
+      background:rgba(96,165,250,.14);
+      color:var(--accent-strong);
       font-size:11px;
       font-weight:800;
       white-space:nowrap;
@@ -183,7 +183,7 @@
       width:8px;
       height:8px;
       border-radius:999px;
-      background:#2563eb;
+      background:var(--accent);
       box-shadow:0 0 0 5px rgba(37,99,235,.12);
     }
 
@@ -203,7 +203,7 @@
     select{
       appearance:none;
       border:1px solid var(--line);
-      background:#fff;
+      background:rgba(255,255,255,.05);
       border-radius:14px;
       color:var(--text);
       font-size:13px;
@@ -219,7 +219,7 @@
 
     button:hover:not(:disabled){
       transform:translateY(-1px);
-      box-shadow:0 10px 18px rgba(15,23,42,.08);
+      box-shadow:0 12px 24px rgba(0,0,0,.18);
     }
 
     button:disabled{
@@ -267,7 +267,7 @@
       padding:10px;
       border:1px solid var(--line);
       border-radius:14px;
-      background:#fff;
+      background:rgba(255,255,255,.04);
       display:grid;
       align-content:start;
       gap:4px;
@@ -291,14 +291,14 @@
     }
 
     .stat-sub{
-      font-size:10px;
+      font-size:9px;
       color:var(--muted);
       line-height:1.25;
     }
 
     .control-row{
       display:grid;
-      gap:6px;
+      gap:5px;
     }
 
     .range-head{
@@ -372,7 +372,7 @@
       display:none;
       border:1px solid var(--line);
       border-radius:18px;
-      background:#f8fafc;
+      background:rgba(11,18,32,.96);
       padding:12px;
       gap:10px;
     }
@@ -422,7 +422,7 @@
       place-items:center;
       border-radius:12px;
       border:1px solid var(--line);
-      background:#fff;
+      background:rgba(255,255,255,.05);
       padding:0;
       position:relative;
       font-weight:850;
@@ -434,13 +434,13 @@
       pointer-events:none;
     }
 
-    .calendar-day.day-none{ background:#f8fafc; }
-    .calendar-day.day-minor{ background:#fff7ed; border-color:#fed7aa; }
-    .calendar-day.day-moderate{ background:#fef2f2; border-color:#fecaca; }
-    .calendar-day.day-major{ background:#f5f3ff; border-color:#ddd6fe; }
+    .calendar-day.day-none{ background:rgba(255,255,255,.03); }
+    .calendar-day.day-minor{ background:rgba(251,191,36,.14); border-color:rgba(251,191,36,.32); }
+    .calendar-day.day-moderate{ background:rgba(251,113,133,.14); border-color:rgba(251,113,133,.30); }
+    .calendar-day.day-major{ background:rgba(167,139,250,.14); border-color:rgba(167,139,250,.30); }
 
     .calendar-day.selected{
-      outline:2px solid var(--accent-strong);
+      outline:2px solid var(--accent);
       outline-offset:1px;
     }
 
@@ -484,7 +484,7 @@
       inset:0;
       width:100%;
       height:100%;
-      background:#d9dfe7;
+      background:#050b16;
     }
 
     .leaflet-image-layer{
@@ -500,7 +500,7 @@
       position:absolute;
       z-index:1200;
       background:var(--panel-soft);
-      border:1px solid rgba(226,232,240,.88);
+      border:1px solid var(--line);
       box-shadow:var(--shadow-strong);
       border-radius:24px;
       backdrop-filter:blur(18px);
@@ -509,14 +509,14 @@
 
     #legendDock{
       top:10px;
-      left:270px;
-      width:188px;
+      left:252px;
+      width:174px;
       padding:10px;
     }
 
     .legend-title{
-      margin:0 0 6px;
-      font-size:13px;
+      margin:0 0 4px;
+      font-size:12px;
       font-weight:850;
       letter-spacing:-.02em;
     }
@@ -533,16 +533,16 @@
     .legend-row{
       display:grid;
       grid-template-columns:14px 1fr;
-      gap:8px;
+      gap:7px;
       align-items:center;
-      font-size:11px;
+      font-size:10.5px;
       font-weight:750;
       line-height:1.15;
     }
 
     .legend-swatch{
-      width:14px;
-      height:14px;
+      width:12px;
+      height:12px;
       border-radius:5px;
       border:1px solid rgba(15,23,42,.12);
     }
@@ -554,7 +554,7 @@
     #rightRail{
       top:10px;
       right:10px;
-      width:214px;
+      width:198px;
       max-height:calc(100vh - 108px);
       overflow:auto;
       padding:10px;
@@ -563,8 +563,8 @@
     }
 
     .rail-card{
-      background:rgba(255,255,255,.72);
-      border:1px solid rgba(226,232,240,.92);
+      background:rgba(255,255,255,.028);
+      border:1px solid var(--line);
       border-radius:16px;
       padding:10px;
     }
@@ -592,7 +592,7 @@
       border-radius:999px;
       border:1px solid var(--line);
       padding:0 8px;
-      background:#fff;
+      background:rgba(255,255,255,.045);
       font-size:10px;
       font-weight:850;
       color:var(--muted);
@@ -611,16 +611,16 @@
       align-items:center;
       gap:8px;
       padding:9px 10px;
-      border:1px solid rgba(226,232,240,.92);
+      border:1px solid var(--line);
       border-radius:14px;
-      background:#fff;
+      background:rgba(255,255,255,.04);
     }
 
     .toggle{
       position:relative;
       width:42px;
       height:24px;
-      background:#cbd5e1;
+      background:rgba(255,255,255,.20);
       border-radius:999px;
       transition:background .18s ease;
       box-shadow:inset 0 0 0 1px rgba(15,23,42,.04);
@@ -634,12 +634,12 @@
       width:18px;
       height:18px;
       border-radius:999px;
-      background:#fff;
-      box-shadow:0 2px 6px rgba(15,23,42,.18);
+      background:#ffffff;
+      box-shadow:0 2px 8px rgba(0,0,0,.28);
     }
 
     .toggle.on{
-      background:#2563eb;
+      background:var(--accent);
     }
 
     .toggle.on::after{
@@ -668,7 +668,7 @@
       min-height:22px;
       padding:0 8px;
       border-radius:999px;
-      background:#f8fafc;
+      background:rgba(255,255,255,.03);
       border:1px solid var(--line);
       font-size:10px;
       font-weight:850;
@@ -682,13 +682,13 @@
       padding:10px;
       border-radius:14px;
       border:1px solid rgba(226,232,240,.95);
-      background:#fff;
+      background:rgba(255,255,255,.04);
       display:grid;
       gap:3px;
     }
 
     .top-tide-item.active{
-      background:#eff6ff;
+      background:rgba(96,165,250,.14);
       border-color:#bfdbfe;
       color:var(--accent-strong);
     }
@@ -702,7 +702,7 @@
     }
 
     .top-tide-item.active .top-tide-rank{
-      color:#2563eb;
+      color:var(--accent);
     }
 
     .top-tide-main{
@@ -931,11 +931,10 @@
       <section class="panel-card brand">
         <div class="brand-top">
           <div>
-            <h1>North Wildwood<br>Flood Replay</h1>
+            <h1>North Wildwood<br>Flood Map</h1>
           </div>
           <div class="brand-chip">Live</div>
         </div>
-        <div class="muted">Forecast, archive, and crest replay.</div>
       </section>
 
       <section class="panel-card">
@@ -1088,7 +1087,7 @@
             <div>
               <h3>Top tides</h3>
             </div>
-            <span id="topTidePill" class="pill">Top 5</span>
+            <span id="topTidePill" class="pill">Historic highs</span>
           </div>
           <div id="topTideList" class="top-tide-list"></div>
         </section>
@@ -1570,6 +1569,14 @@
       return formatHourEntryTime(entry).replace(",", "").replace(" EST", "");
     }
 
+    function formatHourEntryDateShort(entry) {
+      const d = entry?.timeEST ? parseStoredESTToDate(entry.timeEST) : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
+      if (!d || Number.isNaN(d.getTime())) return "--";
+      const est = new Date(d.getTime() - EST_OFFSET_MS);
+      const yy = String(est.getUTCFullYear()).slice(-2);
+      return `${est.getUTCMonth() + 1}/${est.getUTCDate()}/${yy}`;
+    }
+
     function getStageValue(entry) {
       return Number(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
     }
@@ -1734,8 +1741,8 @@
           rank: chosen.length + 1,
           entry,
           peakStage: getStageValue(entry),
-          title: formatHourEntryTimeCompact(entry),
-          subtitle: `${getStageValue(entry).toFixed(2)} ft • ±${TOP_TIDE_WINDOW_HOURS} hr`,
+          title: formatHourEntryDateShort(entry),
+          subtitle: `${getStageValue(entry).toFixed(2)} ft`,
           series,
           peakLocalIndex: flatIdx - startIdx
         });
@@ -1801,7 +1808,7 @@
       } else if (currentViewType === "observed-day") {
         label.textContent = "Observed";
       } else {
-        label.textContent = "Top crest";
+        label.textContent = "Historic crest";
       }
 
       timelineMeta.textContent = `${currentHourIndex + 1} / ${currentSeriesHours.length}`;
@@ -1812,15 +1819,13 @@
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").textContent = formatHourEntryTime(entry);
       document.getElementById("stageText").textContent = Number.isFinite(rawStage) ? `${rawStage.toFixed(2)} ft` : "--";
-      document.getElementById("stageSubText").textContent = displayStage != null
-        ? `Overlay ${displayStage.toFixed(1)} ft`
-        : "No overlay";
+      document.getElementById("stageSubText").textContent = "NAVD88";
       document.getElementById("selectedText").textContent = currentSelectedLabel;
       document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
       document.getElementById("timeSubText").textContent = currentViewType === "forecast"
         ? "Forecast"
         : currentViewType === "top-tide"
-          ? `±${TOP_TIDE_WINDOW_HOURS} hr`
+          ? "Historic crest"
           : (selectedObservedDate || "Observed");
     }
 
