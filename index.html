@@ -110,21 +110,22 @@
     }
 
     #app{
-      position:relative;
-      height:100%;
+      position:fixed;
+      inset:0;
       overflow:hidden;
+      background:var(--bg);
     }
 
     #leftPanel{
       position:absolute;
-      top:18px;
-      left:18px;
+      top:14px;
+      left:14px;
       z-index:1250;
-      width:320px;
-      max-height:calc(100% - 154px);
+      width:286px;
+      max-height:calc(100vh - 124px);
       display:flex;
       flex-direction:column;
-      gap:12px;
+      gap:10px;
       overflow:auto;
       padding:0;
       pointer-events:none;
@@ -257,7 +258,7 @@
 
     .stat-grid{
       display:grid;
-      grid-template-columns:1fr 1fr 1fr;
+      grid-template-columns:1fr 1fr;
       gap:10px;
     }
 
@@ -270,6 +271,10 @@
       display:grid;
       align-content:start;
       gap:6px;
+    }
+
+    .stat-box:last-child{
+      grid-column:1 / -1;
     }
 
     .stat-label{
@@ -459,15 +464,18 @@
     }
 
     #mapWrap{
-      position:relative;
-      min-width:0;
-      min-height:0;
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
       overflow:hidden;
     }
 
     #map{
       position:absolute;
       inset:0;
+      width:100%;
+      height:100%;
       background:#d9dfe7;
     }
 
@@ -492,10 +500,10 @@
     }
 
     #legendDock{
-      top:18px;
-      left:350px;
-      width:270px;
-      padding:13px;
+      top:14px;
+      left:312px;
+      width:236px;
+      padding:12px;
     }
 
     .legend-title{
@@ -541,14 +549,14 @@
     }
 
     #rightRail{
-      top:18px;
-      right:18px;
-      width:290px;
-      max-height:calc(100% - 150px);
+      top:14px;
+      right:14px;
+      width:252px;
+      max-height:calc(100vh - 124px);
       overflow:auto;
-      padding:12px;
+      padding:10px;
       display:grid;
-      gap:12px;
+      gap:10px;
     }
 
     .rail-card{
@@ -710,9 +718,9 @@
 
     #timelineDock{
       position:absolute;
-      left:18px;
-      right:18px;
-      bottom:18px;
+      left:14px;
+      right:14px;
+      bottom:14px;
       z-index:1300;
       padding:12px 16px;
     }
@@ -792,8 +800,8 @@
 
     #toast{
       position:absolute;
-      left:18px;
-      bottom:124px;
+      left:14px;
+      bottom:118px;
       z-index:1500;
       max-width:360px;
       padding:12px 14px;
@@ -829,40 +837,40 @@
 
     @media (max-width: 1320px){
       #leftPanel{
-        width:304px;
+        width:274px;
       }
       #legendDock{
-        left:334px;
-        width:250px;
+        left:300px;
+        width:224px;
       }
       #rightRail{
-        width:272px;
+        width:238px;
       }
     }
 
     @media (max-width: 1180px){
       #leftPanel{
-        width:286px;
-        max-height:calc(100% - 154px);
+        width:266px;
+        max-height:calc(100vh - 132px);
       }
 
       #legendDock{
-        top:16px;
-        left:312px;
-        width:238px;
+        top:14px;
+        left:292px;
+        width:212px;
       }
 
       #rightRail{
-        top:16px;
-        right:16px;
-        width:248px;
-        max-height:calc(100% - 154px);
+        top:14px;
+        right:14px;
+        width:224px;
+        max-height:calc(100vh - 132px);
       }
 
       #timelineDock{
-        left:16px;
-        right:16px;
-        bottom:16px;
+        left:14px;
+        right:14px;
+        bottom:14px;
       }
     }
 
@@ -871,9 +879,13 @@
         grid-template-columns:1fr;
       }
 
+      .stat-box:last-child{
+        grid-column:auto;
+      }
+
       #leftPanel{
-        width:min(280px, calc(100% - 32px));
-        max-height:calc(100% - 188px);
+        width:min(272px, calc(100% - 28px));
+        max-height:calc(100vh - 188px);
       }
 
       #rightRail{
@@ -881,10 +893,10 @@
       }
 
       #legendDock{
-        left:16px;
+        left:14px;
         top:auto;
-        bottom:138px;
-        width:min(300px, calc(100% - 32px));
+        bottom:128px;
+        width:min(280px, calc(100% - 28px));
       }
 
       .timeline-head{
@@ -1114,8 +1126,18 @@
     const OBSERVED_URL = new URL("./observed.json", APP_BASE).href;
 
     const OVERLAY_ROOTS = {
-      depth: new URL("./assets/overlays/flooddepth/", APP_BASE).href,
-      dynamic: new URL("./assets/overlays/dynamicflood/", APP_BASE).href
+      depth: [
+        new URL("./assets/overlays/flooddepth/", APP_BASE).href,
+        new URL("./assets/overlays/FloodDepth/", APP_BASE).href,
+        new URL("./assets/flooddepth/", APP_BASE).href,
+        new URL("./flooddepth/", APP_BASE).href
+      ],
+      dynamic: [
+        new URL("./assets/overlays/dynamicflood/", APP_BASE).href,
+        new URL("./assets/overlays/DynamicFlood/", APP_BASE).href,
+        new URL("./assets/dynamicflood/", APP_BASE).href,
+        new URL("./dynamicflood/", APP_BASE).href
+      ]
     };
 
     const MIN_STAGE = -4.0;
@@ -1137,6 +1159,11 @@
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
     const NJ_ROADS_URL =
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Roads_NJ/MapServer/tile/{z}/{y}/{x}";
+
+    const FALLBACK_LATLNG_BOUNDS = L.latLngBounds(
+      [38.967, -74.835],
+      [39.025, -74.755]
+    );
 
     const SHARED_WORLD = {
       A: 7.5,
@@ -1335,8 +1362,32 @@
       return `DynamicFlood_${code}.png`;
     }
 
-    function getOverlayUrl(mode, stageValue) {
-      return new URL(getOverlayFilename(mode, stageValue), OVERLAY_ROOTS[mode]).href;
+    function getOverlayFilenameCandidates(mode, stageValue) {
+      const code = stageToCode(stageValue);
+      if (mode === "depth") {
+        return [
+          `Depth${code}.png`,
+          `Depth_${code}.png`,
+          `depth${code}.png`,
+          `Depth${code}.PNG`
+        ];
+      }
+      return [
+        `DynamicFlood_${code}.png`,
+        `DynamicFlood${code}.png`,
+        `Dynamic_${code}.png`,
+        `dynamicflood_${code}.png`
+      ];
+    }
+
+    function getOverlayCandidates(mode, stageValue) {
+      const roots = OVERLAY_ROOTS[mode] || [];
+      const filenames = getOverlayFilenameCandidates(mode, stageValue);
+      return roots.flatMap(root => filenames.map(name => new URL(name, root).href));
+    }
+
+    function getPreferredOverlayUrl(mode, stageValue) {
+      return getOverlayCandidates(mode, stageValue)[0];
     }
 
     function projectedPointToLatLng(x, y) {
@@ -1381,6 +1432,17 @@
       img.src = url;
     }
 
+    async function findWorkingOverlay(mode, stageValue) {
+      const candidates = getOverlayCandidates(mode, stageValue);
+      for (const url of candidates) {
+        const exists = await testImageUrl(url);
+        if (exists.ok) {
+          return { url, filename: url.split('/').pop() || getOverlayFilename(mode, stageValue) };
+        }
+      }
+      return null;
+    }
+
     function preloadAroundHour(index) {
       if (!currentSeriesHours.length) return;
       [0, 1, -1, 2, -2].forEach(offset => {
@@ -1388,8 +1450,8 @@
         if (i < 0 || i >= currentSeriesHours.length) return;
         const stage = getOverlayStage(getStageValue(currentSeriesHours[i]));
         if (stage == null) return;
-        preloadImage(getOverlayUrl("depth", stage));
-        preloadImage(getOverlayUrl("dynamic", stage));
+        preloadImage(getPreferredOverlayUrl("depth", stage));
+        preloadImage(getPreferredOverlayUrl("dynamic", stage));
       });
     }
 
@@ -1448,6 +1510,9 @@
         opacity: 0.92,
         pane: "roadsPane"
       }).addTo(map);
+
+      map.fitBounds(FALLBACK_LATLNG_BOUNDS, { padding: [20, 20] });
+      requestAnimationFrame(() => map.invalidateSize());
     }
 
     function clearFloodLayer() {
@@ -1757,17 +1822,17 @@
     async function setFloodLayer(mode, stageValue, token) {
       clearFloodLayer();
       toast("");
+      ensureMap();
 
-      const overlayUrl = getOverlayUrl(mode, stageValue);
-      const exists = await testImageUrl(overlayUrl);
+      const match = await findWorkingOverlay(mode, stageValue);
       if (token !== lastRenderToken) return;
 
-      if (!exists.ok) {
-        toast(`Overlay missing for ${stageValue.toFixed(1)} ft: ${getOverlayFilename(mode, stageValue)}`);
+      if (!match) {
+        toast(`Overlay missing for ${stageValue.toFixed(1)} ft. Check your folder path or file naming.`);
         return;
       }
 
-      ensureMap();
+      const overlayUrl = match.url;
 
       try {
         await ensureOverlayBounds(overlayUrl);
@@ -1792,7 +1857,7 @@
 
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        toast(`Leaflet could not draw ${getOverlayFilename(mode, stageValue)}.`);
+        toast(`Leaflet could not draw ${match.filename}.`);
       });
 
       currentFloodLayer.addTo(map);
@@ -2248,6 +2313,12 @@
       updateModeButtons();
       updateDataModeButtons();
       wireEvents();
+      window.addEventListener('resize', () => {
+        if (map) map.invalidateSize();
+      });
+      requestAnimationFrame(() => {
+        if (map) map.invalidateSize();
+      });
       await reloadAll();
     }
 
