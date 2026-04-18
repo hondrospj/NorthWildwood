@@ -121,8 +121,8 @@
       top:10px;
       left:10px;
       z-index:1250;
-      width:236px;
-      max-height:calc(100vh - 108px);
+      width:242px;
+      max-height:calc(100vh - 92px);
       display:flex;
       flex-direction:column;
       gap:8px;
@@ -145,49 +145,38 @@
     }
 
     .brand{
-      padding:4px;
-      display:grid;
-      gap:4px;
-      min-height:92px;
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      min-height:108px;
     }
 
     .brand-top{
-      display:grid;
-      gap:10px;
-      justify-items:start;
+      width:100%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
     }
 
     h1{
       margin:0;
       max-width:100%;
-      font-size:clamp(18px, 2vw, 21px);
-      line-height:.92;
-      letter-spacing:-.05em;
+      font-size:clamp(26px, 2.6vw, 32px);
+      line-height:.88;
+      letter-spacing:-.055em;
       font-weight:900;
       word-break:keep-all;
+      text-align:center;
     }
 
     .brand-chip{
-      position:static;
-      display:inline-flex;
-      align-items:center;
-      gap:7px;
-      padding:5px 10px;
-      border-radius:999px;
-      background:rgba(96,165,250,.14);
-      color:var(--accent-strong);
-      font-size:10px;
-      font-weight:800;
-      white-space:nowrap;
+      display:none !important;
     }
 
     .brand-chip::before{
-      content:"";
-      width:7px;
-      height:7px;
-      border-radius:999px;
-      background:var(--accent);
-      box-shadow:0 0 0 5px rgba(37,99,235,.12);
+      display:none !important;
     }
 
     .muted{
@@ -261,42 +250,54 @@
 
     .stat-grid{
       display:grid;
-      grid-template-columns:1fr 1fr;
+      grid-template-columns:1fr;
       gap:8px;
     }
 
     .stat-box{
       min-height:0;
-      padding:10px;
+      padding:11px 12px;
       border:1px solid var(--line);
-      border-radius:14px;
+      border-radius:16px;
       background:rgba(255,255,255,.04);
       display:grid;
       align-content:start;
-      gap:4px;
+      gap:5px;
     }
 
     .stat-box:last-child{
-      grid-column:1 / -1;
+      grid-column:auto;
     }
 
     .stat-label{
-      font-size:11px;
-      font-weight:750;
+      font-size:10px;
+      font-weight:800;
       color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.08em;
     }
 
     .stat-value{
-      font-size:15px;
-      line-height:1.12;
-      font-weight:850;
-      letter-spacing:-.03em;
+      font-size:19px;
+      line-height:1.06;
+      font-weight:900;
+      letter-spacing:-.04em;
     }
 
     .stat-sub{
-      font-size:9px;
+      font-size:10px;
       color:var(--muted);
       line-height:1.25;
+    }
+
+    #timeText{
+      font-size:17px;
+      line-height:1.05;
+    }
+
+    #stageText{
+      font-size:19px;
+      line-height:1.02;
     }
 
     .control-row{
@@ -392,11 +393,17 @@
     }
 
     .calendar-popover label{
-      font-size:12px;
+      font-size:10px;
       font-weight:800;
       color:var(--muted);
       display:grid;
-      gap:6px;
+      gap:5px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .calendar-popover select{
+      font-size:12px;
     }
 
     .calendar-popover select{
@@ -722,64 +729,64 @@
       right:10px;
       bottom:10px;
       z-index:1300;
-      padding:34px 14px 12px;
-      border-radius:22px;
+      padding:24px 12px 10px;
+      border-radius:18px;
     }
 
     #timelineBubble{
       position:absolute;
-      top:-14px;
+      top:-12px;
       left:50%;
       transform:translateX(-50%);
       background:#d58a00;
       color:#fff;
-      padding:8px 16px;
-      border-radius:16px;
-      font-size:14px;
+      padding:6px 12px;
+      border-radius:14px;
+      font-size:13px;
       font-weight:850;
       line-height:1;
       white-space:nowrap;
-      box-shadow:0 14px 28px rgba(0,0,0,.34);
+      box-shadow:0 12px 24px rgba(0,0,0,.28);
     }
 
     #timelineBubble::after{
       content:"";
       position:absolute;
       left:50%;
-      bottom:-8px;
+      bottom:-7px;
       transform:translateX(-50%);
-      border-left:8px solid transparent;
-      border-right:8px solid transparent;
-      border-top:8px solid #d58a00;
+      border-left:7px solid transparent;
+      border-right:7px solid transparent;
+      border-top:7px solid #d58a00;
     }
 
     .timeline-top{
       display:flex;
       align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom:10px;
+      justify-content:flex-start;
+      gap:10px;
+      margin-bottom:6px;
     }
 
     .timeline-controls{
       display:flex;
       align-items:center;
-      gap:8px;
+      gap:7px;
     }
 
     .playFab{
-      width:56px;
-      min-width:56px;
-      height:56px;
-      min-height:56px;
+      width:46px;
+      min-width:46px;
+      height:46px;
+      min-height:46px;
       padding:0;
       border-radius:999px;
       background:#ffffff;
       color:#b91c1c;
       border:0;
-      font-size:28px;
+      font-size:22px;
       line-height:1;
-      box-shadow:0 14px 28px rgba(0,0,0,.30);
+      box-shadow:0 12px 22px rgba(0,0,0,.28);
     }
 
     .playFab:hover:not(:disabled){
@@ -787,32 +794,27 @@
     }
 
     .miniAction{
-      min-height:36px;
-      padding:0 12px;
+      min-height:32px;
+      padding:0 11px;
       border-radius:999px;
-      font-size:11px;
+      font-size:10px;
       text-transform:uppercase;
       letter-spacing:.08em;
     }
 
     .timeline-meta{
-      font-size:11px;
-      font-weight:800;
-      color:var(--muted);
-      letter-spacing:.1em;
-      text-transform:uppercase;
-      white-space:nowrap;
+      display:none;
     }
 
     .timeline-days{
       display:grid;
       grid-auto-flow:column;
-      grid-auto-columns:minmax(84px,1fr);
+      grid-auto-columns:minmax(78px,1fr);
       border:1px solid var(--line);
-      border-radius:14px;
+      border-radius:12px;
       overflow:hidden;
       background:rgba(255,255,255,.04);
-      margin-bottom:10px;
+      margin-bottom:6px;
     }
 
     .timeline-day{
@@ -821,9 +823,9 @@
       border-right:1px solid var(--line);
       border-radius:0;
       min-height:0;
-      padding:12px 8px;
+      padding:9px 6px;
       text-align:center;
-      font-size:13px;
+      font-size:12px;
       font-weight:800;
       color:#f0d7a1;
       box-shadow:none;
@@ -841,13 +843,13 @@
     .timeline-trackRow{
       display:grid;
       grid-template-columns:auto 1fr auto;
-      gap:10px;
+      gap:8px;
       align-items:center;
     }
 
     .timeline-end,
     .timeline-scale{
-      font-size:11px;
+      font-size:10px;
       font-weight:800;
       color:var(--muted);
       white-space:nowrap;
@@ -857,33 +859,33 @@
       -webkit-appearance:none;
       appearance:none;
       width:100%;
-      height:8px;
+      height:4px;
       margin:0;
       background:rgba(255,255,255,.18);
       border-radius:999px;
       outline:none;
-      box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
     }
 
     #hourSlider::-webkit-slider-thumb{
       -webkit-appearance:none;
       appearance:none;
-      width:18px;
-      height:18px;
+      width:16px;
+      height:16px;
       border-radius:999px;
       background:#2563eb;
-      border:3px solid #dbeafe;
-      box-shadow:0 6px 14px rgba(0,0,0,.25);
+      border:2px solid #dbeafe;
+      box-shadow:0 5px 12px rgba(0,0,0,.22);
       cursor:pointer;
     }
 
     #hourSlider::-moz-range-thumb{
-      width:18px;
-      height:18px;
+      width:16px;
+      height:16px;
       border-radius:999px;
       background:#2563eb;
-      border:3px solid #dbeafe;
-      box-shadow:0 6px 14px rgba(0,0,0,.25);
+      border:2px solid #dbeafe;
+      box-shadow:0 5px 12px rgba(0,0,0,.22);
       cursor:pointer;
     }
 
@@ -1027,10 +1029,7 @@
     <aside id="leftPanel">
       <section class="panel-card brand">
         <div class="brand-top">
-          <div>
-            <h1>North&nbsp;Wildwood<br>Flood Map</h1>
-          </div>
-          <div class="brand-chip">Live</div>
+          <h1>North&nbsp;Wildwood<br>Flood Map</h1>
         </div>
       </section>
 
@@ -1659,6 +1658,18 @@
       return formatHourEntryTime(entry).replace(",", "").replace(" EST", "");
     }
 
+    function formatSnapshotTime(entry) {
+      const est = getEntryESTDate(entry);
+      if (!est) return "--";
+      const month = MONTH_NAMES[est.getUTCMonth()];
+      const day = est.getUTCDate();
+      let hour = est.getUTCHours();
+      const minute = pad2(est.getUTCMinutes());
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12 || 12;
+      return `${month} ${day}<br>${hour}:${minute} ${ampm}<br>EST`;
+    }
+
     function formatHourEntryDateShort(entry) {
       const d = entry?.timeEST ? parseStoredESTToDate(entry.timeEST) : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
       if (!d || Number.isNaN(d.getTime())) return "--";
@@ -1810,6 +1821,12 @@
       if (!monthKey) return "--";
       const [y, m] = monthKey.split("-");
       return `${MONTH_NAMES_LONG[Number(m) - 1]} ${y}`;
+    }
+
+    function prettyMonthShort(monthKey) {
+      if (!monthKey) return "--";
+      const [y, m] = monthKey.split("-");
+      return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
     }
 
     function getChronologicalDateIndex(dateStr) {
@@ -1981,7 +1998,7 @@
         label.textContent = "Historic crest";
       }
 
-      timelineMeta.textContent = `${currentHourIndex + 1} of ${currentSeriesHours.length} hours`;
+      timelineMeta.textContent = "";
       timelineStart.textContent = first ? formatHourEntryTimeCompact(first) : "--";
       timelineEnd.textContent = last ? formatHourEntryTimeCompact(last) : "--";
       if (bubble) bubble.textContent = formatTimelineBubbleText(entry);
@@ -1990,7 +2007,7 @@
     }
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
-      document.getElementById("timeText").textContent = formatHourEntryTime(entry);
+      document.getElementById("timeText").innerHTML = formatSnapshotTime(entry);
       document.getElementById("stageText").textContent = Number.isFinite(rawStage) ? `${rawStage.toFixed(2)} ft` : "--";
       document.getElementById("stageSubText").textContent = "NAVD88";
       document.getElementById("selectedText").textContent = currentSelectedLabel;
@@ -2126,7 +2143,7 @@
       const yearSelect = document.getElementById("yearSelect");
 
       const years = Array.from(new Set(observedMonthKeys.map(key => key.slice(0, 4)))).sort();
-      monthSelect.innerHTML = MONTH_NAMES_LONG.map((name, i) => `<option value="${i + 1}">${name}</option>`).join("");
+      monthSelect.innerHTML = MONTH_NAMES.map((name, i) => `<option value="${i + 1}">${name}</option>`).join("");
       yearSelect.innerHTML = years.map(year => `<option value="${year}">${year}</option>`).join("");
 
       if (currentMonthKey) {
@@ -2138,7 +2155,7 @@
 
     async function renderCalendar() {
       if (!observedData || !currentMonthKey) return;
-      document.getElementById("monthLabel").textContent = prettyMonth(currentMonthKey);
+      document.getElementById("monthLabel").textContent = prettyMonthShort(currentMonthKey);
 
       const grid = document.getElementById("calendarGrid");
       grid.innerHTML = "";
