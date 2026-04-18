@@ -947,6 +947,43 @@
     }
 
 
+    .leaflet-control-zoom{
+      border:none !important;
+      box-shadow:0 16px 30px rgba(0,0,0,.28);
+      overflow:hidden;
+      border-radius:16px;
+    }
+
+    .leaflet-control-zoom a{
+      width:42px !important;
+      height:42px !important;
+      line-height:42px !important;
+      background:rgba(11,18,32,.94) !important;
+      color:var(--text) !important;
+      border:none !important;
+      font-size:22px !important;
+      font-weight:900 !important;
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+    }
+
+    .leaflet-control-zoom a:hover{
+      background:rgba(20,32,58,.98) !important;
+      color:#ffffff !important;
+    }
+
+    .leaflet-bottom.leaflet-right .leaflet-control-zoom{
+      margin-right:222px;
+      margin-bottom:128px;
+    }
+
+    .leaflet-pane.roads-bright img,
+    .leaflet-layer.roads-bright{
+      filter:grayscale(1) brightness(2.4) contrast(2.05);
+      mix-blend-mode:screen;
+    }
+
+
     #toast{
       position:absolute;
       left:10px;
@@ -1346,7 +1383,7 @@
               </div>
             </div>
             <div class="layer-item">
-              <div class="toggle on" aria-hidden="true"></div>
+              <div id="roadsToggle" class="toggle on" aria-hidden="true"></div>
               <div class="layer-meta">
                 <div class="layer-name">Road names</div>
               </div>
@@ -1425,6 +1462,7 @@
     const TOP_TIDE_DISPLAY_COUNT = 5;
     const TOP_TIDE_SELECT_COUNT = 10;
     const TOP_TIDE_WINDOW_HOURS = 12;
+    const ROAD_LABEL_ZOOM = 10;
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
@@ -1492,6 +1530,7 @@
     let orthoLayer = null;
     let roadsLayer = null;
     let currentFloodLayer = null;
+    let pendingFloodLayer = null;
     let floodProjectedBounds = null;
     let floodLatLngBounds = null;
     let mapHasFit = false;
@@ -1519,6 +1558,8 @@
     let overlayOpacity = DEFAULT_OPACITY;
     let lastRenderToken = 0;
     let imageExistsCache = new Map();
+    let overlayRecordCache = new Map();
+    let preloadPromiseCache = new Map();
 
     function pad2(n) {
       return String(n).padStart(2, "0");
@@ -1698,8 +1739,19 @@
     }
 
     function preloadImage(url) {
-      const img = new Image();
-      img.src = url;
+      if (!url) return Promise.resolve(null);
+      if (preloadPromiseCache.has(url)) return preloadPromiseCache.get(url);
+
+      const promise = new Promise(resolve => {
+        const img = new Image();
+        img.decoding = "async";
+        img.onload = () => resolve(url);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+
+      preloadPromiseCache.set(url, promise);
+      return promise;
     }
 
     async function findWorkingOverlay(mode, stageValue) {
@@ -1713,15 +1765,27 @@
       return null;
     }
 
+    async function getOverlayRecord(mode, stageValue) {
+      const key = `${mode}:${stageToCode(stageValue)}`;
+      if (overlayRecordCache.has(key)) return overlayRecordCache.get(key);
+      const match = await findWorkingOverlay(mode, stageValue);
+      overlayRecordCache.set(key, match);
+      return match;
+    }
+
     function preloadAroundHour(index) {
       if (!currentSeriesHours.length) return;
-      [0, 1, -1, 2, -2].forEach(offset => {
+      [0, 1, -1, 2, -2, 3, -3].forEach(offset => {
         const i = index + offset;
         if (i < 0 || i >= currentSeriesHours.length) return;
         const stage = getOverlayStage(getStageValue(currentSeriesHours[i]));
         if (stage == null) return;
-        preloadImage(getPreferredOverlayUrl("depth", stage));
-        preloadImage(getPreferredOverlayUrl("dynamic", stage));
+
+        ["depth", "dynamic"].forEach(mode => {
+          getOverlayRecord(mode, stage).then(record => {
+            if (record?.url) preloadImage(record.url);
+          });
+        });
       });
     }
 
@@ -1741,7 +1805,7 @@
 
       map = L.map("map", {
         crs: NJSP_CRS,
-        zoomControl: true,
+        zoomControl: false,
         minZoom: 0,
         maxZoom: 12,
         continuousWorld: true,
@@ -1777,15 +1841,39 @@
         noWrap: true,
         updateWhenIdle: true,
         keepBuffer: 2,
-        opacity: 0.92,
+        opacity: 0,
+        className: "roads-layer",
         pane: "roadsPane"
       }).addTo(map);
+
+      L.control.zoom({ position: "bottomright" }).addTo(map);
+      map.on("zoomend", updateRoadLayerAppearance);
+      updateRoadLayerAppearance();
 
       map.fitBounds(FALLBACK_LATLNG_BOUNDS, { padding: [20, 20] });
       requestAnimationFrame(() => map.invalidateSize());
     }
 
+
+    function updateRoadLayerAppearance() {
+      if (!map || !roadsLayer) return;
+
+      const toggle = document.getElementById("roadsToggle");
+      const roadsEnabled = !toggle || toggle.classList.contains("on");
+      const zoom = map.getZoom() || 0;
+      const showLabels = roadsEnabled && zoom >= ROAD_LABEL_ZOOM;
+
+      roadsLayer.setOpacity(showLabels ? 0.96 : 0);
+
+      const pane = map.getPane("roadsPane");
+      if (pane) pane.classList.toggle("roads-bright", showLabels);
+    }
+
     function clearFloodLayer() {
+      if (pendingFloodLayer && map && map.hasLayer(pendingFloodLayer)) {
+        map.removeLayer(pendingFloodLayer);
+        pendingFloodLayer = null;
+      }
       if (currentFloodLayer && map) {
         map.removeLayer(currentFloodLayer);
         currentFloodLayer = null;
@@ -2213,11 +2301,10 @@
     }
 
     async function setFloodLayer(mode, stageValue, token) {
-      clearFloodLayer();
       toast("");
       ensureMap();
 
-      const match = await findWorkingOverlay(mode, stageValue);
+      const match = await getOverlayRecord(mode, stageValue);
       if (token !== lastRenderToken) return;
 
       if (!match) {
@@ -2226,6 +2313,8 @@
       }
 
       const overlayUrl = match.url;
+      await preloadImage(overlayUrl);
+      if (token !== lastRenderToken) return;
 
       try {
         await ensureOverlayBounds(overlayUrl);
@@ -2236,11 +2325,17 @@
 
       if (token !== lastRenderToken) return;
 
-      currentFloodLayer = L.Proj.imageOverlay(
-        `${overlayUrl}?v=${Date.now()}`,
+      if (pendingFloodLayer && map.hasLayer(pendingFloodLayer)) {
+        map.removeLayer(pendingFloodLayer);
+        pendingFloodLayer = null;
+      }
+
+      const previousLayer = currentFloodLayer;
+      const nextLayer = L.Proj.imageOverlay(
+        overlayUrl,
         floodProjectedBounds,
         {
-          opacity: overlayOpacity,
+          opacity: 0,
           interactive: false,
           crossOrigin: true,
           zIndex: 500,
@@ -2248,17 +2343,36 @@
         }
       );
 
-      currentFloodLayer.on("error", () => {
+      pendingFloodLayer = nextLayer;
+
+      nextLayer.once("load", () => {
+        if (token !== lastRenderToken) {
+          if (map.hasLayer(nextLayer)) map.removeLayer(nextLayer);
+          return;
+        }
+
+        nextLayer.setOpacity(overlayOpacity);
+        currentFloodLayer = nextLayer;
+        pendingFloodLayer = null;
+
+        if (previousLayer && map.hasLayer(previousLayer)) {
+          map.removeLayer(previousLayer);
+        }
+
+        if (!mapHasFit && floodLatLngBounds) {
+          map.fitBounds(floodLatLngBounds, { padding: [16, 16] });
+          mapHasFit = true;
+        }
+      });
+
+      nextLayer.on("error", () => {
         if (token !== lastRenderToken) return;
+        if (map.hasLayer(nextLayer)) map.removeLayer(nextLayer);
+        pendingFloodLayer = null;
         toast(`Leaflet could not draw ${match.filename}.`);
       });
 
-      currentFloodLayer.addTo(map);
-
-      if (!mapHasFit && floodLatLngBounds) {
-        map.fitBounds(floodLatLngBounds, { padding: [16, 16] });
-        mapHasFit = true;
-      }
+      nextLayer.addTo(map);
     }
 
     async function renderHour(index) {
@@ -2625,10 +2739,12 @@
     }
 
     function wireLayerToggles() {
-      ["buildingsToggle", "criticalToggle"].forEach(id => {
+      ["buildingsToggle", "criticalToggle", "roadsToggle"].forEach(id => {
         const el = document.getElementById(id);
+        if (!el) return;
         el.addEventListener("click", () => {
           el.classList.toggle("on");
+          if (id === "roadsToggle") updateRoadLayerAppearance();
         });
       });
     }
@@ -2710,6 +2826,7 @@
       updateModeButtons();
       updateDataModeButtons();
       wireEvents();
+      updateRoadLayerAppearance();
       window.addEventListener('resize', () => {
         if (map) map.invalidateSize();
         positionTimelineBubble();
