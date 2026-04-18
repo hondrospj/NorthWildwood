@@ -1,457 +1,1107 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>North Wildwood Flood Replay</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
     :root{
-      --bg:#f3f4f6;
+      --bg:#eef2f7;
       --panel:#ffffff;
+      --panel-soft:rgba(255,255,255,.84);
       --text:#0f172a;
       --muted:#64748b;
-      --line:#e5e7eb;
+      --line:#e2e8f0;
+      --line-strong:#cbd5e1;
       --accent:#2563eb;
       --accent-soft:#dbeafe;
-      --shadow:0 18px 42px rgba(15,23,42,.08);
+      --accent-strong:#1d4ed8;
+      --success:#157347;
+      --success-soft:#dcfce7;
+      --shadow:0 14px 36px rgba(15,23,42,.10);
+      --shadow-strong:0 22px 48px rgba(15,23,42,.16);
       --radius:22px;
 
-      --none:#f8fafc;
       --minor:#f59e0b;
-      --minor-soft:#fef3c7;
       --moderate:#ef4444;
-      --moderate-soft:#fee2e2;
       --major:#7c3aed;
-      --major-soft:#ede9fe;
+      --below:#1d8f52;
+
+      --depth-0:#CFEFFF;
+      --depth-1:#2769DB;
+      --depth-2:#5B5FD6;
+      --depth-3:#5F2DA8;
+      --depth-4:#7C42C4;
+      --depth-5:#A73FA1;
+      --depth-6:#E05AAE;
+      --depth-7:#B1367B;
+      --depth-8:#A52440;
+      --depth-9:#3F000A;
+      --depth-10:#3A0008;
     }
 
-    * { box-sizing: border-box; }
+    *{ box-sizing:border-box; }
 
-    html, body {
-      margin: 0;
-      height: 100%;
+    html, body{
+      margin:0;
+      height:100%;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      background:var(--bg);
+      color:var(--text);
     }
 
-    #app {
-      display: grid;
-      grid-template-columns: 380px 1fr;
-      height: 100%;
+    body{
+      overflow:hidden;
     }
 
-    #panel {
-      padding: 16px;
-      background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-      border-right: 1px solid var(--line);
-      overflow: auto;
+    #topBanner{
+      position:fixed;
+      top:14px;
+      left:50%;
+      transform:translateX(-50%);
+      z-index:5000;
+      min-width:min(720px, calc(100vw - 28px));
+      max-width:min(960px, calc(100vw - 28px));
+      display:none;
+      align-items:center;
+      justify-content:space-between;
+      gap:16px;
+      padding:12px 18px;
+      border-radius:999px;
+      background:rgba(15,23,42,.92);
+      color:#fff;
+      box-shadow:var(--shadow-strong);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
     }
 
-    #map {
-      width: 100%;
-      height: 100%;
-      background: #d7dbe0;
+    #topBanner.alert{
+      display:flex;
     }
 
-    .brand {
-      display: grid;
-      gap: 3px;
-      padding: 2px 2px 10px;
+    #topBanner .banner-text{
+      display:grid;
+      gap:2px;
+      min-width:0;
     }
 
-    h1 {
-      margin: 0;
-      font-size: 29px;
-      line-height: 0.98;
-      letter-spacing: -0.04em;
-      font-weight: 800;
+    #topBanner .banner-eyebrow{
+      font-size:11px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:#bfdbfe;
+      font-weight:800;
     }
 
-    .muted {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.35;
-      word-break: break-word;
+    #topBanner .banner-title{
+      font-size:14px;
+      font-weight:800;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
-    .section {
-      margin-top: 14px;
-      background: var(--panel);
-      border: 1px solid rgba(229,231,235,.9);
-      border-radius: var(--radius);
-      padding: 12px;
-      box-shadow: var(--shadow);
+    #topBanner .banner-meta{
+      font-size:12px;
+      color:#dbeafe;
+      white-space:nowrap;
     }
 
-    .big {
-      font-size: 20px;
-      font-weight: 800;
-      line-height: 1.1;
-      letter-spacing: -0.02em;
-      margin-top: 4px;
+    #app{
+      position:relative;
+      height:100%;
+      overflow:hidden;
     }
 
-    input[type="range"] {
-      width: 100%;
-      margin-top: 8px;
-      accent-color: var(--accent);
+    #leftPanel{
+      position:absolute;
+      top:18px;
+      left:18px;
+      z-index:1250;
+      width:320px;
+      max-height:calc(100% - 154px);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      overflow:auto;
+      padding:0;
+      pointer-events:none;
+      background:none;
+      border:0;
     }
 
-    button {
-      padding: 11px 12px;
-      cursor: pointer;
-      border: 1px solid var(--line);
-      background: #fff;
-      border-radius: 14px;
-      font-size: 14px;
-      font-weight: 650;
-      color: var(--text);
-      transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease;
+    .panel-card{
+      background:rgba(255,255,255,.90);
+      border:1px solid rgba(226,232,240,.88);
+      border-radius:22px;
+      box-shadow:var(--shadow-strong);
+      padding:13px;
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      pointer-events:auto;
     }
 
-    button:hover {
-      transform: translateY(-1px);
+    .brand{
+      padding:2px 2px 2px;
+      display:grid;
+      gap:8px;
     }
 
-    button.activeMode {
-      background: var(--accent-soft);
-      border-color: #bfdbfe;
-      color: #1d4ed8;
+    .brand-top{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
     }
 
-    button:disabled {
-      opacity: .45;
-      cursor: default;
-      transform: none;
+    h1{
+      margin:0;
+      font-size:31px;
+      line-height:.98;
+      letter-spacing:-.05em;
+      font-weight:900;
     }
 
-    .leaflet-image-layer {
-      image-rendering: auto;
+    .brand-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:#eff6ff;
+      color:#1d4ed8;
+      font-size:12px;
+      font-weight:800;
+      white-space:nowrap;
     }
 
-    .grayscale-tiles {
-      filter: grayscale(100%);
-      -webkit-filter: grayscale(100%);
+    .brand-chip::before{
+      content:"";
+      width:8px;
+      height:8px;
+      border-radius:999px;
+      background:#2563eb;
+      box-shadow:0 0 0 5px rgba(37,99,235,.12);
     }
 
-    .mode-buttons {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
+    .muted{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.35;
     }
 
-    .transport-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 8px;
+    .button-grid-2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
     }
 
-    .metric-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 10px;
+    button,
+    select{
+      appearance:none;
+      border:1px solid var(--line);
+      background:#fff;
+      border-radius:16px;
+      color:var(--text);
+      font-size:14px;
+      font-weight:700;
+      min-height:46px;
     }
 
-    .metric-box {
-      padding: 12px;
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      min-height: 84px;
-      background: #fff;
+    button{
+      cursor:pointer;
+      transition:transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, color .16s ease;
+      padding:11px 14px;
     }
 
-    .metric-label {
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 6px;
-      font-weight: 600;
+    button:hover:not(:disabled){
+      transform:translateY(-1px);
+      box-shadow:0 10px 18px rgba(15,23,42,.08);
     }
 
-    .control-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 6px;
+    button:disabled{
+      opacity:.42;
+      cursor:default;
+      transform:none;
+      box-shadow:none;
     }
 
-    .control-label {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 600;
+    button.active{
+      background:var(--accent-soft);
+      color:var(--accent-strong);
+      border-color:#bfdbfe;
     }
 
-    .control-value {
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 750;
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:10px;
     }
 
-    .calendar-toolbar {
-      display: grid;
-      grid-template-columns: 44px 1fr 44px;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 10px;
+    .section-title h2{
+      margin:0;
+      font-size:14px;
+      letter-spacing:-.02em;
+      font-weight:850;
     }
 
-    .calendar-title {
-      text-align: center;
-      font-weight: 800;
-      letter-spacing: -0.02em;
+    .section-kicker{
+      color:var(--muted);
+      font-size:12px;
+      font-weight:700;
     }
 
-    .calendar-legend {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
+    .stat-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:10px;
     }
 
-    .legend-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 12px;
-      font-weight: 700;
-      background: #fff;
+    .stat-box{
+      min-height:102px;
+      padding:12px;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+      display:grid;
+      align-content:start;
+      gap:6px;
     }
 
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      display: inline-block;
+    .stat-label{
+      font-size:12px;
+      font-weight:750;
+      color:var(--muted);
     }
 
-    .legend-dot.none { background: #cbd5e1; }
-    .legend-dot.minor { background: var(--minor); }
-    .legend-dot.moderate { background: var(--moderate); }
-    .legend-dot.major { background: var(--major); }
+    .stat-value{
+      font-size:20px;
+      line-height:1.08;
+      font-weight:850;
+      letter-spacing:-.03em;
+    }
+
+    .stat-sub{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+
+    .control-row{
+      display:grid;
+      gap:8px;
+    }
+
+    .range-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:8px;
+    }
+
+    .range-label{
+      font-size:13px;
+      font-weight:800;
+      color:var(--muted);
+    }
+
+    .range-value{
+      font-size:13px;
+      font-weight:850;
+    }
+
+    input[type="range"]{
+      width:100%;
+      accent-color:var(--accent);
+      margin:0;
+    }
+
+    .transport-row{
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:8px;
+    }
+
+    .calendar-card{
+      display:none;
+      gap:12px;
+    }
+
+    .calendar-card.active{
+      display:grid;
+    }
+
+    .calendar-toolbar{
+      display:grid;
+      grid-template-columns:44px 1fr 44px;
+      gap:8px;
+      align-items:center;
+    }
+
+    .calendar-title-btn{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      font-weight:850;
+      font-size:15px;
+      letter-spacing:-.02em;
+      min-height:46px;
+    }
+
+    .calendar-title-btn .caret{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .calendar-popover{
+      display:none;
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#f8fafc;
+      padding:12px;
+      gap:10px;
+    }
+
+    .calendar-popover.open{
+      display:grid;
+    }
+
+    .calendar-popover-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr auto;
+      gap:8px;
+      align-items:end;
+    }
+
+    .calendar-popover label{
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
+      display:grid;
+      gap:6px;
+    }
+
+    .calendar-popover select{
+      width:100%;
+      padding:0 12px;
+    }
 
     .calendar-head,
-    .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
+    .calendar-grid{
+      display:grid;
+      grid-template-columns:repeat(7, 1fr);
+      gap:6px;
     }
 
-    .calendar-head {
-      margin-bottom: 6px;
+    .calendar-head div{
+      text-align:center;
+      font-size:11px;
+      font-weight:800;
+      color:var(--muted);
+      padding:2px 0;
     }
 
-    .calendar-head div {
-      text-align: center;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--muted);
-      padding: 4px 0;
+    .calendar-day{
+      min-height:48px;
+      display:grid;
+      place-items:center;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background:#fff;
+      padding:0;
+      position:relative;
+      font-weight:850;
+      font-size:13px;
     }
 
-    .calendar-day {
-      min-height: 46px;
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      background: #fff;
-      display: grid;
-      place-items: center;
-      font-weight: 800;
-      font-size: 13px;
-      position: relative;
-      padding: 0;
+    .calendar-day.empty{
+      visibility:hidden;
+      pointer-events:none;
     }
 
-    .calendar-day.empty {
-      visibility: hidden;
-      pointer-events: none;
+    .calendar-day.day-none{ background:#f8fafc; }
+    .calendar-day.day-minor{ background:#fff7ed; border-color:#fed7aa; }
+    .calendar-day.day-moderate{ background:#fef2f2; border-color:#fecaca; }
+    .calendar-day.day-major{ background:#f5f3ff; border-color:#ddd6fe; }
+
+    .calendar-day.selected{
+      outline:2px solid var(--accent-strong);
+      outline-offset:1px;
     }
 
-    .calendar-day.day-none {
-      background: var(--none);
+    .calendar-day .tiny{
+      position:absolute;
+      right:6px;
+      bottom:4px;
+      font-size:10px;
+      font-weight:850;
+      color:var(--muted);
     }
 
-    .calendar-day.day-minor {
-      background: var(--minor-soft);
-      border-color: #fcd34d;
+    .day-nav{
+      display:grid;
+      grid-template-columns:1fr auto 1fr;
+      gap:8px;
+      align-items:center;
     }
 
-    .calendar-day.day-moderate {
-      background: var(--moderate-soft);
-      border-color: #fca5a5;
+    .day-nav-center{
+      text-align:center;
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
     }
 
-    .calendar-day.day-major {
-      background: var(--major-soft);
-      border-color: #c4b5fd;
+    #mapWrap{
+      position:relative;
+      min-width:0;
+      min-height:0;
+      overflow:hidden;
     }
 
-    .calendar-day.selected {
-      outline: 2px solid #1d4ed8;
-      outline-offset: 1px;
+    #map{
+      position:absolute;
+      inset:0;
+      background:#d9dfe7;
     }
 
-    .calendar-day .tiny {
-      position: absolute;
-      right: 6px;
-      bottom: 4px;
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
+    .leaflet-image-layer{
+      image-rendering:auto;
     }
 
-    #historySection {
-      display: none;
+    .grayscale-tiles{
+      filter:grayscale(100%);
+      -webkit-filter:grayscale(100%);
     }
 
-    #statusBox {
-      display: grid;
-      gap: 8px;
-      margin-top: 14px;
+    .map-floating{
+      position:absolute;
+      z-index:1200;
+      background:var(--panel-soft);
+      border:1px solid rgba(226,232,240,.88);
+      box-shadow:var(--shadow-strong);
+      border-radius:24px;
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
     }
 
-    #status,
-    #warn {
-      border-radius: 16px;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
-      background: #fff;
-      font-size: 12px;
-      line-height: 1.35;
-      box-shadow: var(--shadow);
+    #legendDock{
+      top:18px;
+      left:350px;
+      width:270px;
+      padding:13px;
     }
 
-    #status {
-      color: var(--muted);
+    .legend-title{
+      margin:0 0 8px;
+      font-size:14px;
+      font-weight:850;
+      letter-spacing:-.02em;
     }
 
-    #warn {
-      display: none;
-      color: #7c2d12;
-      background: #fff7ed;
-      border-color: #fed7aa;
-      white-space: pre-line;
+    .legend-sub{
+      margin:0 0 12px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
     }
 
-    @media (max-width: 1080px) {
-      #app {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
+    .legend-list{
+      display:grid;
+      gap:7px;
+    }
+
+    .legend-row{
+      display:grid;
+      grid-template-columns:18px 1fr;
+      gap:10px;
+      align-items:center;
+      font-size:12px;
+      font-weight:750;
+    }
+
+    .legend-swatch{
+      width:18px;
+      height:18px;
+      border-radius:6px;
+      border:1px solid rgba(15,23,42,.12);
+    }
+
+    .legend-note{
+      margin-top:12px;
+      font-size:11px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+
+    #rightRail{
+      top:18px;
+      right:18px;
+      width:290px;
+      max-height:calc(100% - 150px);
+      overflow:auto;
+      padding:12px;
+      display:grid;
+      gap:12px;
+    }
+
+    .rail-card{
+      background:rgba(255,255,255,.72);
+      border:1px solid rgba(226,232,240,.92);
+      border-radius:20px;
+      padding:14px;
+    }
+
+    .rail-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+
+    .rail-head h3{
+      margin:0;
+      font-size:14px;
+      font-weight:850;
+      letter-spacing:-.02em;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      min-height:30px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      padding:0 10px;
+      background:#fff;
+      font-size:11px;
+      font-weight:850;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .layer-list,
+    .top-tide-list{
+      display:grid;
+      gap:10px;
+    }
+
+    .layer-item{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      gap:10px;
+      padding:11px 12px;
+      border:1px solid rgba(226,232,240,.92);
+      border-radius:16px;
+      background:#fff;
+    }
+
+    .toggle{
+      position:relative;
+      width:42px;
+      height:24px;
+      background:#cbd5e1;
+      border-radius:999px;
+      transition:background .18s ease;
+      box-shadow:inset 0 0 0 1px rgba(15,23,42,.04);
+    }
+
+    .toggle::after{
+      content:"";
+      position:absolute;
+      top:3px;
+      left:3px;
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      background:#fff;
+      box-shadow:0 2px 6px rgba(15,23,42,.18);
+    }
+
+    .toggle.on{
+      background:#2563eb;
+    }
+
+    .toggle.on::after{
+      left:21px;
+    }
+
+    .layer-meta{
+      display:grid;
+      gap:3px;
+      min-width:0;
+    }
+
+    .layer-name{
+      font-size:13px;
+      font-weight:850;
+    }
+
+    .layer-desc{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.3;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      min-height:26px;
+      padding:0 10px;
+      border-radius:999px;
+      background:#f8fafc;
+      border:1px solid var(--line);
+      font-size:11px;
+      font-weight:850;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .top-tide-item{
+      width:100%;
+      text-align:left;
+      padding:12px;
+      border-radius:18px;
+      border:1px solid rgba(226,232,240,.95);
+      background:#fff;
+      display:grid;
+      gap:5px;
+    }
+
+    .top-tide-item.active{
+      background:#eff6ff;
+      border-color:#bfdbfe;
+      color:var(--accent-strong);
+    }
+
+    .top-tide-rank{
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    .top-tide-item.active .top-tide-rank{
+      color:#2563eb;
+    }
+
+    .top-tide-main{
+      font-size:14px;
+      font-weight:850;
+      letter-spacing:-.02em;
+    }
+
+    .top-tide-sub{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.35;
+    }
+
+    #timelineDock{
+      position:absolute;
+      left:18px;
+      right:18px;
+      bottom:18px;
+      z-index:1300;
+      padding:12px 16px;
+    }
+
+    .timeline-head{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      align-items:center;
+      gap:14px;
+      margin-bottom:10px;
+    }
+
+    .transport-inline{
+      display:flex;
+      gap:8px;
+    }
+
+    .transport-inline button{
+      min-width:48px;
+      min-height:42px;
+      padding:0 14px;
+      border-radius:14px;
+    }
+
+    .timeline-title{
+      min-width:0;
+      text-align:center;
+      display:grid;
+      gap:3px;
+    }
+
+    .timeline-label{
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .timeline-value{
+      font-size:18px;
+      font-weight:900;
+      letter-spacing:-.03em;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .timeline-meta{
+      font-size:12px;
+      font-weight:750;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .timeline-range{
+      display:grid;
+      grid-template-columns:auto 1fr auto;
+      gap:12px;
+      align-items:center;
+    }
+
+    .timeline-end{
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .timeline-scale{
+      font-size:12px;
+      font-weight:800;
+      color:var(--muted);
+      text-align:right;
+      white-space:nowrap;
+    }
+
+    #toast{
+      position:absolute;
+      left:18px;
+      bottom:124px;
+      z-index:1500;
+      max-width:360px;
+      padding:12px 14px;
+      border-radius:18px;
+      border:1px solid rgba(251,191,36,.4);
+      background:rgba(255,251,235,.96);
+      color:#92400e;
+      box-shadow:var(--shadow);
+      display:none;
+      line-height:1.35;
+      font-size:12px;
+      font-weight:700;
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+    }
+
+    #toast.show{
+      display:block;
+    }
+
+    #leftPanel::-webkit-scrollbar,
+    #rightRail::-webkit-scrollbar{
+      width:10px;
+    }
+
+    #leftPanel::-webkit-scrollbar-thumb,
+    #rightRail::-webkit-scrollbar-thumb{
+      background:rgba(148,163,184,.45);
+      border-radius:999px;
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+
+    @media (max-width: 1320px){
+      #leftPanel{
+        width:304px;
+      }
+      #legendDock{
+        left:334px;
+        width:250px;
+      }
+      #rightRail{
+        width:272px;
+      }
+    }
+
+    @media (max-width: 1180px){
+      #leftPanel{
+        width:286px;
+        max-height:calc(100% - 154px);
       }
 
-      #panel {
-        border-right: 0;
-        border-bottom: 1px solid var(--line);
+      #legendDock{
+        top:16px;
+        left:312px;
+        width:238px;
       }
 
-      .metric-grid {
-        grid-template-columns: 1fr;
+      #rightRail{
+        top:16px;
+        right:16px;
+        width:248px;
+        max-height:calc(100% - 154px);
+      }
+
+      #timelineDock{
+        left:16px;
+        right:16px;
+        bottom:16px;
+      }
+    }
+
+    @media (max-width: 860px){
+      .stat-grid{
+        grid-template-columns:1fr;
+      }
+
+      #leftPanel{
+        width:min(280px, calc(100% - 32px));
+        max-height:calc(100% - 188px);
+      }
+
+      #rightRail{
+        display:none;
+      }
+
+      #legendDock{
+        left:16px;
+        top:auto;
+        bottom:138px;
+        width:min(300px, calc(100% - 32px));
+      }
+
+      .timeline-head{
+        grid-template-columns:1fr;
+        gap:10px;
+      }
+
+      .timeline-title{
+        text-align:left;
+      }
+
+      .timeline-range{
+        grid-template-columns:1fr;
       }
     }
   </style>
 </head>
 <body>
+  <div id="topBanner">
+    <div class="banner-text">
+      <div class="banner-eyebrow">NWS Flood Alert</div>
+      <div id="bannerTitle" class="banner-title">Checking alerts</div>
+      <div id="bannerMeta" class="banner-meta"></div>
+    </div>
+    <div id="bannerCount" class="pill">0 active</div>
+  </div>
+
   <div id="app">
-    <aside id="panel">
-      <div class="brand">
-        <h1>North Wildwood<br>Flood Replay</h1>
-        <div class="muted">Stone Harbor USGS driver station</div>
-        <div id="archiveText" class="muted">Observed archive: --</div>
-      </div>
-
-      <div class="section">
-        <div class="mode-buttons">
-          <button id="forecastDataBtn" class="activeMode">Forecast</button>
-          <button id="observedDataBtn">Observed</button>
+    <aside id="leftPanel">
+      <section class="panel-card brand">
+        <div class="brand-top">
+          <div>
+            <h1>North Wildwood<br>Flood Replay</h1>
+          </div>
+          <div class="brand-chip">Professional Replay</div>
         </div>
-        <div id="dataModeText" class="muted" style="margin-top:8px;">Current data mode: Forecast</div>
-      </div>
+        <div class="muted">Sleek flood playback for forecast windows, observed archive days, and highest-crest replay windows.</div>
+      </section>
 
-      <div class="section">
-        <div class="mode-buttons">
-          <button id="depthModeBtn" class="activeMode">Flood Depth</button>
-          <button id="dynamicModeBtn">Dynamic Flood</button>
+      <section class="panel-card">
+        <div class="section-title">
+          <h2>Data source</h2>
+          <span id="dataModePill" class="pill">Forecast</span>
         </div>
-        <div id="overlayModeText" class="muted" style="margin-top:8px;">Current overlay type: Flood Depth</div>
-      </div>
+        <div class="button-grid-2">
+          <button id="forecastDataBtn" class="active" type="button">Forecast</button>
+          <button id="observedDataBtn" type="button">Observed Archive</button>
+        </div>
+      </section>
 
-      <div id="historySection" class="section">
+      <section class="panel-card">
+        <div class="section-title">
+          <h2>Overlay</h2>
+          <span id="overlayModePill" class="pill">Flood Depth</span>
+        </div>
+        <div class="button-grid-2">
+          <button id="depthModeBtn" class="active" type="button">Flood Depth</button>
+          <button id="dynamicModeBtn" type="button">Dynamic Flood</button>
+        </div>
+      </section>
+
+      <section class="panel-card">
+        <div class="section-title">
+          <h2>Scene snapshot</h2>
+          <span class="section-kicker">Live selection</span>
+        </div>
+        <div class="stat-grid">
+          <div class="stat-box">
+            <div class="stat-label">Time</div>
+            <div id="timeText" class="stat-value">--</div>
+            <div id="timeSubText" class="stat-sub">North Wildwood replay clock</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Water level</div>
+            <div id="stageText" class="stat-value">--</div>
+            <div id="stageSubText" class="stat-sub">NAVD88</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">Selection</div>
+            <div id="selectedText" class="stat-value">--</div>
+            <div id="selectedSubText" class="stat-sub">--</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="calendarCard" class="panel-card calendar-card">
+        <div class="section-title">
+          <h2>Observed calendar</h2>
+          <span class="section-kicker">Daily archive</span>
+        </div>
+
         <div class="calendar-toolbar">
           <button id="prevMonthBtn" type="button" aria-label="Previous month">‹</button>
-          <div id="monthLabel" class="calendar-title">--</div>
+          <button id="calendarTitleBtn" class="calendar-title-btn" type="button">
+            <span id="monthLabel">--</span>
+            <span class="caret">▾</span>
+          </button>
           <button id="nextMonthBtn" type="button" aria-label="Next month">›</button>
         </div>
 
-        <div class="calendar-legend">
-          <div class="legend-pill"><span class="legend-dot none"></span>None</div>
-          <div class="legend-pill"><span class="legend-dot minor"></span>Minor</div>
-          <div class="legend-pill"><span class="legend-dot moderate"></span>Moderate</div>
-          <div class="legend-pill"><span class="legend-dot major"></span>Major</div>
+        <div id="calendarPopover" class="calendar-popover">
+          <div class="calendar-popover-grid">
+            <label>
+              Month
+              <select id="monthSelect"></select>
+            </label>
+            <label>
+              Year
+              <select id="yearSelect"></select>
+            </label>
+            <button id="calendarGoBtn" type="button">Go</button>
+          </div>
         </div>
 
         <div class="calendar-head">
           <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
         </div>
         <div id="calendarGrid" class="calendar-grid"></div>
-      </div>
 
-      <div class="section">
-        <div class="metric-grid">
-          <div class="metric-box">
-            <div class="metric-label">Time</div>
-            <div id="timeText" class="big">--</div>
-            <div id="issuedText" class="muted">--</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Water level</div>
-            <div id="stageText" class="big">--</div>
-            <div id="matchedText" class="muted">--</div>
-          </div>
-          <div class="metric-box">
-            <div class="metric-label">Selected</div>
-            <div id="selectedText" class="big">--</div>
-            <div id="selectedSubText" class="muted">--</div>
-          </div>
+        <div class="day-nav">
+          <button id="prevDayBtn" type="button">Previous Day</button>
+          <div id="dayNavCenter" class="day-nav-center">Select a day</div>
+          <button id="nextDayBtn" type="button">Next Day</button>
         </div>
-      </div>
+      </section>
 
-      <div class="section">
-        <div class="control-head">
-          <div id="hourLabel" class="control-label">Forecast hour</div>
-          <div id="hourText" class="control-value">Hour 0</div>
+      <section class="panel-card">
+        <div class="section-title">
+          <h2>Overlay opacity</h2>
+          <span id="opacityText" class="pill">75%</span>
         </div>
-        <input id="hourSlider" type="range" min="0" max="0" value="0" step="1" />
-      </div>
-
-      <div class="section">
-        <div class="control-head">
-          <div class="control-label">Overlay opacity</div>
-          <div id="opacityText" class="control-value">100%</div>
+        <div class="control-row">
+          <input id="opacitySlider" type="range" min="1" max="100" value="75" step="1" />
+          <div class="muted">Default starts at 75%, with full manual control from 1% to 100%.</div>
         </div>
-        <input id="opacitySlider" type="range" min="0" max="100" value="100" step="1" />
-      </div>
-
-      <div class="section">
-        <div class="transport-row">
-          <button id="playBtn" type="button">Play</button>
-          <button id="stopBtn" type="button">Stop</button>
-          <button id="reloadBtn" type="button">Reload</button>
-        </div>
-      </div>
-
-      <div id="statusBox">
-        <div id="status">Starting…</div>
-        <div id="warn"></div>
-      </div>
+      </section>
     </aside>
 
-    <main id="map"></main>
+    <main id="mapWrap">
+      <div id="map"></div>
+
+      <section id="legendDock" class="map-floating">
+        <h2 id="legendTitle" class="legend-title">Flood depth</h2>
+        <p id="legendSub" class="legend-sub">Depth intervals are shown as continuous classes for the selected replay hour.</p>
+        <div id="legendList" class="legend-list"></div>
+        <div id="legendNote" class="legend-note"></div>
+      </section>
+
+      <aside id="rightRail" class="map-floating">
+        <section class="rail-card">
+          <div class="rail-head">
+            <div>
+              <h3>Layers</h3>
+            </div>
+            <span class="pill">Right rail</span>
+          </div>
+          <div class="layer-list">
+            <div class="layer-item">
+              <div id="buildingsToggle" class="toggle on" aria-hidden="true"></div>
+              <div class="layer-meta">
+                <div class="layer-name">Buildings</div>
+                <div class="layer-desc">Placeholder control for future building footprints and structure overlays.</div>
+              </div>
+              <span class="badge">Coming soon</span>
+            </div>
+            <div class="layer-item">
+              <div id="criticalToggle" class="toggle on" aria-hidden="true"></div>
+              <div class="layer-meta">
+                <div class="layer-name">Critical infrastructure</div>
+                <div class="layer-desc">Placeholder control for utilities, public safety sites, and priority assets.</div>
+              </div>
+              <span class="badge">Coming soon</span>
+            </div>
+            <div class="layer-item">
+              <div class="toggle on" aria-hidden="true"></div>
+              <div class="layer-meta">
+                <div class="layer-name">Road names</div>
+                <div class="layer-desc">Live NJ road label layer drawn above flood overlays.</div>
+              </div>
+              <span class="badge">Live</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="rail-card">
+          <div class="rail-head">
+            <div>
+              <h3>Highest tides</h3>
+            </div>
+            <span id="topTidePill" class="pill">Top 5 of top 10 crests</span>
+          </div>
+          <div id="topTideList" class="top-tide-list"></div>
+        </section>
+      </aside>
+
+      <section id="timelineDock" class="map-floating">
+        <div class="timeline-head">
+          <div class="transport-inline">
+            <button id="playBtn" type="button">Play</button>
+            <button id="stopBtn" type="button">Stop</button>
+            <button id="reloadBtn" type="button">Reload</button>
+          </div>
+          <div class="timeline-title">
+            <div id="timelineLabel" class="timeline-label">Replay timeline</div>
+            <div id="timelineValue" class="timeline-value">--</div>
+          </div>
+          <div id="timelineMeta" class="timeline-meta">--</div>
+        </div>
+        <div class="timeline-range">
+          <div id="timelineStart" class="timeline-end">--</div>
+          <input id="hourSlider" type="range" min="0" max="0" value="0" step="1" />
+          <div id="timelineEnd" class="timeline-scale">--</div>
+        </div>
+      </section>
+
+      <div id="toast"></div>
+    </main>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -468,17 +1118,25 @@
       dynamic: new URL("./assets/overlays/dynamicflood/", APP_BASE).href
     };
 
-    const DEFAULT_OVERLAY_MODE = "depth";
-    const DEFAULT_DATA_MODE = "forecast";
-
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
     const STAGE_STEP = 0.2;
     const MIN_VISIBLE_STAGE = 1.5;
     const FORCED_STAGE = 1.6;
+    const DEFAULT_OVERLAY_MODE = "depth";
+    const DEFAULT_DATA_MODE = "forecast";
+    const DEFAULT_OPACITY = 0.75;
+    const TOP_TIDE_DISPLAY_COUNT = 5;
+    const TOP_TIDE_SELECT_COUNT = 10;
+    const TOP_TIDE_WINDOW_HOURS = 12;
+
+    const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
+    const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
 
     const NJ_BASEMAP_URL =
       "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
+    const NJ_ROADS_URL =
+      "https://maps.nj.gov/arcgis/rest/services/Basemap/Roads_NJ/MapServer/tile/{z}/{y}/{x}";
 
     const SHARED_WORLD = {
       A: 7.5,
@@ -495,26 +1153,43 @@
     const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
       resolutions: [
-        2006.2172023914932,
-        1003.1086011953124,
-        501.55430059809026,
-        250.7771502986111,
-        125.38857514930555,
-        62.694287574652776,
-        31.347143787326388,
-        15.673571894097222,
-        7.836785947048611,
-        3.9183929730902776,
-        1.9591964843749998,
-        0.9795982430555555,
+        2006.2172023914932, 1003.1086011953124, 501.55430059809026, 250.7771502986111,
+        125.38857514930555, 62.694287574652776, 31.347143787326388, 15.673571894097222,
+        7.836785947048611, 3.9183929730902776, 1.9591964843749998, 0.9795982430555555,
         0.48979912152777777
       ]
     });
 
     const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const MONTH_NAMES_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
     const EST_OFFSET_MS = 5 * 60 * 60 * 1000;
 
+    const DEPTH_LEGEND = [
+      { label: "< 0.10 ft", color: "var(--depth-0)" },
+      { label: "0.10–0.25 ft", color: "var(--depth-1)" },
+      { label: "0.25–0.50 ft", color: "var(--depth-2)" },
+      { label: "0.50–1.00 ft", color: "var(--depth-3)" },
+      { label: "1.00–1.50 ft", color: "var(--depth-4)" },
+      { label: "1.50–2.00 ft", color: "var(--depth-5)" },
+      { label: "2.00–2.50 ft", color: "var(--depth-6)" },
+      { label: "2.50–3.00 ft", color: "var(--depth-7)" },
+      { label: "3.00–4.00 ft", color: "var(--depth-8)" },
+      { label: "4.00–5.00 ft", color: "var(--depth-9)" },
+      { label: "5.00+ ft", color: "var(--depth-10)" },
+      { label: "Areas Below Grade But Not Likely Flooded", color: "var(--below)" }
+    ];
+
+    const DYNAMIC_LEGEND = [
+      { label: "Minor", color: "var(--minor)" },
+      { label: "Moderate", color: "var(--moderate)" },
+      { label: "Major", color: "var(--major)" },
+      { label: "Areas Below Grade But Not Likely Flooded", color: "var(--below)" }
+    ];
+
     let map = null;
+    let orthoLayer = null;
+    let roadsLayer = null;
     let currentFloodLayer = null;
     let floodProjectedBounds = null;
     let floodLatLngBounds = null;
@@ -523,6 +1198,8 @@
     let forecastData = null;
     let observedData = null;
     let observedMonthKeys = [];
+    let observedFlatHours = [];
+    let topTideEvents = [];
     let currentMonthKey = null;
     let selectedObservedDate = null;
 
@@ -532,57 +1209,97 @@
     let currentHourIndex = 0;
     let currentSelectedLabel = "Forecast";
     let currentSelectedSubLabel = "--";
+    let currentViewType = "forecast";
+    let currentTopTideIndex = null;
+    let currentRangeLabel = "--";
+    let currentBaseModeBeforeTopTide = "observed";
 
     let playTimer = null;
-    let overlayOpacity = 1.0;
+    let overlayOpacity = DEFAULT_OPACITY;
     let lastRenderToken = 0;
+    let imageExistsCache = new Map();
 
-    const imageExistsCache = new Map();
-
-    function setStatus(msg) {
-      document.getElementById("status").textContent = msg;
+    function pad2(n) {
+      return String(n).padStart(2, "0");
     }
 
-    function setWarn(msg) {
-      const el = document.getElementById("warn");
+    function toast(msg = "") {
+      const el = document.getElementById("toast");
       if (!msg) {
-        el.style.display = "none";
+        el.classList.remove("show");
         el.textContent = "";
-      } else {
-        el.style.display = "block";
-        el.textContent = msg;
+        return;
       }
+      el.textContent = msg;
+      el.classList.add("show");
     }
 
-    async function fetchJson(url) {
-      const r = await fetch(url, { cache: "no-store" });
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status} for ${url}`);
+    function setBanner(active, title = "", meta = "", count = 0) {
+      const banner = document.getElementById("topBanner");
+      banner.classList.toggle("alert", Boolean(active));
+      document.getElementById("bannerTitle").textContent = title || "No active flood alerts";
+      document.getElementById("bannerMeta").textContent = meta || "";
+      document.getElementById("bannerCount").textContent = `${count} active`;
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, {
+        cache: "no-store",
+        headers: { "Accept": "application/geo+json, application/json" },
+        ...options
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} for ${url}`);
       }
-      return r.json();
+      return response.json();
     }
 
     function setOpacityText() {
-      document.getElementById("opacityText").textContent =
-        `${Math.round(overlayOpacity * 100)}%`;
+      document.getElementById("opacityText").textContent = `${Math.round(overlayOpacity * 100)}%`;
     }
 
     function updateModeButtons() {
-      document.getElementById("depthModeBtn").classList.toggle("activeMode", currentOverlayMode === "depth");
-      document.getElementById("dynamicModeBtn").classList.toggle("activeMode", currentOverlayMode === "dynamic");
-      document.getElementById("overlayModeText").textContent =
-        `Current overlay type: ${currentOverlayMode === "depth" ? "Flood Depth" : "Dynamic Flood"}`;
+      document.getElementById("depthModeBtn").classList.toggle("active", currentOverlayMode === "depth");
+      document.getElementById("dynamicModeBtn").classList.toggle("active", currentOverlayMode === "dynamic");
+      document.getElementById("overlayModePill").textContent =
+        currentOverlayMode === "depth" ? "Flood Depth" : "Dynamic Flood";
+      renderLegend();
     }
 
     function updateDataModeButtons() {
-      document.getElementById("forecastDataBtn").classList.toggle("activeMode", currentDataMode === "forecast");
-      document.getElementById("observedDataBtn").classList.toggle("activeMode", currentDataMode === "observed");
-      document.getElementById("dataModeText").textContent =
-        `Current data mode: ${currentDataMode === "forecast" ? "Forecast" : "Observed"}`;
-      document.getElementById("historySection").style.display =
-        currentDataMode === "observed" ? "block" : "none";
-      document.getElementById("hourLabel").textContent =
-        currentDataMode === "forecast" ? "Forecast hour" : "Replay hour";
+      document.getElementById("forecastDataBtn").classList.toggle("active", currentDataMode === "forecast");
+      document.getElementById("observedDataBtn").classList.toggle("active", currentDataMode === "observed");
+      document.getElementById("dataModePill").textContent =
+        currentDataMode === "forecast" ? "Forecast" : "Observed";
+      document.getElementById("calendarCard").classList.toggle("active", currentDataMode === "observed");
+    }
+
+    function renderLegend() {
+      const list = document.getElementById("legendList");
+      const title = document.getElementById("legendTitle");
+      const sub = document.getElementById("legendSub");
+      const note = document.getElementById("legendNote");
+      const items = currentOverlayMode === "depth" ? DEPTH_LEGEND : DYNAMIC_LEGEND;
+
+      title.textContent = currentOverlayMode === "depth" ? "Flood depth" : "Dynamic flood";
+      sub.textContent = currentOverlayMode === "depth"
+        ? "Depth intervals are shown for the selected replay hour."
+        : "Severity classes update with the selected replay hour.";
+
+      list.innerHTML = "";
+      items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "legend-row";
+        row.innerHTML = `
+          <span class="legend-swatch" style="background:${item.color};"></span>
+          <span>${item.label}</span>
+        `;
+        list.appendChild(row);
+      });
+
+      note.textContent = currentOverlayMode === "depth"
+        ? "Depth legend uses the exact class breaks you specified."
+        : "Dynamic flood legend swaps into place automatically when Dynamic Flood is selected.";
     }
 
     function clampStage(value) {
@@ -601,11 +1318,8 @@
     function getOverlayStage(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
-
       if (n < MIN_VISIBLE_STAGE) return FORCED_STAGE;
-
-      const clipped = clampStage(n);
-      return clampStage(floorToCatalogStep(clipped));
+      return clampStage(floorToCatalogStep(clampStage(n)));
     }
 
     function stageToCode(stageValue) {
@@ -618,8 +1332,7 @@
     function getOverlayFilename(mode, stageValue) {
       const code = stageToCode(stageValue);
       if (mode === "depth") return `Depth${code}.png`;
-      if (mode === "dynamic") return `DynamicFlood_${code}.png`;
-      throw new Error(`Unknown overlay mode: ${mode}`);
+      return `DynamicFlood_${code}.png`;
     }
 
     function getOverlayUrl(mode, stageValue) {
@@ -632,50 +1345,33 @@
 
     function computeProjectedBounds(width, height) {
       const { A, D, B, E, C, F } = SHARED_WORLD;
-
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
         throw new Error("Shared world file contains rotation or skew.");
       }
-
-      const west  = C - (A / 2);
+      const west = C - (A / 2);
       const north = F - (E / 2);
-      const east  = C + A * (width  - 0.5);
+      const east = C + A * (width - 0.5);
       const south = F + E * (height - 0.5);
-
       return { west, south, east, north };
     }
 
     async function loadImageMeta(url) {
       return new Promise((resolve, reject) => {
         const img = new Image();
-
-        img.onload = () => {
-          resolve({
-            width: img.naturalWidth,
-            height: img.naturalHeight
-          });
-        };
-
-        img.onerror = () => {
-          reject(new Error(`Could not load image: ${url}`));
-        };
-
+        img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+        img.onerror = () => reject(new Error(`Could not load image: ${url}`));
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
     }
 
     async function testImageUrl(url) {
-      if (imageExistsCache.has(url)) {
-        return imageExistsCache.get(url);
-      }
-
-      const result = await new Promise((resolve) => {
+      if (imageExistsCache.has(url)) return imageExistsCache.get(url);
+      const result = await new Promise(resolve => {
         const img = new Image();
         img.onload = () => resolve({ ok: true });
         img.onerror = () => resolve({ ok: false });
         img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       });
-
       imageExistsCache.set(url, result);
       return result;
     }
@@ -687,36 +1383,21 @@
 
     function preloadAroundHour(index) {
       if (!currentSeriesHours.length) return;
-
-      const offsets = [0, 1, -1, 2, -2];
-
-      for (const offset of offsets) {
+      [0, 1, -1, 2, -2].forEach(offset => {
         const i = index + offset;
-        if (i < 0 || i >= currentSeriesHours.length) continue;
-
+        if (i < 0 || i >= currentSeriesHours.length) return;
         const stage = getOverlayStage(getStageValue(currentSeriesHours[i]));
-        if (stage === null) continue;
-
+        if (stage == null) return;
         preloadImage(getOverlayUrl("depth", stage));
         preloadImage(getOverlayUrl("dynamic", stage));
-      }
+      });
     }
 
     async function ensureOverlayBounds(sampleOverlayUrl) {
       if (floodProjectedBounds && floodLatLngBounds) return;
-
       const meta = await loadImageMeta(sampleOverlayUrl);
-      if (!meta.width || !meta.height) {
-        throw new Error(`Could not read image size for ${sampleOverlayUrl}`);
-      }
-
       const b = computeProjectedBounds(meta.width, meta.height);
-
-      floodProjectedBounds = L.bounds(
-        [b.west, b.south],
-        [b.east, b.north]
-      );
-
+      floodProjectedBounds = L.bounds([b.west, b.south], [b.east, b.north]);
       floodLatLngBounds = L.latLngBounds(
         projectedPointToLatLng(b.west, b.south),
         projectedPointToLatLng(b.east, b.north)
@@ -737,7 +1418,14 @@
         zoomDelta: 1
       });
 
-      L.tileLayer(NJ_BASEMAP_URL, {
+      map.createPane("orthoPane");
+      map.createPane("floodPane");
+      map.createPane("roadsPane");
+      map.getPane("orthoPane").style.zIndex = 200;
+      map.getPane("floodPane").style.zIndex = 500;
+      map.getPane("roadsPane").style.zIndex = 650;
+
+      orthoLayer = L.tileLayer(NJ_BASEMAP_URL, {
         attribution: "NJ OGIS Orthophoto 2015",
         tileSize: 512,
         minZoom: 0,
@@ -745,7 +1433,20 @@
         noWrap: true,
         updateWhenIdle: true,
         keepBuffer: 2,
-        className: "grayscale-tiles"
+        className: "grayscale-tiles",
+        pane: "orthoPane"
+      }).addTo(map);
+
+      roadsLayer = L.tileLayer(NJ_ROADS_URL, {
+        attribution: "NJ Roads_NJ",
+        tileSize: 512,
+        minZoom: 0,
+        maxZoom: 12,
+        noWrap: true,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        opacity: 0.92,
+        pane: "roadsPane"
       }).addTo(map);
     }
 
@@ -757,47 +1458,41 @@
     }
 
     function applyOverlayOpacity() {
-      if (currentFloodLayer && typeof currentFloodLayer.setOpacity === "function") {
-        currentFloodLayer.setOpacity(overlayOpacity);
-      }
-    }
-
-    function pad2(n) {
-      return String(n).padStart(2, "0");
+      if (currentFloodLayer?.setOpacity) currentFloodLayer.setOpacity(overlayOpacity);
     }
 
     function formatFixedESTFromUtc(isoString) {
       if (!isoString) return "--";
       const d = new Date(isoString);
       if (Number.isNaN(d.getTime())) return "--";
-
       const est = new Date(d.getTime() - EST_OFFSET_MS);
       const month = MONTH_NAMES[est.getUTCMonth()];
       const day = est.getUTCDate();
       let hour = est.getUTCHours();
       const minute = pad2(est.getUTCMinutes());
       const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12;
-      if (hour === 0) hour = 12;
-
+      hour = hour % 12 || 12;
       return `${month} ${day}, ${hour}:${minute} ${ampm} EST`;
     }
 
     function formatStoredEST(timeEST) {
       if (!timeEST) return "--";
-
       const match = String(timeEST).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
       if (!match) return String(timeEST);
-
       const month = MONTH_NAMES[Number(match[2]) - 1];
       const day = Number(match[3]);
       let hour = Number(match[4]);
       const minute = match[5];
       const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12;
-      if (hour === 0) hour = 12;
-
+      hour = hour % 12 || 12;
       return `${month} ${day}, ${hour}:${minute} ${ampm} EST`;
+    }
+
+    function parseStoredESTToDate(timeEST) {
+      const match = String(timeEST || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [ , y, m, d, hh, mm ] = match;
+      return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh) + 5, Number(mm)));
     }
 
     function formatHourEntryTime(entry) {
@@ -814,26 +1509,21 @@
 
     function buildNotes(rawStage, matchedStage) {
       const notes = [];
-
       if (rawStage < MIN_VISIBLE_STAGE) {
-        notes.push(`Any stage below ${MIN_VISIBLE_STAGE.toFixed(1)} ft is forced to the ${FORCED_STAGE.toFixed(1)} ft raster.`);
+        notes.push(`Any stage below ${MIN_VISIBLE_STAGE.toFixed(1)} ft is drawn with the ${FORCED_STAGE.toFixed(1)} ft overlay.`);
       } else if (Math.abs(rawStage - matchedStage) > 0.0001) {
-        notes.push(`Stage was rounded down to the nearest published flood PNG: ${matchedStage.toFixed(1)} ft.`);
+        notes.push(`Rendered from the nearest lower published overlay at ${matchedStage.toFixed(1)} ft.`);
       }
-
       if (rawStage > MAX_STAGE) {
-        notes.push(`Value was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
+        notes.push(`The selected stage was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
       }
-
-      return notes.join("\n");
+      return notes.join(" ");
     }
 
     function getPeakHourIndex(hours = currentSeriesHours) {
       if (!hours.length) return 0;
-
       let maxIndex = 0;
       let maxVal = -Infinity;
-
       hours.forEach((h, i) => {
         const v = getStageValue(h);
         if (Number.isFinite(v) && v > maxVal) {
@@ -841,7 +1531,6 @@
           maxIndex = i;
         }
       });
-
       return maxIndex;
     }
 
@@ -855,9 +1544,9 @@
 
     function buildObservedMonthKeysFromDays(days) {
       const keys = new Set();
-      for (const day of days) {
+      days.forEach(day => {
         if (day?.date) keys.add(getMonthKeyFromDate(day.date));
-      }
+      });
       return Array.from(keys).sort();
     }
 
@@ -872,36 +1561,209 @@
     function getLatestObservedDate() {
       const days = getObservedDays();
       if (!days.length) return null;
-
       const floodDays = days.filter(d => (d.classification || "none") !== "none");
-      if (floodDays.length) {
-        return floodDays[floodDays.length - 1].date;
-      }
-
-      return days[days.length - 1].date;
+      return (floodDays.length ? floodDays[floodDays.length - 1] : days[days.length - 1]).date;
     }
 
     function prettyMonth(monthKey) {
       if (!monthKey) return "--";
       const [y, m] = monthKey.split("-");
-      return `${MONTH_NAMES[Number(m) - 1]} ${y}`;
+      return `${MONTH_NAMES_LONG[Number(m) - 1]} ${y}`;
+    }
+
+    function getChronologicalDateIndex(dateStr) {
+      return getObservedDays().findIndex(d => d.date === dateStr);
+    }
+
+    function getNeighborObservedDate(dateStr, direction) {
+      const days = getObservedDays();
+      const idx = getChronologicalDateIndex(dateStr);
+      if (idx < 0) return null;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= days.length) return null;
+      return days[nextIdx]?.date || null;
+    }
+
+    function updateDayNav() {
+      const center = document.getElementById("dayNavCenter");
+      const prevBtn = document.getElementById("prevDayBtn");
+      const nextBtn = document.getElementById("nextDayBtn");
+
+      if (!selectedObservedDate) {
+        center.textContent = "Select a day";
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        return;
+      }
+
+      const day = getObservedDayRecord(selectedObservedDate);
+      const cls = day?.classification || "none";
+      center.textContent = `${selectedObservedDate} • ${cls}${day?.peakNAVD88 != null ? ` • Peak ${Number(day.peakNAVD88).toFixed(2)} ft` : ""}`;
+      prevBtn.disabled = !getNeighborObservedDate(selectedObservedDate, -1);
+      nextBtn.disabled = !getNeighborObservedDate(selectedObservedDate, 1);
+    }
+
+    function buildObservedFlatHours() {
+      const flat = [];
+      getObservedDays().forEach(day => {
+        const hours = Array.isArray(day.hours) ? day.hours : [];
+        hours.forEach((hour, idx) => {
+          flat.push({
+            ...hour,
+            observedDate: day.date,
+            classification: day.classification || "none",
+            peakNAVD88: day.peakNAVD88,
+            sourceHourIndex: idx,
+            absoluteIndex: flat.length
+          });
+        });
+      });
+      return flat;
+    }
+
+    function entryTimeMs(entry) {
+      if (entry.timeEST) {
+        const d = parseStoredESTToDate(entry.timeEST);
+        if (d) return d.getTime();
+      }
+      if (entry.timeUtc) {
+        const d = new Date(entry.timeUtc);
+        if (!Number.isNaN(d.getTime())) return d.getTime();
+      }
+      return null;
+    }
+
+    function buildTopTideEvents() {
+      if (!observedFlatHours.length) return [];
+      const sorted = observedFlatHours
+        .filter(entry => Number.isFinite(getStageValue(entry)))
+        .slice()
+        .sort((a, b) => getStageValue(b) - getStageValue(a));
+
+      const chosen = [];
+      const minGapMs = TOP_TIDE_WINDOW_HOURS * 60 * 60 * 1000;
+
+      for (const entry of sorted) {
+        const t = entryTimeMs(entry);
+        if (t == null) continue;
+        const overlaps = chosen.some(existing => {
+          const et = entryTimeMs(existing.entry);
+          return et != null && Math.abs(et - t) < minGapMs;
+        });
+        if (overlaps) continue;
+
+        const flatIdx = observedFlatHours.findIndex(x => x.absoluteIndex === entry.absoluteIndex);
+        if (flatIdx < 0) continue;
+
+        const startIdx = Math.max(0, flatIdx - TOP_TIDE_WINDOW_HOURS);
+        const endIdx = Math.min(observedFlatHours.length - 1, flatIdx + TOP_TIDE_WINDOW_HOURS);
+        const series = observedFlatHours.slice(startIdx, endIdx + 1).map((item, idx) => ({
+          ...item,
+          topTideHourIndex: idx
+        }));
+
+        chosen.push({
+          rank: chosen.length + 1,
+          entry,
+          peakStage: getStageValue(entry),
+          title: formatHourEntryTime(entry),
+          subtitle: `${entry.observedDate} • Peak ${getStageValue(entry).toFixed(2)} ft NAVD88`,
+          series,
+          peakLocalIndex: flatIdx - startIdx
+        });
+
+        if (chosen.length >= TOP_TIDE_SELECT_COUNT) break;
+      }
+      return chosen;
+    }
+
+    function renderTopTides() {
+      const wrap = document.getElementById("topTideList");
+      wrap.innerHTML = "";
+
+      if (!topTideEvents.length) {
+        const empty = document.createElement("div");
+        empty.className = "muted";
+        empty.textContent = "Top-tide windows will appear when observed archive data is available.";
+        wrap.appendChild(empty);
+        return;
+      }
+
+      topTideEvents.slice(0, TOP_TIDE_DISPLAY_COUNT).forEach((event, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "top-tide-item";
+        btn.classList.toggle("active", currentViewType === "top-tide" && currentTopTideIndex === idx);
+        btn.innerHTML = `
+          <div class="top-tide-rank">Rank ${event.rank}</div>
+          <div class="top-tide-main">${event.title}</div>
+          <div class="top-tide-sub">${event.subtitle}<br>12 hours before and after crest</div>
+        `;
+        btn.addEventListener("click", () => {
+          loadTopTideEvent(idx).catch(err => toast(err.message));
+        });
+        wrap.appendChild(btn);
+      });
+    }
+
+    function renderTimelineMeta(currentEntry = null) {
+      const timelineValue = document.getElementById("timelineValue");
+      const timelineMeta = document.getElementById("timelineMeta");
+      const timelineStart = document.getElementById("timelineStart");
+      const timelineEnd = document.getElementById("timelineEnd");
+      const label = document.getElementById("timelineLabel");
+
+      const first = currentSeriesHours[0];
+      const last = currentSeriesHours[currentSeriesHours.length - 1];
+
+      if (!currentSeriesHours.length) {
+        timelineValue.textContent = "--";
+        timelineMeta.textContent = "--";
+        timelineStart.textContent = "--";
+        timelineEnd.textContent = "--";
+        label.textContent = "Replay timeline";
+        return;
+      }
+
+      const currentTime = formatHourEntryTime(currentEntry || currentSeriesHours[currentHourIndex]);
+      timelineValue.textContent = currentTime;
+
+      if (currentViewType === "forecast") {
+        label.textContent = "Forecast timeline";
+        timelineMeta.textContent = `${currentHourIndex + 1} of ${currentSeriesHours.length} forecast hours`;
+      } else if (currentViewType === "observed-day") {
+        label.textContent = "Observed timeline";
+        timelineMeta.textContent = `${selectedObservedDate || "--"} • ${currentHourIndex + 1} of ${currentSeriesHours.length} hours`;
+      } else {
+        label.textContent = "Highest-tide window";
+        timelineMeta.textContent = `${currentRangeLabel} • ${currentHourIndex + 1} of ${currentSeriesHours.length} hours`;
+      }
+
+      timelineStart.textContent = first ? formatHourEntryTime(first) : "--";
+      timelineEnd.textContent = last ? formatHourEntryTime(last) : "--";
+    }
+
+    function renderSelectionMeta(entry, rawStage, displayStage) {
+      document.getElementById("timeText").textContent = formatHourEntryTime(entry);
+      document.getElementById("stageText").textContent = Number.isFinite(rawStage) ? `${rawStage.toFixed(2)} ft` : "--";
+      document.getElementById("stageSubText").textContent = displayStage != null
+        ? `Rendered from ${displayStage.toFixed(1)} ft overlay`
+        : "No overlay";
+      document.getElementById("selectedText").textContent = currentSelectedLabel;
+      document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
+      document.getElementById("timeSubText").textContent = currentRangeLabel || "Replay window";
     }
 
     async function setFloodLayer(mode, stageValue, token) {
       clearFloodLayer();
-      setWarn("");
+      toast("");
 
-      const filename = getOverlayFilename(mode, stageValue);
       const overlayUrl = getOverlayUrl(mode, stageValue);
-
-      setStatus(`Checking ${filename}...`);
-
       const exists = await testImageUrl(overlayUrl);
       if (token !== lastRenderToken) return;
 
       if (!exists.ok) {
-        setWarn(`Could not load overlay for ${stageValue.toFixed(1)} ft.\n${overlayUrl}`);
-        setStatus(`Overlay load failed for ${filename}`);
+        toast(`Overlay missing for ${stageValue.toFixed(1)} ft: ${getOverlayFilename(mode, stageValue)}`);
         return;
       }
 
@@ -910,8 +1772,7 @@
       try {
         await ensureOverlayBounds(overlayUrl);
       } catch (err) {
-        setWarn(err.message);
-        setStatus("Projected overlay setup failed");
+        toast(err.message);
         return;
       }
 
@@ -924,25 +1785,20 @@
           opacity: overlayOpacity,
           interactive: false,
           crossOrigin: true,
-          zIndex: 500
+          zIndex: 500,
+          pane: "floodPane"
         }
       );
 
-      currentFloodLayer.on("load", () => {
-        if (token !== lastRenderToken) return;
-        setStatus(`Loaded ${filename}`);
-      });
-
       currentFloodLayer.on("error", () => {
         if (token !== lastRenderToken) return;
-        setWarn(`The image URL exists but Leaflet could not draw it:\n${overlayUrl}`);
-        setStatus(`Overlay draw failed for ${filename}`);
+        toast(`Leaflet could not draw ${getOverlayFilename(mode, stageValue)}.`);
       });
 
       currentFloodLayer.addTo(map);
 
       if (!mapHasFit && floodLatLngBounds) {
-        map.fitBounds(floodLatLngBounds, { padding: [10, 10] });
+        map.fitBounds(floodLatLngBounds, { padding: [16, 16] });
         mapHasFit = true;
       }
     }
@@ -950,68 +1806,62 @@
     async function renderHour(index) {
       if (!currentSeriesHours.length) return;
 
-      const h = currentSeriesHours[index];
-      if (!h) return;
+      const entry = currentSeriesHours[index];
+      if (!entry) return;
 
       currentHourIndex = index;
 
-      const rawStage = getStageValue(h);
+      const rawStage = getStageValue(entry);
       const displayStage = getOverlayStage(rawStage);
-
-      if (displayStage === null) {
-        setWarn("Stage is not numeric.");
+      if (displayStage == null) {
+        toast("Stage is not numeric for the selected hour.");
         return;
       }
 
-      document.getElementById("hourText").textContent = `Hour ${h.hourIndex ?? h.hour ?? index}`;
-      document.getElementById("timeText").textContent = formatHourEntryTime(h);
-      document.getElementById("stageText").textContent = `${rawStage.toFixed(2)} ft`;
-      document.getElementById("matchedText").textContent = `Showing ${displayStage.toFixed(1)} ft`;
+      renderSelectionMeta(entry, rawStage, displayStage);
+      renderTimelineMeta(entry);
 
-      document.getElementById("selectedText").textContent = currentSelectedLabel;
-      document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
+      const slider = document.getElementById("hourSlider");
+      slider.value = String(index);
 
-      setWarn(buildNotes(rawStage, displayStage));
+      const note = buildNotes(rawStage, displayStage);
+      toast(note);
 
       const token = ++lastRenderToken;
       await setFloodLayer(currentOverlayMode, displayStage, token);
-
       preloadAroundHour(index);
+    }
+
+    function syncSliderBounds() {
+      const slider = document.getElementById("hourSlider");
+      slider.max = String(Math.max(0, currentSeriesHours.length - 1));
+      slider.value = String(Math.min(currentHourIndex, currentSeriesHours.length - 1));
     }
 
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
-
       currentSeriesHours = Array.isArray(forecastData.hours) ? forecastData.hours : [];
+      currentViewType = "forecast";
+      currentTopTideIndex = null;
       currentSelectedLabel = "Forecast";
       currentSelectedSubLabel = forecastData.sourceType || "Live forecast";
+      currentRangeLabel = forecastData.hours?.length
+        ? `${formatHourEntryTime(forecastData.hours[0])} to ${formatHourEntryTime(forecastData.hours[forecastData.hours.length - 1])}`
+        : "Forecast replay window";
 
-      document.getElementById("issuedText").textContent =
-        forecastData.issuedUtc ? `Updated ${formatFixedESTFromUtc(forecastData.issuedUtc)}` : "--";
-
-      document.getElementById("archiveText").textContent =
-        observedData?.archiveStartDate && observedData?.archiveEndDate
-          ? `Observed archive: ${observedData.archiveStartDate} to ${observedData.archiveEndDate} EST`
-          : "Observed archive: root observed.json";
-
-      const slider = document.getElementById("hourSlider");
-      slider.max = String(Math.max(0, currentSeriesHours.length - 1));
-
-      const peakIndex = getPeakHourIndex(currentSeriesHours);
-      slider.value = String(peakIndex);
-      currentHourIndex = peakIndex;
+      syncSliderBounds();
+      currentHourIndex = getPeakHourIndex(currentSeriesHours);
+      document.getElementById("hourSlider").value = String(currentHourIndex);
     }
 
     async function loadObserved() {
-      observedData = await fetchJson(OBSERVED_URL);
+      if (!observedData) observedData = await fetchJson(OBSERVED_URL);
 
       const days = getObservedDays();
       observedMonthKeys = buildObservedMonthKeysFromDays(days);
-
-      document.getElementById("archiveText").textContent =
-        observedData.archiveStartDate && observedData.archiveEndDate
-          ? `Observed archive: ${observedData.archiveStartDate} to ${observedData.archiveEndDate} EST`
-          : "Observed archive loaded";
+      observedFlatHours = buildObservedFlatHours();
+      topTideEvents = buildTopTideEvents();
+      renderTopTides();
 
       if (!currentMonthKey) {
         currentMonthKey =
@@ -1020,27 +1870,37 @@
           (observedMonthKeys.length ? observedMonthKeys[observedMonthKeys.length - 1] : null);
       }
 
-      if (!currentMonthKey && observedMonthKeys.length) {
-        currentMonthKey = observedMonthKeys[observedMonthKeys.length - 1];
+      populateCalendarSelectors();
+    }
+
+    function populateCalendarSelectors() {
+      const monthSelect = document.getElementById("monthSelect");
+      const yearSelect = document.getElementById("yearSelect");
+
+      const years = Array.from(new Set(observedMonthKeys.map(key => key.slice(0, 4)))).sort();
+      monthSelect.innerHTML = MONTH_NAMES_LONG.map((name, i) => `<option value="${i + 1}">${name}</option>`).join("");
+      yearSelect.innerHTML = years.map(year => `<option value="${year}">${year}</option>`).join("");
+
+      if (currentMonthKey) {
+        const [y, m] = currentMonthKey.split("-");
+        monthSelect.value = String(Number(m));
+        yearSelect.value = y;
       }
     }
 
     async function renderCalendar() {
       if (!observedData || !currentMonthKey) return;
+      document.getElementById("monthLabel").textContent = prettyMonth(currentMonthKey);
 
       const grid = document.getElementById("calendarGrid");
       grid.innerHTML = "";
-
-      document.getElementById("monthLabel").textContent = prettyMonth(currentMonthKey);
 
       const [year, monthNum] = currentMonthKey.split("-").map(Number);
       const first = new Date(Date.UTC(year, monthNum - 1, 1));
       const lastDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
       const firstWeekday = first.getUTCDay();
-
       const monthDays = getObservedDaysForMonth(currentMonthKey);
-      const daysByDate = new Map();
-      monthDays.forEach(day => daysByDate.set(day.date, day));
+      const daysByDate = new Map(monthDays.map(day => [day.date, day]));
 
       for (let i = 0; i < firstWeekday; i++) {
         const blank = document.createElement("div");
@@ -1051,104 +1911,92 @@
       for (let day = 1; day <= lastDay; day++) {
         const dateStr = `${year}-${pad2(monthNum)}-${pad2(day)}`;
         const meta = daysByDate.get(dateStr);
-
         const btn = document.createElement("button");
-        btn.className = "calendar-day";
         btn.type = "button";
+        btn.className = "calendar-day";
+        btn.textContent = String(day);
 
         if (!meta) {
           btn.classList.add("day-none");
           btn.disabled = true;
-          btn.textContent = String(day);
           grid.appendChild(btn);
           continue;
         }
 
         const cls = meta.classification || "none";
         btn.classList.add(`day-${cls}`);
-        btn.textContent = String(day);
-
-        if (selectedObservedDate === dateStr) {
-          btn.classList.add("selected");
-        }
-
+        if (selectedObservedDate === dateStr && currentViewType !== "top-tide") btn.classList.add("selected");
         btn.title = `${dateStr} • ${cls}${meta.peakNAVD88 != null ? ` • Peak ${Number(meta.peakNAVD88).toFixed(2)} ft` : ""}`;
         btn.addEventListener("click", () => {
-          loadObservedDay(dateStr).catch(err => {
-            console.error(err);
-            setStatus(err.message);
-            setWarn(err.message);
-          });
+          loadObservedDay(dateStr).catch(err => toast(err.message));
         });
 
         const tiny = document.createElement("span");
         tiny.className = "tiny";
         tiny.textContent = cls === "none" ? "" : cls.charAt(0).toUpperCase();
         btn.appendChild(tiny);
-
         grid.appendChild(btn);
       }
 
       const monthIndex = observedMonthKeys.indexOf(currentMonthKey);
       document.getElementById("prevMonthBtn").disabled = monthIndex <= 0;
       document.getElementById("nextMonthBtn").disabled = monthIndex === -1 || monthIndex >= observedMonthKeys.length - 1;
+      updateDayNav();
+      populateCalendarSelectors();
     }
 
-    async function loadObservedDay(dateStr) {
+    async function loadObservedDay(dateStr, preferredHourIndex = null) {
       const dayRecord = getObservedDayRecord(dateStr);
+      if (!dayRecord) throw new Error(`Observed day not found: ${dateStr}`);
 
-      if (!dayRecord) {
-        throw new Error(`Observed day not found in observed.json: ${dateStr}`);
-      }
+      stopPlayback();
+      currentDataMode = "observed";
+      updateDataModeButtons();
 
-      currentSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
       selectedObservedDate = dateStr;
       currentMonthKey = dateStr.slice(0, 7);
-
+      currentSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
+      currentViewType = "observed-day";
+      currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
       currentSelectedSubLabel =
         `${dayRecord.classification || "none"}${dayRecord.peakNAVD88 != null ? ` • Peak ${Number(dayRecord.peakNAVD88).toFixed(2)} ft` : ""}`;
+      currentRangeLabel = `${dateStr} • 24-hour observed replay`;
 
-      document.getElementById("issuedText").textContent = "Observed replay • Fixed EST";
-
-      const slider = document.getElementById("hourSlider");
-      slider.max = String(Math.max(0, currentSeriesHours.length - 1));
-
-      const peakIndex = getPeakHourIndex(currentSeriesHours);
-      slider.value = String(peakIndex);
-      currentHourIndex = peakIndex;
+      syncSliderBounds();
+      currentHourIndex = preferredHourIndex != null ? preferredHourIndex : getPeakHourIndex(currentSeriesHours);
+      document.getElementById("hourSlider").value = String(currentHourIndex);
 
       await renderCalendar();
-      await renderHour(peakIndex);
+      await renderHour(currentHourIndex);
+      renderTopTides();
     }
 
-    function stopPlayback() {
-      if (playTimer) {
-        clearInterval(playTimer);
-        playTimer = null;
-      }
-    }
-
-    function startPlayback() {
+    async function loadTopTideEvent(index) {
+      if (!topTideEvents[index]) throw new Error("Top-tide window not available.");
       stopPlayback();
 
-      if (!currentSeriesHours.length) return;
+      currentBaseModeBeforeTopTide = currentDataMode;
+      currentDataMode = "observed";
+      updateDataModeButtons();
 
-      const slider = document.getElementById("hourSlider");
-      let i = Number(slider.value);
+      const event = topTideEvents[index];
+      currentViewType = "top-tide";
+      currentTopTideIndex = index;
+      currentSelectedLabel = `Top crest #${event.rank}`;
+      currentSelectedSubLabel = `${event.peakStage.toFixed(2)} ft NAVD88`;
+      currentRangeLabel = `${event.title} • ±${TOP_TIDE_WINDOW_HOURS} hours`;
+      selectedObservedDate = event.entry.observedDate;
+      currentMonthKey = event.entry.observedDate.slice(0, 7);
+      currentSeriesHours = event.series;
 
-      playTimer = setInterval(() => {
-        renderHour(i).catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-          stopPlayback();
-        });
+      syncSliderBounds();
+      currentHourIndex = event.peakLocalIndex;
+      document.getElementById("hourSlider").value = String(currentHourIndex);
 
-        slider.value = String(i);
-        i += 1;
-        if (i >= currentSeriesHours.length) i = 0;
-      }, 1500);
+      await renderCalendar();
+      await renderHour(currentHourIndex);
+      renderTopTides();
     }
 
     async function switchOverlayMode(mode) {
@@ -1159,20 +2007,21 @@
     }
 
     async function switchDataMode(mode) {
-      if (mode === currentDataMode) return;
-
+      if (mode === currentDataMode && currentViewType !== "top-tide") return;
       stopPlayback();
-      currentDataMode = mode;
-      updateDataModeButtons();
-      clearFloodLayer();
-      setWarn("");
+      toast("");
 
       if (mode === "forecast") {
+        currentDataMode = "forecast";
+        updateDataModeButtons();
         await loadForecast();
+        renderTopTides();
         await renderHour(currentHourIndex);
         return;
       }
 
+      currentDataMode = "observed";
+      updateDataModeButtons();
       await loadObserved();
       await renderCalendar();
 
@@ -1180,105 +2029,187 @@
       if (defaultDate) {
         await loadObservedDay(defaultDate);
       } else {
-        setStatus("No observed dates were found in observed.json");
+        toast("No observed dates were found in observed.json.");
       }
     }
 
     async function reloadAll() {
       stopPlayback();
       clearFloodLayer();
-      setWarn("");
+      toast("");
+      imageExistsCache = new Map();
 
-      if (currentDataMode === "forecast") {
-        setStatus("Reloading forecast...");
-        await loadForecast();
-        await renderHour(currentHourIndex);
-        return;
+      const [forecast, observed] = await Promise.all([
+        fetchJson(FORECAST_URL),
+        fetchJson(OBSERVED_URL).catch(() => null)
+      ]);
+
+      forecastData = forecast;
+      observedData = observed;
+      observedMonthKeys = [];
+      observedFlatHours = [];
+      topTideEvents = [];
+
+      if (observedData) {
+        await loadObserved();
+      } else {
+        renderTopTides();
       }
 
-      setStatus("Reloading observed archive...");
-      observedData = null;
-      observedMonthKeys = [];
-
-      await loadObserved();
-      await renderCalendar();
-
-      const defaultDate = selectedObservedDate || getLatestObservedDate();
-      if (defaultDate) {
-        await loadObservedDay(defaultDate);
+      if (currentDataMode === "observed") {
+        const defaultDate = selectedObservedDate || getLatestObservedDate();
+        if (defaultDate) {
+          await loadObservedDay(defaultDate);
+        } else {
+          currentDataMode = "forecast";
+          updateDataModeButtons();
+          await loadForecast();
+          await renderHour(currentHourIndex);
+        }
       } else {
-        setStatus("No observed dates were found in observed.json");
+        await loadForecast();
+        await renderHour(currentHourIndex);
+      }
+
+      checkNwsAlerts().catch(() => {});
+    }
+
+    function stopPlayback() {
+      if (playTimer) {
+        clearInterval(playTimer);
+        playTimer = null;
       }
     }
 
-    async function main() {
-      setOpacityText();
-      updateModeButtons();
-      updateDataModeButtons();
+    async function stepPlaybackForward() {
+      if (!currentSeriesHours.length) return;
 
-      document.getElementById("hourSlider").addEventListener("input", async (e) => {
+      let nextIndex = currentHourIndex + 1;
+
+      if (nextIndex < currentSeriesHours.length) {
+        await renderHour(nextIndex);
+        return;
+      }
+
+      if (currentViewType === "observed-day") {
+        const nextDate = getNeighborObservedDate(selectedObservedDate, 1);
+        if (nextDate) {
+          await loadObservedDay(nextDate, 0);
+          return;
+        }
+      }
+
+      nextIndex = 0;
+      await renderHour(nextIndex);
+    }
+
+    function startPlayback() {
+      stopPlayback();
+      if (!currentSeriesHours.length) return;
+
+      playTimer = setInterval(() => {
+        stepPlaybackForward().catch(err => {
+          toast(err.message);
+          stopPlayback();
+        });
+      }, 1200);
+    }
+
+    async function goToCalendarSelection() {
+      const year = document.getElementById("yearSelect").value;
+      const month = pad2(document.getElementById("monthSelect").value);
+      const key = `${year}-${month}`;
+      if (!observedMonthKeys.includes(key)) {
+        toast("No archive dates are available for that month.");
+        return;
+      }
+      currentMonthKey = key;
+      document.getElementById("calendarPopover").classList.remove("open");
+      await renderCalendar();
+    }
+
+    async function checkNwsAlerts() {
+      try {
+        const point = await fetchJson(NWS_POINT_URL);
+        const forecastZoneUrl = point?.properties?.forecastZone || point?.properties?.county;
+        if (!forecastZoneUrl) return setBanner(false);
+
+        const zoneCode = String(forecastZoneUrl).split("/").pop();
+        if (!zoneCode) return setBanner(false);
+
+        const alerts = await fetchJson(`https://api.weather.gov/alerts/active?zone=${zoneCode}`);
+        const features = Array.isArray(alerts?.features) ? alerts.features : [];
+        const floodAlerts = features.filter(feature => {
+          const event = String(feature?.properties?.event || "").toLowerCase();
+          const area = String(feature?.properties?.areaDesc || "").toLowerCase();
+          return (
+            /(coastal flood|flood|storm surge)/.test(event) &&
+            /(cape may|north wildwood|wildwood)/.test(area)
+          );
+        });
+
+        if (!floodAlerts.length) {
+          setBanner(false);
+          return;
+        }
+
+        const primary = floodAlerts[0]?.properties || {};
+        const title = primary.headline || primary.event || "Active flood alert";
+        const meta = [primary.severity, primary.effective, primary.expires].filter(Boolean).join(" • ");
+        setBanner(true, title, meta, floodAlerts.length);
+      } catch (err) {
+        setBanner(false);
+      }
+    }
+
+    function wireLayerToggles() {
+      ["buildingsToggle", "criticalToggle"].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener("click", () => {
+          el.classList.toggle("on");
+        });
+      });
+    }
+
+    function wireEvents() {
+      document.getElementById("hourSlider").addEventListener("input", async e => {
         stopPlayback();
         await renderHour(Number(e.target.value));
       });
 
-      document.getElementById("opacitySlider").addEventListener("input", (e) => {
+      document.getElementById("opacitySlider").addEventListener("input", e => {
         overlayOpacity = Number(e.target.value) / 100;
         setOpacityText();
         applyOverlayOpacity();
       });
 
-      document.getElementById("depthModeBtn").addEventListener("click", () => {
-        switchOverlayMode("depth").catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
-      });
-
-      document.getElementById("dynamicModeBtn").addEventListener("click", () => {
-        switchOverlayMode("dynamic").catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
-      });
-
       document.getElementById("forecastDataBtn").addEventListener("click", () => {
-        switchDataMode("forecast").catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
+        switchDataMode("forecast").catch(err => toast(err.message));
       });
 
       document.getElementById("observedDataBtn").addEventListener("click", () => {
-        switchDataMode("observed").catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
+        switchDataMode("observed").catch(err => toast(err.message));
+      });
+
+      document.getElementById("depthModeBtn").addEventListener("click", () => {
+        switchOverlayMode("depth").catch(err => toast(err.message));
+      });
+
+      document.getElementById("dynamicModeBtn").addEventListener("click", () => {
+        switchOverlayMode("dynamic").catch(err => toast(err.message));
       });
 
       document.getElementById("playBtn").addEventListener("click", startPlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
-
       document.getElementById("reloadBtn").addEventListener("click", () => {
-        reloadAll().catch(err => {
-          console.error(err);
-          setStatus(err.message);
-          setWarn(err.message);
-        });
+        reloadAll().catch(err => toast(err.message));
       });
 
       document.getElementById("prevMonthBtn").addEventListener("click", () => {
         const idx = observedMonthKeys.indexOf(currentMonthKey);
         if (idx > 0) {
           currentMonthKey = observedMonthKeys[idx - 1];
-          renderCalendar().catch(err => {
-            console.error(err);
-            setStatus(err.message);
-            setWarn(err.message);
-          });
+          renderCalendar().catch(err => toast(err.message));
         }
       });
 
@@ -1286,21 +2217,43 @@
         const idx = observedMonthKeys.indexOf(currentMonthKey);
         if (idx >= 0 && idx < observedMonthKeys.length - 1) {
           currentMonthKey = observedMonthKeys[idx + 1];
-          renderCalendar().catch(err => {
-            console.error(err);
-            setStatus(err.message);
-            setWarn(err.message);
-          });
+          renderCalendar().catch(err => toast(err.message));
         }
       });
 
+      document.getElementById("prevDayBtn").addEventListener("click", () => {
+        const date = getNeighborObservedDate(selectedObservedDate, -1);
+        if (date) loadObservedDay(date).catch(err => toast(err.message));
+      });
+
+      document.getElementById("nextDayBtn").addEventListener("click", () => {
+        const date = getNeighborObservedDate(selectedObservedDate, 1);
+        if (date) loadObservedDay(date).catch(err => toast(err.message));
+      });
+
+      document.getElementById("calendarTitleBtn").addEventListener("click", () => {
+        document.getElementById("calendarPopover").classList.toggle("open");
+      });
+
+      document.getElementById("calendarGoBtn").addEventListener("click", () => {
+        goToCalendarSelection().catch(err => toast(err.message));
+      });
+
+      wireLayerToggles();
+    }
+
+    async function main() {
+      ensureMap();
+      setOpacityText();
+      updateModeButtons();
+      updateDataModeButtons();
+      wireEvents();
       await reloadAll();
     }
 
     main().catch(err => {
       console.error(err);
-      setStatus(err.message);
-      setWarn(err.message);
+      toast(err.message);
     });
   </script>
 </body>
