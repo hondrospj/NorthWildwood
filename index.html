@@ -149,7 +149,7 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      min-height:108px;
+      min-height:124px;
     }
 
     .brand-top{
@@ -163,8 +163,8 @@
     h1{
       margin:0;
       max-width:100%;
-      font-size:clamp(26px, 2.6vw, 32px);
-      line-height:.88;
+      font-size:clamp(30px, 3vw, 38px);
+      line-height:.86;
       letter-spacing:-.055em;
       font-weight:900;
       word-break:keep-all;
@@ -256,13 +256,15 @@
 
     .stat-box{
       min-height:0;
-      padding:11px 12px;
+      padding:12px;
       border:1px solid var(--line);
       border-radius:16px;
       background:rgba(255,255,255,.04);
       display:grid;
-      align-content:start;
-      gap:5px;
+      align-content:center;
+      justify-items:center;
+      text-align:center;
+      gap:6px;
     }
 
     .stat-box:last-child{
@@ -683,13 +685,15 @@
 
     .top-tide-item{
       width:100%;
-      text-align:left;
-      padding:10px;
+      text-align:center;
+      padding:11px 10px;
       border-radius:14px;
       border:1px solid rgba(226,232,240,.95);
       background:rgba(255,255,255,.04);
       display:grid;
-      gap:3px;
+      justify-items:center;
+      align-items:center;
+      gap:4px;
     }
 
     .top-tide-item.active{
@@ -704,6 +708,8 @@
       letter-spacing:.06em;
       text-transform:uppercase;
       color:var(--muted);
+      text-align:center;
+      width:100%;
     }
 
     .top-tide-item.active .top-tide-rank{
@@ -714,12 +720,16 @@
       font-size:13px;
       font-weight:850;
       letter-spacing:-.02em;
+      text-align:center;
+      width:100%;
     }
 
     .top-tide-sub{
       font-size:10px;
       color:var(--muted);
-      line-height:1.25;
+      line-height:1.3;
+      text-align:center;
+      width:100%;
     }
 
 
@@ -967,6 +977,32 @@
     }
 
     @media (max-width: 860px){
+      #topBanner{
+        min-width:min(420px, calc(100vw - 16px));
+        max-width:min(560px, calc(100vw - 16px));
+        top:8px;
+      }
+
+      #leftPanel{
+        width:min(236px, calc(50vw - 14px));
+        max-height:calc(100vh - 170px);
+      }
+
+      #rightRail{
+        display:grid;
+        width:min(188px, calc(50vw - 14px));
+        max-height:calc(100vh - 170px);
+        top:10px;
+        right:10px;
+      }
+
+      #legendDock{
+        left:10px;
+        top:auto;
+        bottom:100px;
+        width:min(180px, calc(46vw - 14px));
+      }
+
       .stat-grid{
         grid-template-columns:1fr;
       }
@@ -975,29 +1011,8 @@
         grid-column:auto;
       }
 
-      #leftPanel{
-        width:min(248px, calc(100% - 20px));
-        max-height:calc(100vh - 176px);
-      }
-
-      #rightRail{
-        display:none;
-      }
-
-      #legendDock{
-        left:10px;
-        top:auto;
-        bottom:108px;
-        width:min(220px, calc(100% - 20px));
-      }
-
       .timeline-top{
         flex-wrap:wrap;
-      }
-
-      .timeline-meta{
-        width:100%;
-        text-align:right;
       }
 
       .timeline-trackRow{
@@ -1005,12 +1020,109 @@
       }
 
       .timeline-days{
-        grid-auto-columns:minmax(68px,1fr);
+        grid-auto-columns:minmax(64px,1fr);
+      }
+
+      .top-tide-item{
+        padding:10px 8px;
+      }
+    }
+
+    @media (max-width: 640px){
+      #topBanner{
+        min-width:calc(100vw - 14px);
+        max-width:calc(100vw - 14px);
+        padding:8px 10px;
+      }
+
+      #topBanner .banner-meta{
+        display:none;
+      }
+
+      #leftPanel{
+        width:calc(50vw - 12px);
+        max-height:calc(100vh - 154px);
+        gap:6px;
+      }
+
+      #rightRail{
+        width:calc(50vw - 12px);
+        max-height:calc(100vh - 154px);
+        gap:6px;
+        padding:8px;
+      }
+
+      .panel-card,
+      .rail-card{
+        padding:9px;
+        border-radius:16px;
+      }
+
+      .brand{
+        min-height:98px;
+        padding:10px;
+      }
+
+      h1{
+        font-size:clamp(24px, 7.3vw, 34px);
+      }
+
+      .button-grid-2{
+        grid-template-columns:1fr;
+      }
+
+      button,
+      select{
+        min-height:36px;
+        font-size:12px;
+      }
+
+      .calendar-popover-grid{
+        grid-template-columns:1fr 1fr 64px;
+        gap:6px;
+      }
+
+      .calendar-head div{
+        font-size:10px;
+      }
+
+      .calendar-day{
+        min-height:34px;
+        font-size:11px;
+      }
+
+      .day-nav-center{
+        max-width:80px;
+        font-size:9px;
+      }
+
+      .layer-item{
+        grid-template-columns:auto 1fr;
+      }
+
+      .badge{
+        display:none;
+      }
+
+      #legendDock{
+        width:min(160px, calc(50vw - 14px));
+        bottom:92px;
+      }
+
+      .legend-row{
+        font-size:10px;
+      }
+
+      #timelineDock{
+        left:8px;
+        right:8px;
+        bottom:8px;
+        padding:22px 10px 8px;
       }
 
       #timelineBubble{
-        font-size:12px;
-        padding:7px 12px;
+        font-size:11px;
+        padding:6px 10px;
       }
     }
   </style>
@@ -1055,7 +1167,7 @@
         </div>
       </section>
 
-      <section class="panel-card">
+      <section class="panel-card snapshot-card">
         <div class="section-title">
           <h2>Snapshot</h2>
           
@@ -1170,7 +1282,7 @@
           </div>
         </section>
 
-        <section class="rail-card">
+        <section class="rail-card top-tides-card">
           <div class="rail-head">
             <div>
               <h3>#5 Highest Tides</h3>
