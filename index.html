@@ -58,17 +58,17 @@
 
     #topBanner{
       position:fixed;
-      top:14px;
+      top:10px;
       left:50%;
       transform:translateX(-50%);
       z-index:5000;
-      min-width:min(720px, calc(100vw - 28px));
-      max-width:min(960px, calc(100vw - 28px));
+      min-width:min(540px, calc(100vw - 20px));
+      max-width:min(760px, calc(100vw - 20px));
       display:none;
       align-items:center;
       justify-content:space-between;
-      gap:16px;
-      padding:12px 18px;
+      gap:12px;
+      padding:10px 14px;
       border-radius:999px;
       background:rgba(15,23,42,.92);
       color:#fff;
@@ -96,7 +96,7 @@
     }
 
     #topBanner .banner-title{
-      font-size:14px;
+      font-size:13px;
       font-weight:800;
       white-space:nowrap;
       overflow:hidden;
@@ -104,7 +104,7 @@
     }
 
     #topBanner .banner-meta{
-      font-size:12px;
+      font-size:11px;
       color:#dbeafe;
       white-space:nowrap;
     }
@@ -118,14 +118,14 @@
 
     #leftPanel{
       position:absolute;
-      top:14px;
-      left:14px;
+      top:10px;
+      left:10px;
       z-index:1250;
-      width:286px;
-      max-height:calc(100vh - 124px);
+      width:252px;
+      max-height:calc(100vh - 108px);
       display:flex;
       flex-direction:column;
-      gap:10px;
+      gap:8px;
       overflow:auto;
       padding:0;
       pointer-events:none;
@@ -134,20 +134,20 @@
     }
 
     .panel-card{
-      background:rgba(255,255,255,.90);
+      background:rgba(255,255,255,.84);
       border:1px solid rgba(226,232,240,.88);
-      border-radius:22px;
-      box-shadow:var(--shadow-strong);
-      padding:13px;
+      border-radius:18px;
+      box-shadow:0 16px 32px rgba(15,23,42,.12);
+      padding:10px;
       backdrop-filter:blur(16px);
       -webkit-backdrop-filter:blur(16px);
       pointer-events:auto;
     }
 
     .brand{
-      padding:2px 2px 2px;
+      padding:2px;
       display:grid;
-      gap:8px;
+      gap:4px;
     }
 
     .brand-top{
@@ -159,8 +159,8 @@
 
     h1{
       margin:0;
-      font-size:31px;
-      line-height:.98;
+      font-size:25px;
+      line-height:.94;
       letter-spacing:-.05em;
       font-weight:900;
     }
@@ -169,11 +169,11 @@
       display:inline-flex;
       align-items:center;
       gap:8px;
-      padding:8px 12px;
+      padding:6px 10px;
       border-radius:999px;
       background:#eff6ff;
       color:#1d4ed8;
-      font-size:12px;
+      font-size:11px;
       font-weight:800;
       white-space:nowrap;
     }
@@ -189,8 +189,8 @@
 
     .muted{
       color:var(--muted);
-      font-size:13px;
-      line-height:1.35;
+      font-size:11px;
+      line-height:1.3;
     }
 
     .button-grid-2{
@@ -204,17 +204,17 @@
       appearance:none;
       border:1px solid var(--line);
       background:#fff;
-      border-radius:16px;
+      border-radius:14px;
       color:var(--text);
-      font-size:14px;
+      font-size:13px;
       font-weight:700;
-      min-height:46px;
+      min-height:40px;
     }
 
     button{
       cursor:pointer;
       transition:transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, color .16s ease;
-      padding:11px 14px;
+      padding:9px 12px;
     }
 
     button:hover:not(:disabled){
@@ -240,37 +240,37 @@
       align-items:center;
       justify-content:space-between;
       gap:8px;
-      margin-bottom:10px;
+      margin-bottom:8px;
     }
 
     .section-title h2{
       margin:0;
-      font-size:14px;
+      font-size:13px;
       letter-spacing:-.02em;
       font-weight:850;
     }
 
     .section-kicker{
       color:var(--muted);
-      font-size:12px;
+      font-size:11px;
       font-weight:700;
     }
 
     .stat-grid{
       display:grid;
       grid-template-columns:1fr 1fr;
-      gap:10px;
+      gap:8px;
     }
 
     .stat-box{
-      min-height:102px;
-      padding:12px;
+      min-height:0;
+      padding:10px;
       border:1px solid var(--line);
-      border-radius:18px;
+      border-radius:14px;
       background:#fff;
       display:grid;
       align-content:start;
-      gap:6px;
+      gap:4px;
     }
 
     .stat-box:last-child{
@@ -278,27 +278,27 @@
     }
 
     .stat-label{
-      font-size:12px;
+      font-size:11px;
       font-weight:750;
       color:var(--muted);
     }
 
     .stat-value{
-      font-size:20px;
-      line-height:1.08;
+      font-size:15px;
+      line-height:1.12;
       font-weight:850;
       letter-spacing:-.03em;
     }
 
     .stat-sub{
-      font-size:12px;
+      font-size:10px;
       color:var(--muted);
-      line-height:1.35;
+      line-height:1.25;
     }
 
     .control-row{
       display:grid;
-      gap:8px;
+      gap:6px;
     }
 
     .range-head{
@@ -341,10 +341,14 @@
       display:grid;
     }
 
+    .stat-box:last-child{
+      grid-column:1 / -1;
+    }
+
     .calendar-toolbar{
       display:grid;
-      grid-template-columns:44px 1fr 44px;
-      gap:8px;
+      grid-template-columns:40px 1fr 40px;
+      gap:6px;
       align-items:center;
     }
 
@@ -352,11 +356,11 @@
       display:flex;
       align-items:center;
       justify-content:center;
-      gap:8px;
+      gap:6px;
       font-weight:850;
-      font-size:15px;
+      font-size:13px;
       letter-spacing:-.02em;
-      min-height:46px;
+      min-height:40px;
     }
 
     .calendar-title-btn .caret{
@@ -401,7 +405,7 @@
     .calendar-grid{
       display:grid;
       grid-template-columns:repeat(7, 1fr);
-      gap:6px;
+      gap:4px;
     }
 
     .calendar-head div{
@@ -413,16 +417,16 @@
     }
 
     .calendar-day{
-      min-height:48px;
+      min-height:38px;
       display:grid;
       place-items:center;
-      border-radius:16px;
+      border-radius:12px;
       border:1px solid var(--line);
       background:#fff;
       padding:0;
       position:relative;
       font-weight:850;
-      font-size:13px;
+      font-size:12px;
     }
 
     .calendar-day.empty{
@@ -452,15 +456,19 @@
     .day-nav{
       display:grid;
       grid-template-columns:1fr auto 1fr;
-      gap:8px;
+      gap:6px;
       align-items:center;
     }
 
     .day-nav-center{
       text-align:center;
-      font-size:12px;
+      font-size:10px;
       font-weight:800;
       color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:96px;
     }
 
     #mapWrap{
@@ -500,83 +508,78 @@
     }
 
     #legendDock{
-      top:14px;
-      left:312px;
-      width:236px;
-      padding:12px;
+      top:10px;
+      left:270px;
+      width:188px;
+      padding:10px;
     }
 
     .legend-title{
-      margin:0 0 8px;
-      font-size:14px;
+      margin:0 0 6px;
+      font-size:13px;
       font-weight:850;
       letter-spacing:-.02em;
     }
 
     .legend-sub{
-      margin:0 0 12px;
-      color:var(--muted);
-      font-size:12px;
-      line-height:1.35;
+      display:none;
     }
 
     .legend-list{
       display:grid;
-      gap:7px;
+      gap:6px;
     }
 
     .legend-row{
       display:grid;
-      grid-template-columns:18px 1fr;
-      gap:10px;
+      grid-template-columns:14px 1fr;
+      gap:8px;
       align-items:center;
-      font-size:12px;
+      font-size:11px;
       font-weight:750;
+      line-height:1.15;
     }
 
     .legend-swatch{
-      width:18px;
-      height:18px;
-      border-radius:6px;
+      width:14px;
+      height:14px;
+      border-radius:5px;
       border:1px solid rgba(15,23,42,.12);
     }
 
     .legend-note{
-      margin-top:12px;
-      font-size:11px;
-      color:var(--muted);
-      line-height:1.35;
+      display:none;
     }
 
     #rightRail{
-      top:14px;
-      right:14px;
-      width:252px;
-      max-height:calc(100vh - 124px);
+      top:10px;
+      right:10px;
+      width:214px;
+      max-height:calc(100vh - 108px);
       overflow:auto;
       padding:10px;
       display:grid;
-      gap:10px;
+      gap:8px;
     }
 
     .rail-card{
       background:rgba(255,255,255,.72);
       border:1px solid rgba(226,232,240,.92);
-      border-radius:20px;
-      padding:14px;
+      border-radius:16px;
+      padding:10px;
     }
 
     .rail-head{
       display:flex;
       align-items:flex-start;
       justify-content:space-between;
-      gap:12px;
-      margin-bottom:10px;
+      gap:8px;
+      margin-bottom:8px;
     }
 
     .rail-head h3{
       margin:0;
-      font-size:14px;
+      font-size:13px;
       font-weight:850;
       letter-spacing:-.02em;
     }
@@ -584,13 +587,13 @@
     .pill{
       display:inline-flex;
       align-items:center;
-      gap:7px;
-      min-height:30px;
+      gap:6px;
+      min-height:24px;
       border-radius:999px;
       border:1px solid var(--line);
-      padding:0 10px;
+      padding:0 8px;
       background:#fff;
-      font-size:11px;
+      font-size:10px;
       font-weight:850;
       color:var(--muted);
       white-space:nowrap;
@@ -599,17 +602,17 @@
     .layer-list,
     .top-tide-list{
       display:grid;
-      gap:10px;
+      gap:8px;
     }
 
     .layer-item{
       display:grid;
       grid-template-columns:auto 1fr auto;
       align-items:center;
-      gap:10px;
-      padding:11px 12px;
+      gap:8px;
+      padding:9px 10px;
       border:1px solid rgba(226,232,240,.92);
-      border-radius:16px;
+      border-radius:14px;
       background:#fff;
     }
 
@@ -645,31 +648,29 @@
 
     .layer-meta{
       display:grid;
-      gap:3px;
+      gap:2px;
       min-width:0;
     }
 
     .layer-name{
-      font-size:13px;
+      font-size:12px;
       font-weight:850;
     }
 
     .layer-desc{
-      font-size:12px;
-      color:var(--muted);
-      line-height:1.3;
+      display:none;
     }
 
     .badge{
       display:inline-flex;
       align-items:center;
       justify-content:center;
-      min-height:26px;
-      padding:0 10px;
+      min-height:22px;
+      padding:0 8px;
       border-radius:999px;
       background:#f8fafc;
       border:1px solid var(--line);
-      font-size:11px;
+      font-size:10px;
       font-weight:850;
       color:var(--muted);
       white-space:nowrap;
@@ -678,12 +679,12 @@
     .top-tide-item{
       width:100%;
       text-align:left;
-      padding:12px;
-      border-radius:18px;
+      padding:10px;
+      border-radius:14px;
       border:1px solid rgba(226,232,240,.95);
       background:#fff;
       display:grid;
-      gap:5px;
+      gap:3px;
     }
 
     .top-tide-item.active{
@@ -693,9 +694,9 @@
     }
 
     .top-tide-rank{
-      font-size:11px;
+      font-size:10px;
       font-weight:900;
-      letter-spacing:.08em;
+      letter-spacing:.06em;
       text-transform:uppercase;
       color:var(--muted);
     }
@@ -705,55 +706,56 @@
     }
 
     .top-tide-main{
-      font-size:14px;
+      font-size:13px;
       font-weight:850;
       letter-spacing:-.02em;
     }
 
     .top-tide-sub{
-      font-size:12px;
+      font-size:10px;
       color:var(--muted);
-      line-height:1.35;
+      line-height:1.25;
     }
 
     #timelineDock{
       position:absolute;
-      left:14px;
-      right:14px;
-      bottom:14px;
+      left:10px;
+      right:10px;
+      bottom:10px;
       z-index:1300;
-      padding:12px 16px;
+      padding:10px 14px;
+      border-radius:18px;
     }
 
     .timeline-head{
       display:grid;
       grid-template-columns:auto 1fr auto;
       align-items:center;
-      gap:14px;
-      margin-bottom:10px;
+      gap:10px;
+      margin-bottom:6px;
     }
 
     .transport-inline{
       display:flex;
-      gap:8px;
+      gap:6px;
     }
 
     .transport-inline button{
-      min-width:48px;
-      min-height:42px;
-      padding:0 14px;
-      border-radius:14px;
+      min-width:44px;
+      min-height:36px;
+      padding:0 12px;
+      border-radius:12px;
     }
 
     .timeline-title{
       min-width:0;
       text-align:center;
       display:grid;
-      gap:3px;
+      gap:2px;
     }
 
     .timeline-label{
-      font-size:12px;
+      font-size:10px;
       font-weight:800;
       color:var(--muted);
       text-transform:uppercase;
@@ -761,7 +763,7 @@
     }
 
     .timeline-value{
-      font-size:18px;
+      font-size:15px;
       font-weight:900;
       letter-spacing:-.03em;
       white-space:nowrap;
@@ -770,7 +772,7 @@
     }
 
     .timeline-meta{
-      font-size:12px;
+      font-size:10px;
       font-weight:750;
       color:var(--muted);
       white-space:nowrap;
@@ -779,19 +781,19 @@
     .timeline-range{
       display:grid;
       grid-template-columns:auto 1fr auto;
-      gap:12px;
+      gap:8px;
       align-items:center;
     }
 
     .timeline-end{
-      font-size:12px;
+      font-size:10px;
       font-weight:800;
       color:var(--muted);
       white-space:nowrap;
     }
 
     .timeline-scale{
-      font-size:12px;
+      font-size:10px;
       font-weight:800;
       color:var(--muted);
       text-align:right;
@@ -800,19 +802,19 @@
 
     #toast{
       position:absolute;
-      left:14px;
-      bottom:118px;
+      left:10px;
+      bottom:100px;
       z-index:1500;
-      max-width:360px;
-      padding:12px 14px;
-      border-radius:18px;
+      max-width:300px;
+      padding:10px 12px;
+      border-radius:14px;
       border:1px solid rgba(251,191,36,.4);
       background:rgba(255,251,235,.96);
       color:#92400e;
       box-shadow:var(--shadow);
       display:none;
-      line-height:1.35;
-      font-size:12px;
+      line-height:1.3;
+      font-size:11px;
       font-weight:700;
       backdrop-filter:blur(12px);
       -webkit-backdrop-filter:blur(12px);
@@ -837,40 +839,40 @@
 
     @media (max-width: 1320px){
       #leftPanel{
-        width:274px;
+        width:244px;
       }
       #legendDock{
-        left:300px;
-        width:224px;
+        left:262px;
+        width:180px;
       }
       #rightRail{
-        width:238px;
+        width:206px;
       }
     }
 
     @media (max-width: 1180px){
       #leftPanel{
-        width:266px;
-        max-height:calc(100vh - 132px);
+        width:236px;
+        max-height:calc(100vh - 116px);
       }
 
       #legendDock{
-        top:14px;
-        left:292px;
-        width:212px;
+        top:10px;
+        left:254px;
+        width:172px;
       }
 
       #rightRail{
-        top:14px;
-        right:14px;
-        width:224px;
-        max-height:calc(100vh - 132px);
+        top:10px;
+        right:10px;
+        width:196px;
+        max-height:calc(100vh - 116px);
       }
 
       #timelineDock{
-        left:14px;
-        right:14px;
-        bottom:14px;
+        left:10px;
+        right:10px;
+        bottom:10px;
       }
     }
 
@@ -884,8 +886,8 @@
       }
 
       #leftPanel{
-        width:min(272px, calc(100% - 28px));
-        max-height:calc(100vh - 188px);
+        width:min(248px, calc(100% - 20px));
+        max-height:calc(100vh - 176px);
       }
 
       #rightRail{
@@ -893,15 +895,15 @@
       }
 
       #legendDock{
-        left:14px;
+        left:10px;
         top:auto;
-        bottom:128px;
-        width:min(280px, calc(100% - 28px));
+        bottom:108px;
+        width:min(220px, calc(100% - 20px));
       }
 
       .timeline-head{
         grid-template-columns:1fr;
-        gap:10px;
+        gap:8px;
       }
 
       .timeline-title{
@@ -917,7 +919,7 @@
 <body>
   <div id="topBanner">
     <div class="banner-text">
-      <div class="banner-eyebrow">NWS Flood Alert</div>
+      <div class="banner-eyebrow">Flood alert</div>
       <div id="bannerTitle" class="banner-title">Checking alerts</div>
       <div id="bannerMeta" class="banner-meta"></div>
     </div>
@@ -931,9 +933,9 @@
           <div>
             <h1>North Wildwood<br>Flood Replay</h1>
           </div>
-          <div class="brand-chip">Professional Replay</div>
+          <div class="brand-chip">Live</div>
         </div>
-        <div class="muted">Sleek flood playback for forecast windows, observed archive days, and highest-crest replay windows.</div>
+        <div class="muted">Forecast, archive, and crest replay.</div>
       </section>
 
       <section class="panel-card">
@@ -943,7 +945,7 @@
         </div>
         <div class="button-grid-2">
           <button id="forecastDataBtn" class="active" type="button">Forecast</button>
-          <button id="observedDataBtn" type="button">Observed Archive</button>
+          <button id="observedDataBtn" type="button">Observed</button>
         </div>
       </section>
 
@@ -960,14 +962,14 @@
 
       <section class="panel-card">
         <div class="section-title">
-          <h2>Scene snapshot</h2>
-          <span class="section-kicker">Live selection</span>
+          <h2>Snapshot</h2>
+          <span class="section-kicker">Live</span>
         </div>
         <div class="stat-grid">
           <div class="stat-box">
             <div class="stat-label">Time</div>
             <div id="timeText" class="stat-value">--</div>
-            <div id="timeSubText" class="stat-sub">North Wildwood replay clock</div>
+            <div id="timeSubText" class="stat-sub">--</div>
           </div>
           <div class="stat-box">
             <div class="stat-label">Water level</div>
@@ -977,15 +979,15 @@
           <div class="stat-box">
             <div class="stat-label">Selection</div>
             <div id="selectedText" class="stat-value">--</div>
-            <div id="selectedSubText" class="stat-sub">--</div>
+            <div id="selectedSubText" class="stat-sub"></div>
           </div>
         </div>
       </section>
 
       <section id="calendarCard" class="panel-card calendar-card">
         <div class="section-title">
-          <h2>Observed calendar</h2>
-          <span class="section-kicker">Daily archive</span>
+          <h2>Calendar</h2>
+          <span class="section-kicker">Observed</span>
         </div>
 
         <div class="calendar-toolbar">
@@ -1017,9 +1019,9 @@
         <div id="calendarGrid" class="calendar-grid"></div>
 
         <div class="day-nav">
-          <button id="prevDayBtn" type="button">Previous Day</button>
+          <button id="prevDayBtn" type="button">Prev</button>
           <div id="dayNavCenter" class="day-nav-center">Select a day</div>
-          <button id="nextDayBtn" type="button">Next Day</button>
+          <button id="nextDayBtn" type="button">Next</button>
         </div>
       </section>
 
@@ -1030,7 +1032,7 @@
         </div>
         <div class="control-row">
           <input id="opacitySlider" type="range" min="1" max="100" value="75" step="1" />
-          <div class="muted">Default starts at 75%, with full manual control from 1% to 100%.</div>
+          <div class="muted">75% default</div>
         </div>
       </section>
     </aside>
@@ -1040,7 +1042,7 @@
 
       <section id="legendDock" class="map-floating">
         <h2 id="legendTitle" class="legend-title">Flood depth</h2>
-        <p id="legendSub" class="legend-sub">Depth intervals are shown as continuous classes for the selected replay hour.</p>
+        <p id="legendSub" class="legend-sub"></p>
         <div id="legendList" class="legend-list"></div>
         <div id="legendNote" class="legend-note"></div>
       </section>
@@ -1051,30 +1053,30 @@
             <div>
               <h3>Layers</h3>
             </div>
-            <span class="pill">Right rail</span>
+            <span class="pill">Layers</span>
           </div>
           <div class="layer-list">
             <div class="layer-item">
               <div id="buildingsToggle" class="toggle on" aria-hidden="true"></div>
               <div class="layer-meta">
                 <div class="layer-name">Buildings</div>
-                <div class="layer-desc">Placeholder control for future building footprints and structure overlays.</div>
+                <div class="layer-desc">Soon</div>
               </div>
-              <span class="badge">Coming soon</span>
+              <span class="badge">Soon</span>
             </div>
             <div class="layer-item">
               <div id="criticalToggle" class="toggle on" aria-hidden="true"></div>
               <div class="layer-meta">
                 <div class="layer-name">Critical infrastructure</div>
-                <div class="layer-desc">Placeholder control for utilities, public safety sites, and priority assets.</div>
+                <div class="layer-desc">Soon</div>
               </div>
-              <span class="badge">Coming soon</span>
+              <span class="badge">Soon</span>
             </div>
             <div class="layer-item">
               <div class="toggle on" aria-hidden="true"></div>
               <div class="layer-meta">
                 <div class="layer-name">Road names</div>
-                <div class="layer-desc">Live NJ road label layer drawn above flood overlays.</div>
+                <div class="layer-desc">Live</div>
               </div>
               <span class="badge">Live</span>
             </div>
@@ -1084,9 +1086,9 @@
         <section class="rail-card">
           <div class="rail-head">
             <div>
-              <h3>Highest tides</h3>
+              <h3>Top tides</h3>
             </div>
-            <span id="topTidePill" class="pill">Top 5 of top 10 crests</span>
+            <span id="topTidePill" class="pill">Top 5</span>
           </div>
           <div id="topTideList" class="top-tide-list"></div>
         </section>
@@ -1100,7 +1102,7 @@
             <button id="reloadBtn" type="button">Reload</button>
           </div>
           <div class="timeline-title">
-            <div id="timelineLabel" class="timeline-label">Replay timeline</div>
+            <div id="timelineLabel" class="timeline-label">Replay</div>
             <div id="timelineValue" class="timeline-value">--</div>
           </div>
           <div id="timelineMeta" class="timeline-meta">--</div>
@@ -1309,9 +1311,7 @@
       const items = currentOverlayMode === "depth" ? DEPTH_LEGEND : DYNAMIC_LEGEND;
 
       title.textContent = currentOverlayMode === "depth" ? "Flood depth" : "Dynamic flood";
-      sub.textContent = currentOverlayMode === "depth"
-        ? "Depth intervals are shown for the selected replay hour."
-        : "Severity classes update with the selected replay hour.";
+      sub.textContent = "";
 
       list.innerHTML = "";
       items.forEach(item => {
@@ -1324,9 +1324,7 @@
         list.appendChild(row);
       });
 
-      note.textContent = currentOverlayMode === "depth"
-        ? "Depth legend uses the exact class breaks you specified."
-        : "Dynamic flood legend swaps into place automatically when Dynamic Flood is selected.";
+      note.textContent = "";
     }
 
     function clampStage(value) {
@@ -1568,6 +1566,10 @@
       return "--";
     }
 
+    function formatHourEntryTimeCompact(entry) {
+      return formatHourEntryTime(entry).replace(",", "").replace(" EST", "");
+    }
+
     function getStageValue(entry) {
       return Number(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
     }
@@ -1655,15 +1657,16 @@
       const nextBtn = document.getElementById("nextDayBtn");
 
       if (!selectedObservedDate) {
-        center.textContent = "Select a day";
+        center.textContent = "Pick a day";
         prevBtn.disabled = true;
         nextBtn.disabled = true;
         return;
       }
 
       const day = getObservedDayRecord(selectedObservedDate);
-      const cls = day?.classification || "none";
-      center.textContent = `${selectedObservedDate} • ${cls}${day?.peakNAVD88 != null ? ` • Peak ${Number(day.peakNAVD88).toFixed(2)} ft` : ""}`;
+      center.textContent = day?.peakNAVD88 != null
+        ? `${selectedObservedDate} • ${Number(day.peakNAVD88).toFixed(2)} ft`
+        : selectedObservedDate;
       prevBtn.disabled = !getNeighborObservedDate(selectedObservedDate, -1);
       nextBtn.disabled = !getNeighborObservedDate(selectedObservedDate, 1);
     }
@@ -1731,8 +1734,8 @@
           rank: chosen.length + 1,
           entry,
           peakStage: getStageValue(entry),
-          title: formatHourEntryTime(entry),
-          subtitle: `${entry.observedDate} • Peak ${getStageValue(entry).toFixed(2)} ft NAVD88`,
+          title: formatHourEntryTimeCompact(entry),
+          subtitle: `${getStageValue(entry).toFixed(2)} ft • ±${TOP_TIDE_WINDOW_HOURS} hr`,
           series,
           peakLocalIndex: flatIdx - startIdx
         });
@@ -1749,7 +1752,7 @@
       if (!topTideEvents.length) {
         const empty = document.createElement("div");
         empty.className = "muted";
-        empty.textContent = "Top-tide windows will appear when observed archive data is available.";
+        empty.textContent = "No archive data.";
         wrap.appendChild(empty);
         return;
       }
@@ -1760,9 +1763,9 @@
         btn.className = "top-tide-item";
         btn.classList.toggle("active", currentViewType === "top-tide" && currentTopTideIndex === idx);
         btn.innerHTML = `
-          <div class="top-tide-rank">Rank ${event.rank}</div>
+          <div class="top-tide-rank">#${event.rank}</div>
           <div class="top-tide-main">${event.title}</div>
-          <div class="top-tide-sub">${event.subtitle}<br>12 hours before and after crest</div>
+          <div class="top-tide-sub">${event.subtitle}</div>
         `;
         btn.addEventListener("click", () => {
           loadTopTideEvent(idx).catch(err => toast(err.message));
@@ -1786,7 +1789,7 @@
         timelineMeta.textContent = "--";
         timelineStart.textContent = "--";
         timelineEnd.textContent = "--";
-        label.textContent = "Replay timeline";
+        label.textContent = "Replay";
         return;
       }
 
@@ -1794,29 +1797,31 @@
       timelineValue.textContent = currentTime;
 
       if (currentViewType === "forecast") {
-        label.textContent = "Forecast timeline";
-        timelineMeta.textContent = `${currentHourIndex + 1} of ${currentSeriesHours.length} forecast hours`;
+        label.textContent = "Forecast";
       } else if (currentViewType === "observed-day") {
-        label.textContent = "Observed timeline";
-        timelineMeta.textContent = `${selectedObservedDate || "--"} • ${currentHourIndex + 1} of ${currentSeriesHours.length} hours`;
+        label.textContent = "Observed";
       } else {
-        label.textContent = "Highest-tide window";
-        timelineMeta.textContent = `${currentRangeLabel} • ${currentHourIndex + 1} of ${currentSeriesHours.length} hours`;
+        label.textContent = "Top crest";
       }
 
-      timelineStart.textContent = first ? formatHourEntryTime(first) : "--";
-      timelineEnd.textContent = last ? formatHourEntryTime(last) : "--";
+      timelineMeta.textContent = `${currentHourIndex + 1} / ${currentSeriesHours.length}`;
+      timelineStart.textContent = first ? formatHourEntryTimeCompact(first) : "--";
+      timelineEnd.textContent = last ? formatHourEntryTimeCompact(last) : "--";
     }
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").textContent = formatHourEntryTime(entry);
       document.getElementById("stageText").textContent = Number.isFinite(rawStage) ? `${rawStage.toFixed(2)} ft` : "--";
       document.getElementById("stageSubText").textContent = displayStage != null
-        ? `Rendered from ${displayStage.toFixed(1)} ft overlay`
+        ? `Overlay ${displayStage.toFixed(1)} ft`
         : "No overlay";
       document.getElementById("selectedText").textContent = currentSelectedLabel;
       document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
-      document.getElementById("timeSubText").textContent = currentRangeLabel || "Replay window";
+      document.getElementById("timeSubText").textContent = currentViewType === "forecast"
+        ? "Forecast"
+        : currentViewType === "top-tide"
+          ? `±${TOP_TIDE_WINDOW_HOURS} hr`
+          : (selectedObservedDate || "Observed");
     }
 
     async function setFloodLayer(mode, stageValue, token) {
@@ -1909,10 +1914,10 @@
       currentViewType = "forecast";
       currentTopTideIndex = null;
       currentSelectedLabel = "Forecast";
-      currentSelectedSubLabel = forecastData.sourceType || "Live forecast";
+      currentSelectedSubLabel = "Live";
       currentRangeLabel = forecastData.hours?.length
         ? `${formatHourEntryTime(forecastData.hours[0])} to ${formatHourEntryTime(forecastData.hours[forecastData.hours.length - 1])}`
-        : "Forecast replay window";
+        : "Forecast";
 
       syncSliderBounds();
       currentHourIndex = getPeakHourIndex(currentSeriesHours);
@@ -2024,9 +2029,10 @@
       currentViewType = "observed-day";
       currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
-      currentSelectedSubLabel =
-        `${dayRecord.classification || "none"}${dayRecord.peakNAVD88 != null ? ` • Peak ${Number(dayRecord.peakNAVD88).toFixed(2)} ft` : ""}`;
-      currentRangeLabel = `${dateStr} • 24-hour observed replay`;
+      currentSelectedSubLabel = dayRecord.peakNAVD88 != null
+        ? `${Number(dayRecord.peakNAVD88).toFixed(2)} ft peak`
+        : (dayRecord.classification || "Observed");
+      currentRangeLabel = `${dateStr}`;
 
       syncSliderBounds();
       currentHourIndex = preferredHourIndex != null ? preferredHourIndex : getPeakHourIndex(currentSeriesHours);
@@ -2048,9 +2054,9 @@
       const event = topTideEvents[index];
       currentViewType = "top-tide";
       currentTopTideIndex = index;
-      currentSelectedLabel = `Top crest #${event.rank}`;
-      currentSelectedSubLabel = `${event.peakStage.toFixed(2)} ft NAVD88`;
-      currentRangeLabel = `${event.title} • ±${TOP_TIDE_WINDOW_HOURS} hours`;
+      currentSelectedLabel = `Crest #${event.rank}`;
+      currentSelectedSubLabel = `${event.peakStage.toFixed(2)} ft`;
+      currentRangeLabel = `${event.title}`;
       selectedObservedDate = event.entry.observedDate;
       currentMonthKey = event.entry.observedDate.slice(0, 7);
       currentSeriesHours = event.series;
@@ -2193,6 +2199,13 @@
       await renderCalendar();
     }
 
+    function formatLocalBannerTime(value) {
+      if (!value) return "";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return "";
+      return formatFixedESTFromUtc(d.toISOString());
+    }
+
     async function checkNwsAlerts() {
       try {
         const point = await fetchJson(NWS_POINT_URL);
@@ -2219,8 +2232,8 @@
         }
 
         const primary = floodAlerts[0]?.properties || {};
-        const title = primary.headline || primary.event || "Active flood alert";
-        const meta = [primary.severity, primary.effective, primary.expires].filter(Boolean).join(" • ");
+        const title = primary.event || "Flood alert";
+        const meta = [primary.severity, primary.expires ? `Until ${formatLocalBannerTime(primary.expires)}` : ""].filter(Boolean).join(" • ");
         setBanner(true, title, meta, floodAlerts.length);
       } catch (err) {
         setBanner(false);
