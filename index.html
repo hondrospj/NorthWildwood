@@ -215,6 +215,10 @@
       margin-bottom:8px;
     }
 
+    .compact-card .control-row{
+      min-height:0;
+    }
+
     .segmented-control{
       display:grid;
       grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -329,6 +333,7 @@
     }
 
     .stat-box{
+      width:100%;
       min-height:0;
       padding:14px 12px;
       border:1px solid var(--line);
@@ -1206,14 +1211,41 @@
       padding:10px 12px;
     }
 
+    body.observed-mode .compact-card{
+      min-height:114px;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      align-self:stretch;
+    }
+
+    body.observed-mode .data-source-card,
+    body.observed-mode .overlay-card,
+    body.observed-mode .datum-card,
+    body.observed-mode .opacity-card{
+      align-self:stretch;
+    }
+
+    body.observed-mode .compact-card .button-grid-2,
+    body.observed-mode .datum-card .segmented-control,
+    body.observed-mode .opacity-card .control-row{
+      flex:1 1 auto;
+    }
+
+    body.observed-mode .opacity-card .control-row{
+      display:grid;
+      align-content:center;
+    }
+
     body.observed-mode .snapshot-card .stat-grid{
-      grid-template-columns:1fr 1fr;
+      grid-template-columns:1fr;
       gap:8px;
     }
 
     body.observed-mode .snapshot-card .stat-box{
-      min-height:0;
-      padding:12px 10px;
+      width:100%;
+      min-height:112px;
+      padding:12px 12px;
       gap:5px;
     }
 
@@ -1334,6 +1366,25 @@
       border-radius:18px;
     }
 
+    body.observed-tight .compact-card{
+      min-height:94px;
+      display:flex;
+      flex-direction:column;
+      justify-content:space-between;
+      align-self:stretch;
+    }
+
+    body.observed-tight .compact-card .button-grid-2,
+    body.observed-tight .datum-card .segmented-control,
+    body.observed-tight .opacity-card .control-row{
+      flex:1 1 auto;
+    }
+
+    body.observed-tight .opacity-card .control-row{
+      display:grid;
+      align-content:center;
+    }
+
     body.observed-tight .section-title{
       margin-bottom:7px;
     }
@@ -1365,12 +1416,14 @@
     }
 
     body.observed-tight .snapshot-card .stat-grid{
-      grid-template-columns:1fr 1fr;
+      grid-template-columns:1fr;
       gap:6px;
     }
 
     body.observed-tight .snapshot-card .stat-box{
-      padding:8px 8px;
+      width:100%;
+      min-height:90px;
+      padding:10px 10px;
       gap:4px;
       border-radius:15px;
     }
@@ -1599,6 +1652,25 @@
         font-size:13px;
       }
 
+      body.observed-mode .compact-card{
+        min-height:90px;
+        display:flex;
+        flex-direction:column;
+        justify-content:space-between;
+        align-self:stretch;
+      }
+
+      body.observed-mode .compact-card .button-grid-2,
+      body.observed-mode .datum-card .segmented-control,
+      body.observed-mode .opacity-card .control-row{
+        flex:1 1 auto;
+      }
+
+      body.observed-mode .opacity-card .control-row{
+        display:grid;
+        align-content:center;
+      }
+
       body.observed-mode .pill{
         min-height:22px;
         padding:0 7px;
@@ -1621,11 +1693,14 @@
       }
 
       body.observed-mode .snapshot-card .stat-grid{
+        grid-template-columns:1fr;
         gap:6px;
       }
 
       body.observed-mode .snapshot-card .stat-box{
-        padding:10px 8px;
+        width:100%;
+        min-height:92px;
+        padding:10px 10px;
         gap:4px;
         border-radius:15px;
       }
@@ -1913,11 +1988,13 @@
       }
 
       body.observed-mode .snapshot-card .stat-grid{
-        grid-template-columns:1fr 1fr;
+        grid-template-columns:1fr;
       }
 
       body.observed-mode .snapshot-card .stat-box{
-        padding:10px 8px;
+        width:100%;
+        min-height:88px;
+        padding:10px 10px;
       }
 
       body.observed-mode #timeText,
@@ -1950,7 +2027,7 @@
       }
 
       body.observed-mode .snapshot-card .stat-grid{
-        grid-template-columns:1fr 1fr;
+        grid-template-columns:1fr;
       }
 
       .button-grid-2{
