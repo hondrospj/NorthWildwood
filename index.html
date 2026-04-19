@@ -745,20 +745,27 @@
       bottom:132px;
       right:16px;
       width:208px;
-      overflow-y:auto;
-      overflow-x:hidden;
-      padding:12px;
+      padding:0;
       display:grid;
-      gap:10px;
+      gap:12px;
       align-content:start;
-      scrollbar-gutter:stable;
+      align-items:start;
+      background:none;
+      border:0;
+      box-shadow:none;
+      backdrop-filter:none;
+      -webkit-backdrop-filter:none;
+      overflow:visible;
+      pointer-events:none;
     }
 
     .rail-card{
       background:rgba(255,255,255,.028);
       border:1px solid var(--line);
       border-radius:16px;
-      padding:10px;
+      padding:12px;
+      pointer-events:auto;
+      box-shadow:0 16px 32px rgba(15,23,42,.16);
     }
 
     .rail-head{
@@ -797,12 +804,39 @@
       gap:8px;
     }
 
+    .top-tides-card{
+      display:grid;
+      grid-template-rows:auto minmax(0, 1fr);
+      min-height:0;
+      max-height:calc(100vh - 218px);
+      overflow:hidden;
+    }
+
+    .top-tide-list{
+      overflow-y:auto;
+      overflow-x:hidden;
+      max-height:100%;
+      padding-right:2px;
+      align-content:start;
+    }
+
+    .top-tide-list::-webkit-scrollbar{
+      width:8px;
+    }
+
+    .top-tide-list::-webkit-scrollbar-thumb{
+      background:rgba(148,163,184,.38);
+      border-radius:999px;
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+
     .layer-item{
       display:grid;
       grid-template-columns:auto 1fr auto;
       align-items:center;
       gap:8px;
-      padding:9px 10px;
+      padding:10px 12px;
       border:1px solid var(--line);
       border-radius:14px;
       background:rgba(255,255,255,.04);
@@ -871,14 +905,14 @@
     .top-tide-item{
       width:100%;
       text-align:center;
-      padding:13px 10px;
+      padding:11px 10px;
       border-radius:15px;
       border:1px solid rgba(226,232,240,.95);
       background:rgba(255,255,255,.04);
       display:grid;
       justify-items:center;
       align-items:center;
-      gap:5px;
+      gap:4px;
     }
 
     .top-tide-item.active{
@@ -1786,6 +1820,51 @@
       }
     }
 
+
+    @media (max-height: 980px){
+      #rightRail{
+        bottom:144px;
+      }
+
+      .rail-card{
+        padding:11px;
+      }
+
+      .top-tides-card{
+        max-height:calc(100vh - 236px);
+      }
+
+      .top-tide-item{
+        padding:10px 9px;
+      }
+    }
+
+    @media (max-height: 860px){
+      #rightRail{
+        bottom:152px;
+      }
+
+      .layer-item{
+        padding:9px 10px;
+      }
+
+      .top-tides-card{
+        max-height:calc(100vh - 248px);
+      }
+
+      .top-tide-item{
+        padding:9px 8px;
+        border-radius:14px;
+      }
+
+      .top-tide-main{
+        font-size:15px;
+      }
+
+      .top-tide-sub{
+        font-size:12px;
+      }
+    }
 
     @media (max-width: 1320px){
       #leftPanel{
