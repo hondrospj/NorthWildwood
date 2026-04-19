@@ -491,30 +491,31 @@
     .calendar-grid{
       display:grid;
       grid-template-columns:repeat(7, 1fr);
-      gap:4px;
+      gap:6px;
     }
 
     .calendar-head div{
       text-align:center;
-      font-size:11px;
-      font-weight:800;
-      color:var(--muted);
-      padding:2px 0;
+      font-size:13px;
+      font-weight:850;
+      color:#c5d0ea;
+      padding:3px 0 2px;
+      letter-spacing:.02em;
     }
 
     .calendar-day{
-      min-height:38px;
+      min-height:44px;
       display:grid;
       place-items:center;
-      border-radius:12px;
+      border-radius:14px;
       border:1px solid var(--line);
-      background:rgba(255,255,255,.045);
+      background:rgba(255,255,255,.055);
       padding:0;
       position:relative;
       font-weight:850;
-      font-size:12px;
+      font-size:15px;
       color:var(--text);
-      transition:transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease, color .14s ease;
+      transition:transform .14s ease, border-color .14s ease, background .14s ease, box-shadow .14s ease;
     }
 
     .calendar-day:hover:not(:disabled){
@@ -526,7 +527,7 @@
 
     .calendar-day:disabled{
       cursor:default;
-      opacity:.68;
+      opacity:.72;
       box-shadow:none;
     }
 
@@ -536,9 +537,9 @@
     }
 
     .calendar-day.day-none{
-      background:rgba(255,255,255,.022);
-      color:rgba(169,182,211,.44);
-      border-color:rgba(255,255,255,.04);
+      background:rgba(255,255,255,.024);
+      color:rgba(169,182,211,.52);
+      border-color:rgba(255,255,255,.045);
     }
 
     .calendar-day.day-minor{ background:rgba(213,138,0,.16); border-color:rgba(213,138,0,.42); }
@@ -547,16 +548,16 @@
 
     .calendar-day.selected{
       outline:none;
-      border-color:rgba(245,158,11,.96);
-      box-shadow:0 0 0 2px rgba(245,158,11,.38), inset 0 1px 0 rgba(255,255,255,.06);
+      border-color:rgba(245,158,11,.98);
+      box-shadow:0 0 0 2px rgba(245,158,11,.34), inset 0 1px 0 rgba(255,255,255,.06);
     }
 
     .calendar-day.selected::after{
       content:"";
       position:absolute;
       inset:4px;
-      border-radius:8px;
-      border:1px solid rgba(255,255,255,.07);
+      border-radius:9px;
+      border:1px solid rgba(255,255,255,.08);
       pointer-events:none;
     }
 
@@ -566,59 +567,76 @@
 
     .day-nav{
       display:grid;
-      grid-template-columns:40px minmax(0, 1fr) 40px;
-      gap:7px;
+      grid-template-columns:46px minmax(0, 1fr) 46px;
+      gap:8px;
       align-items:stretch;
     }
 
     .calendar-nav-btn{
-      min-height:48px;
+      min-height:54px;
       padding:0;
-      border-radius:14px;
-      font-size:20px;
+      border-radius:16px;
+      font-size:24px;
       font-weight:900;
       line-height:1;
     }
 
     .day-nav-center{
       display:grid;
-      gap:2px;
-      align-content:center;
-      min-height:48px;
-      padding:9px 12px;
+      place-items:center;
+      min-height:54px;
+      padding:10px 14px;
       text-align:center;
       color:var(--text);
       border:1px solid var(--line);
-      border-radius:14px;
+      border-radius:16px;
       background:rgba(255,255,255,.045);
-      min-width:0;
-    }
-
-    .day-nav-label{
-      font-size:9px;
+      font-size:17px;
       font-weight:850;
-      letter-spacing:.12em;
-      text-transform:uppercase;
-      color:var(--muted);
+      letter-spacing:-.015em;
+      min-width:0;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
 
-    .day-nav-main{
+    .calendar-key{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:8px;
+      margin-top:8px;
+    }
+
+    .calendar-key-item{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:8px;
+      min-height:34px;
+      padding:0 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.045);
       font-size:12px;
       font-weight:850;
       color:var(--text);
       white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
     }
 
-    .day-nav-sub{
-      font-size:10px;
-      font-weight:750;
-      color:var(--muted);
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
+    .calendar-key-swatch{
+      width:12px;
+      height:12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      flex:0 0 auto;
     }
+
+    .calendar-key-item.minor{ background:rgba(213,138,0,.10); border-color:rgba(213,138,0,.22); }
+    .calendar-key-item.minor .calendar-key-swatch{ background:var(--minor); }
+    .calendar-key-item.moderate{ background:rgba(216,75,103,.11); border-color:rgba(216,75,103,.24); }
+    .calendar-key-item.moderate .calendar-key-swatch{ background:var(--moderate); }
+    .calendar-key-item.major{ background:rgba(124,92,224,.12); border-color:rgba(124,92,224,.25); }
+    .calendar-key-item.major .calendar-key-swatch{ background:var(--major); }
 
     #mapWrap{
       position:fixed;
@@ -1206,17 +1224,21 @@
     }
 
     body.observed-mode .calendar-card{
-      gap:7px;
+      gap:10px;
     }
 
     body.observed-mode .calendar-toolbar{
-      grid-template-columns:36px 1fr 36px;
-      gap:5px;
+      grid-template-columns:42px 1fr 42px;
+      gap:7px;
     }
 
     body.observed-mode .calendar-toolbar > button,
     body.observed-mode .calendar-title-btn{
-      min-height:36px;
+      min-height:42px;
+    }
+
+    body.observed-mode .calendar-title-btn{
+      font-size:15px;
     }
 
     body.observed-mode .calendar-popover{
@@ -1225,47 +1247,32 @@
     }
 
     body.observed-mode .calendar-head div{
-      font-size:10px;
-      padding:0;
+      font-size:12px;
+      padding:1px 0;
     }
 
     body.observed-mode .calendar-grid{
-      gap:3px;
+      gap:5px;
     }
 
     body.observed-mode .calendar-day{
-      min-height:31px;
-      font-size:11.5px;
-      border-radius:10px;
+      min-height:42px;
+      font-size:15px;
+      border-radius:13px;
     }
 
-    body.observed-mode .day-nav{
-      grid-template-columns:34px minmax(0, 1fr) 34px;
-      gap:6px;
-    }
-
-    body.observed-mode .calendar-nav-btn{
-      min-height:38px;
-      font-size:18px;
-      border-radius:12px;
+    body.observed-mode .day-nav button{
+      min-height:46px;
     }
 
     body.observed-mode .day-nav-center{
-      min-height:38px;
-      padding:7px 10px;
-      border-radius:12px;
+      min-height:46px;
+      font-size:16px;
     }
 
-    body.observed-mode .day-nav-label{
-      font-size:8px;
-    }
-
-    body.observed-mode .day-nav-main{
-      font-size:11px;
-    }
-
-    body.observed-mode .day-nav-sub{
-      font-size:9px;
+    body.observed-mode .calendar-key-item{
+      min-height:32px;
+      font-size:11.5px;
     }
 
     body.observed-mode .opacity-card{
@@ -1379,61 +1386,61 @@
     }
 
     body.observed-tight .calendar-card{
-      gap:4px;
+      gap:6px;
     }
 
     body.observed-tight .calendar-toolbar{
-      grid-template-columns:34px 1fr 34px;
-      gap:4px;
+      grid-template-columns:36px 1fr 36px;
+      gap:5px;
     }
 
     body.observed-tight .calendar-toolbar > button,
     body.observed-tight .calendar-title-btn{
-      min-height:34px;
+      min-height:36px;
+    }
+
+    body.observed-tight .calendar-title-btn{
+      font-size:13px;
     }
 
     body.observed-tight .calendar-head div{
-      font-size:9px;
+      font-size:11px;
     }
 
     body.observed-tight .calendar-grid{
-      gap:3px;
-    }
-
-    body.observed-tight .calendar-day{
-      min-height:24px;
-      font-size:10px;
-      border-radius:9px;
-    }
-
-    body.observed-tight .day-nav{
-      grid-template-columns:28px minmax(0, 1fr) 28px;
       gap:4px;
     }
 
-    body.observed-tight .calendar-nav-btn{
-      min-height:28px;
-      font-size:15px;
+    body.observed-tight .calendar-day{
+      min-height:31px;
+      font-size:12px;
       border-radius:10px;
+    }
+
+    body.observed-tight .day-nav{
+      gap:6px;
+    }
+
+    body.observed-tight .day-nav button{
+      min-height:36px;
+      font-size:16px;
     }
 
     body.observed-tight .day-nav-center{
-      min-height:28px;
+      font-size:13px;
+      min-height:36px;
       max-width:none;
-      padding:5px 7px;
-      border-radius:10px;
     }
 
-    body.observed-tight .day-nav-label{
-      font-size:7px;
+    body.observed-tight .calendar-key{
+      gap:6px;
+      margin-top:6px;
     }
 
-    body.observed-tight .day-nav-main{
-      font-size:9px;
-    }
-
-    body.observed-tight .day-nav-sub{
-      font-size:7px;
+    body.observed-tight .calendar-key-item{
+      min-height:28px;
+      font-size:10.5px;
+      padding:0 8px;
     }
 
     body.observed-tight .opacity-card{
@@ -1500,34 +1507,12 @@
     }
 
     body.observed-tight.observed-ultra-tight .calendar-head div{
-      font-size:8px;
-    }
-
-    body.observed-tight.observed-ultra-tight .calendar-day{
-      min-height:22px;
       font-size:9px;
     }
 
-    body.observed-tight.observed-ultra-tight .calendar-nav-btn{
-      min-height:26px;
-      font-size:14px;
-    }
-
-    body.observed-tight.observed-ultra-tight .day-nav-center{
-      min-height:26px;
-      padding:4px 6px;
-    }
-
-    body.observed-tight.observed-ultra-tight .day-nav-label{
-      font-size:7px;
-    }
-
-    body.observed-tight.observed-ultra-tight .day-nav-main{
-      font-size:8px;
-    }
-
-    body.observed-tight.observed-ultra-tight .day-nav-sub{
-      font-size:7px;
+    body.observed-tight.observed-ultra-tight .calendar-day{
+      min-height:24px;
+      font-size:10px;
     }
 
     body.observed-tight.observed-ultra-tight #timeText,
@@ -1655,45 +1640,61 @@
       }
 
       body.observed-mode .calendar-card{
-        gap:6px;
+        gap:7px;
       }
 
       body.observed-mode .calendar-toolbar{
-        grid-template-columns:34px 1fr 34px;
-        gap:4px;
+        grid-template-columns:36px 1fr 36px;
+        gap:5px;
       }
 
       body.observed-mode .calendar-toolbar > button,
       body.observed-mode .calendar-title-btn{
-        min-height:34px;
+        min-height:36px;
+      }
+
+      body.observed-mode .calendar-title-btn{
+        font-size:13px;
       }
 
       body.observed-mode .calendar-head div{
-        font-size:10px;
+        font-size:11px;
       }
 
       body.observed-mode .calendar-grid{
-        gap:3px;
+        gap:4px;
       }
 
       body.observed-mode .calendar-day{
-        min-height:29px;
-        font-size:11px;
-        border-radius:9px;
+        min-height:33px;
+        font-size:12px;
+        border-radius:10px;
       }
 
       body.observed-mode .day-nav{
-        gap:5px;
+        gap:6px;
       }
 
       body.observed-mode .day-nav button{
-        min-height:32px;
-        font-size:11px;
+        min-height:36px;
+        font-size:16px;
       }
 
       body.observed-mode .day-nav-center{
-        font-size:10px;
+        font-size:13px;
+        min-height:36px;
         max-width:none;
+      }
+
+      body.observed-mode .calendar-key{
+        gap:6px;
+        margin-top:6px;
+      }
+
+      body.observed-mode .calendar-key-item{
+        min-height:28px;
+        font-size:10.5px;
+        padding:0 8px;
       }
 
       body.observed-mode .opacity-card{
@@ -1876,27 +1877,9 @@
         font-size:14px;
       }
 
-      .day-nav{
-        grid-template-columns:38px minmax(0, 1fr) 38px;
-      }
-
-      .calendar-nav-btn{
-        min-height:42px;
-        font-size:18px;
-      }
-
       .day-nav-center{
         max-width:none;
-        min-height:42px;
-        padding:8px 10px;
-      }
-
-      .day-nav-main{
-        font-size:11px;
-      }
-
-      .day-nav-sub{
-        font-size:10px;
+        font-size:12px;
       }
 
       .top-tide-main{
@@ -1943,22 +1926,8 @@
       }
 
       body.observed-mode .calendar-day{
-        min-height:30px;
-        font-size:12px;
-      }
-
-      body.observed-mode .day-nav{
-        grid-template-columns:34px minmax(0, 1fr) 34px;
-      }
-
-      body.observed-mode .calendar-nav-btn{
-        min-height:36px;
-        font-size:17px;
-      }
-
-      body.observed-mode .day-nav-center{
-        min-height:36px;
-        padding:7px 9px;
+        min-height:34px;
+        font-size:13px;
       }
 
       body.observed-mode .mobile-top-tides-card{
@@ -2122,13 +2091,15 @@
         <div id="calendarGrid" class="calendar-grid"></div>
 
         <div class="day-nav">
-          <button id="prevDayBtn" class="calendar-nav-btn" type="button" aria-label="Previous observed day">‹</button>
-          <div class="day-nav-center">
-            <div class="day-nav-label">Selected day</div>
-            <div id="dayNavCenter" class="day-nav-main">Pick a day</div>
-            <div id="dayNavSub" class="day-nav-sub">Choose a highlighted date</div>
-          </div>
-          <button id="nextDayBtn" class="calendar-nav-btn" type="button" aria-label="Next observed day">›</button>
+          <button id="prevDayBtn" type="button" class="calendar-nav-btn" aria-label="Previous observed day">‹</button>
+          <div id="dayNavCenter" class="day-nav-center">Pick a day</div>
+          <button id="nextDayBtn" type="button" class="calendar-nav-btn" aria-label="Next observed day">›</button>
+        </div>
+
+        <div class="calendar-key" aria-label="Observed flood day key">
+          <div class="calendar-key-item minor"><span class="calendar-key-swatch"></span><span>Minor</span></div>
+          <div class="calendar-key-item moderate"><span class="calendar-key-swatch"></span><span>Moderate</span></div>
+          <div class="calendar-key-item major"><span class="calendar-key-swatch"></span><span>Major</span></div>
         </div>
       </section>
 
@@ -2413,12 +2384,6 @@
       { label: "Areas Below Grade But Not Likely Flooded", color: "var(--below)" }
     ];
 
-    const BOUNDARY_LEGEND_ITEM = {
-      label: "Municipal boundary",
-      color: "var(--boundary-red)",
-      kind: "line"
-    };
-
     let map = null;
     let basemapGrayLayer = null;
     let basemapColorLayer = null;
@@ -2577,7 +2542,7 @@
       const title = document.getElementById("legendTitle");
       const sub = document.getElementById("legendSub");
       const note = document.getElementById("legendNote");
-      const items = [...(currentOverlayMode === "depth" ? DEPTH_LEGEND : DYNAMIC_LEGEND), BOUNDARY_LEGEND_ITEM];
+      const items = currentOverlayMode === "depth" ? DEPTH_LEGEND : DYNAMIC_LEGEND;
 
       title.textContent = currentOverlayMode === "depth" ? "Flood depth" : "Dynamic flood";
       sub.textContent = "";
@@ -2585,17 +2550,21 @@
       list.innerHTML = "";
       items.forEach(item => {
         const row = document.createElement("div");
-        row.className = `legend-row${item.kind === "line" ? " legend-row-boundary" : ""}`;
-        const swatchClass = item.kind === "line" ? "legend-swatch legend-line" : "legend-swatch";
-        const swatchStyle = item.kind === "line"
-          ? `border-top-color:${item.color};`
-          : `background:${item.color};`;
+        row.className = "legend-row";
         row.innerHTML = `
-          <span class="${swatchClass}" style="${swatchStyle}"></span>
+          <span class="legend-swatch" style="background:${item.color};"></span>
           <span>${item.label}</span>
         `;
         list.appendChild(row);
       });
+
+      const boundaryRow = document.createElement("div");
+      boundaryRow.className = "legend-row legend-row-boundary";
+      boundaryRow.innerHTML = `
+        <span class="legend-swatch legend-line"></span>
+        <span>Municipal boundary</span>
+      `;
+      list.appendChild(boundaryRow);
 
       note.textContent = "";
     }
@@ -3193,21 +3162,6 @@
       return `${est.getUTCMonth() + 1}/${est.getUTCDate()}/${yy}`;
     }
 
-    function formatIsoDatePretty(dateStr) {
-      const match = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if (!match) return String(dateStr || "--");
-      const [, year, month, day] = match;
-      return `${MONTH_NAMES[Number(month) - 1]} ${Number(day)}, ${year}`;
-    }
-
-    function formatClassificationLabel(classification) {
-      const key = String(classification || "none").toLowerCase();
-      if (key === "minor") return "Minor flood";
-      if (key === "moderate") return "Moderate flood";
-      if (key === "major") return "Major flood";
-      return "Observed day";
-    }
-
     function getEntryESTDate(entry) {
       const d = entry?.timeEST ? parseStoredESTToDate(entry.timeEST) : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
       if (!d || Number.isNaN(d.getTime())) return null;
@@ -3359,6 +3313,13 @@
       return `${MONTH_NAMES_LONG[Number(m) - 1]} ${y}`;
     }
 
+    function formatSelectedObservedDate(dateStr) {
+      const match = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return dateStr || "Pick a day";
+      const [, y, m, d] = match;
+      return `${MONTH_NAMES[Number(m) - 1]} ${Number(d)}, ${y}`;
+    }
+
     function prettyMonthShort(monthKey) {
       if (!monthKey) return "--";
       const [y, m] = monthKey.split("-");
@@ -3380,27 +3341,17 @@
 
     function updateDayNav() {
       const center = document.getElementById("dayNavCenter");
-      const sub = document.getElementById("dayNavSub");
       const prevBtn = document.getElementById("prevDayBtn");
       const nextBtn = document.getElementById("nextDayBtn");
 
       if (!selectedObservedDate) {
         center.textContent = "Pick a day";
-        if (sub) sub.textContent = "Choose a highlighted date";
         prevBtn.disabled = true;
         nextBtn.disabled = true;
         return;
       }
 
-      const day = getObservedDayRecord(selectedObservedDate);
-      center.textContent = formatIsoDatePretty(selectedObservedDate);
-      if (sub) {
-        const classText = formatClassificationLabel(day?.classification);
-        const peakText = day?.peakNAVD88 != null
-          ? `Peak ${formatStageForDisplay(day.peakNAVD88)}`
-          : getDatumLongLabel();
-        sub.textContent = `${classText} • ${peakText}`;
-      }
+      center.textContent = formatSelectedObservedDate(selectedObservedDate);
       prevBtn.disabled = !getNeighborObservedDate(selectedObservedDate, -1);
       nextBtn.disabled = !getNeighborObservedDate(selectedObservedDate, 1);
     }
@@ -3763,7 +3714,7 @@
         const cls = meta.classification || "none";
         btn.classList.add(`day-${cls}`);
         if (selectedObservedDate === dateStr && currentViewType !== "top-tide") btn.classList.add("selected");
-        btn.title = `${dateStr} • ${cls}${meta.peakNAVD88 != null ? ` • Peak ${formatStageForDisplay(meta.peakNAVD88)}` : ""}`;
+        btn.title = `${formatSelectedObservedDate(dateStr)} • ${cls}`;
         btn.addEventListener("click", () => {
           loadObservedDay(dateStr).catch(err => toast(err.message));
         });
