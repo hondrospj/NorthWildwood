@@ -139,7 +139,7 @@
       overflow-y:auto;
       overflow-x:hidden;
       padding:0 4px 4px 0;
-      pointer-events:none;
+      pointer-events:auto;
       background:none;
       border:0;
       scrollbar-gutter:stable;
@@ -1165,6 +1165,212 @@
     }
 
 
+    body.observed-tight #leftPanel{
+      width:368px;
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      align-content:start;
+      gap:8px;
+      padding-right:2px;
+    }
+
+    body.observed-tight #leftPanel .brand,
+    body.observed-tight #leftPanel .snapshot-card,
+    body.observed-tight #leftPanel .calendar-card.active,
+    body.observed-tight #leftPanel .mobile-top-tides-card{
+      grid-column:1 / -1;
+    }
+
+    body.observed-tight #leftPanel .data-source-card,
+    body.observed-tight #leftPanel .overlay-card,
+    body.observed-tight #leftPanel .datum-card,
+    body.observed-tight #leftPanel .opacity-card{
+      grid-column:auto;
+    }
+
+    body.observed-tight .brand{
+      min-height:76px;
+      padding:10px 12px;
+    }
+
+    body.observed-tight h1{
+      font-size:clamp(18px, 2vw, 28px);
+    }
+
+    body.observed-tight .panel-card{
+      padding:9px 11px;
+      border-radius:18px;
+    }
+
+    body.observed-tight .section-title{
+      margin-bottom:7px;
+    }
+
+    body.observed-tight .section-title h2{
+      font-size:13px;
+    }
+
+    body.observed-tight .pill{
+      min-height:22px;
+      padding:0 7px;
+      font-size:10px;
+    }
+
+    body.observed-tight .button-grid-2{
+      gap:6px;
+    }
+
+    body.observed-tight button,
+    body.observed-tight select{
+      min-height:34px;
+      font-size:12px;
+    }
+
+    body.observed-tight .datum-card .segmented-control button{
+      min-height:34px;
+      padding:7px 8px;
+      font-size:11.5px;
+    }
+
+    body.observed-tight .snapshot-card .stat-grid{
+      grid-template-columns:1fr 1fr;
+      gap:6px;
+    }
+
+    body.observed-tight .snapshot-card .stat-box{
+      padding:10px 8px;
+      gap:4px;
+      border-radius:15px;
+    }
+
+    body.observed-tight .stat-label{
+      font-size:10px;
+    }
+
+    body.observed-tight #timeText,
+    body.observed-tight #stageText{
+      font-size:20px;
+      line-height:1.02;
+    }
+
+    body.observed-tight .calendar-card{
+      gap:6px;
+    }
+
+    body.observed-tight .calendar-toolbar{
+      grid-template-columns:34px 1fr 34px;
+      gap:4px;
+    }
+
+    body.observed-tight .calendar-toolbar > button,
+    body.observed-tight .calendar-title-btn{
+      min-height:34px;
+    }
+
+    body.observed-tight .calendar-head div{
+      font-size:10px;
+    }
+
+    body.observed-tight .calendar-grid{
+      gap:3px;
+    }
+
+    body.observed-tight .calendar-day{
+      min-height:28px;
+      font-size:11px;
+      border-radius:9px;
+    }
+
+    body.observed-tight .day-nav{
+      gap:5px;
+    }
+
+    body.observed-tight .day-nav button{
+      min-height:31px;
+      font-size:11px;
+    }
+
+    body.observed-tight .day-nav-center{
+      font-size:10px;
+      max-width:none;
+    }
+
+    body.observed-tight .opacity-card{
+      padding-top:8px;
+      padding-bottom:8px;
+    }
+
+    body.observed-tight .opacity-card .muted{
+      display:none;
+    }
+
+    body.observed-tight #legendDock{
+      left:400px;
+    }
+
+    body.observed-tight #leftPanel.needs-scroll::after{
+      content:"Scroll";
+      position:sticky;
+      bottom:0;
+      margin-left:auto;
+      margin-right:4px;
+      align-self:end;
+      font-size:10px;
+      font-weight:800;
+      color:#c7d2fe;
+      background:linear-gradient(180deg, rgba(11,18,32,0), rgba(11,18,32,.92) 52%);
+      padding:18px 10px 0;
+      pointer-events:none;
+    }
+
+    body.observed-tight.observed-ultra-tight #leftPanel{
+      width:392px;
+      gap:7px;
+    }
+
+    body.observed-tight.observed-ultra-tight .brand{
+      min-height:68px;
+      padding:9px 11px;
+    }
+
+    body.observed-tight.observed-ultra-tight .panel-card{
+      padding:8px 10px;
+      border-radius:17px;
+    }
+
+    body.observed-tight.observed-ultra-tight h1{
+      font-size:clamp(17px, 1.75vw, 25px);
+    }
+
+    body.observed-tight.observed-ultra-tight button,
+    body.observed-tight.observed-ultra-tight select{
+      min-height:32px;
+      font-size:11px;
+    }
+
+    body.observed-tight.observed-ultra-tight .datum-card .segmented-control button{
+      min-height:32px;
+      font-size:11px;
+    }
+
+    body.observed-tight.observed-ultra-tight .calendar-head div{
+      font-size:9px;
+    }
+
+    body.observed-tight.observed-ultra-tight .calendar-day{
+      min-height:26px;
+      font-size:10px;
+    }
+
+    body.observed-tight.observed-ultra-tight #timeText,
+    body.observed-tight.observed-ultra-tight #stageText{
+      font-size:18px;
+    }
+
+    body.observed-tight.observed-ultra-tight .stat-label{
+      font-size:9px;
+    }
+
     #toast{
       position:absolute;
       left:10px;
@@ -1619,7 +1825,7 @@
         </div>
       </section>
 
-      <section class="panel-card compact-card">
+      <section class="panel-card compact-card data-source-card">
         <div class="section-title">
           <h2>Data source</h2>
           <span id="dataModePill" class="pill">Forecast</span>
@@ -1630,7 +1836,7 @@
         </div>
       </section>
 
-      <section class="panel-card compact-card">
+      <section class="panel-card compact-card overlay-card">
         <div class="section-title">
           <h2>Overlay</h2>
           <span id="overlayModePill" class="pill">Flood Depth</span>
@@ -1852,7 +2058,13 @@
     const OSM_BASEMAP_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
     const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png";
     const MUNICIPAL_BOUNDARY_QUERY_URL = "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/NJ_Municipalities_3857/FeatureServer/0/query";
-    const MUNICIPAL_BOUNDARY_WHERE = "NAME = 'North Wildwood City'";
+    const MUNICIPAL_BOUNDARY_OUTFIELDS = "NAME,COUNTY,MUN,MUN_LABEL,MUN_TYPE,GNIS_NAME";
+    const MUNICIPAL_BOUNDARY_QUERY_CANDIDATES = [
+      "MUN_LABEL = 'NORTH WILDWOOD CITY' AND COUNTY = 'CAPE MAY'",
+      "NAME = 'North Wildwood City' AND COUNTY = 'CAPE MAY'",
+      "GNIS_NAME = 'North Wildwood City' AND COUNTY = 'CAPE MAY'",
+      "MUN = 'North Wildwood' AND COUNTY = 'CAPE MAY'"
+    ];
     const DATUM_OFFSETS = {
       navd88: 0,
       mllw: 2.75
@@ -2146,6 +2358,7 @@
         currentDataMode === "forecast" ? "Forecast" : "Observed";
       document.getElementById("calendarCard").classList.toggle("active", currentDataMode === "observed");
       document.body.classList.toggle("observed-mode", currentDataMode === "observed");
+      syncLeftPanelLayout();
     }
 
     function renderLegend() {
@@ -2380,6 +2593,81 @@
       return outerRings;
     }
 
+    function normalizeBoundaryRingsFromArcGIS(rings, sourceWkid = 3857) {
+      if (!Array.isArray(rings)) return [];
+      const sourceCrs = Number(sourceWkid) === 4326 ? "EPSG:4326" : "EPSG:3857";
+
+      return rings
+        .map(ring => Array.isArray(ring) ? ring : [])
+        .map(ring => ring
+          .filter(coord => Array.isArray(coord) && coord.length >= 2)
+          .map(([x, y]) => {
+            const pair = sourceCrs === "EPSG:4326" ? [x, y] : proj4(sourceCrs, "EPSG:4326", [x, y]);
+            const [lng, lat] = pair;
+            return [lat, lng];
+          })
+        )
+        .map(ring => {
+          if (ring.length > 1) {
+            const first = ring[0];
+            const last = ring[ring.length - 1];
+            if (first[0] === last[0] && first[1] === last[1]) ring.pop();
+          }
+          return ring;
+        })
+        .filter(ring => ring.length >= 3)
+        .sort((a, b) => approximateRingArea(b) - approximateRingArea(a));
+    }
+
+    function buildGeoJsonFeatureFromArcGIS(feature) {
+      if (!feature?.geometry?.rings?.length) return null;
+      const spatialReference = feature.geometry.spatialReference || {};
+      const sourceWkid = Number(spatialReference.latestWkid || spatialReference.wkid || 3857);
+      const rings = normalizeBoundaryRingsFromArcGIS(feature.geometry.rings, sourceWkid);
+      if (!rings.length) return null;
+
+      const coordinates = rings.length === 1
+        ? [rings[0].map(([lat, lng]) => [lng, lat])]
+        : rings.map(ring => [ring.map(([lat, lng]) => [lng, lat])]);
+
+      return {
+        type: "Feature",
+        properties: feature.attributes || {},
+        geometry: {
+          type: rings.length === 1 ? "Polygon" : "MultiPolygon",
+          coordinates
+        }
+      };
+    }
+
+    async function fetchMunicipalBoundaryFeature() {
+      for (const where of MUNICIPAL_BOUNDARY_QUERY_CANDIDATES) {
+        const params = new URLSearchParams({
+          f: "json",
+          where,
+          outFields: MUNICIPAL_BOUNDARY_OUTFIELDS,
+          returnGeometry: "true",
+          outSR: "3857",
+          resultRecordCount: "1"
+        });
+
+        const response = await fetch(`${MUNICIPAL_BOUNDARY_QUERY_URL}?${params.toString()}`, {
+          cache: "no-store",
+          headers: { "Accept": "application/json" }
+        });
+
+        if (!response.ok) continue;
+        const json = await response.json();
+        const feature = Array.isArray(json?.features) ? json.features[0] : null;
+        const geojsonFeature = buildGeoJsonFeatureFromArcGIS(feature);
+        if (geojsonFeature) {
+          return { feature: geojsonFeature, rings: normalizeBoundaryRingsFromArcGIS(feature.geometry.rings, Number(feature.geometry?.spatialReference?.latestWkid || feature.geometry?.spatialReference?.wkid || 3857)) };
+        }
+      }
+
+      return null;
+    }
+
     function updateMunicipalBoundaryLayer() {
       if (!map) return;
 
@@ -2418,17 +2706,13 @@
 
     async function loadMunicipalBoundary() {
       try {
-        const url = `${MUNICIPAL_BOUNDARY_QUERY_URL}?f=geojson&where=${encodeURIComponent(MUNICIPAL_BOUNDARY_WHERE)}&outFields=NAME,COUNTY,MUN,MUN_LABEL,MUN_TYPE&returnGeometry=true&outSR=4326`;
-        const geojson = await fetchJson(url);
-        const feature = Array.isArray(geojson?.features) ? geojson.features[0] : null;
-        const rings = normalizeBoundaryRingsFromGeoJSON(feature?.geometry);
-
-        if (!feature || !rings.length) {
+        const boundary = await fetchMunicipalBoundaryFeature();
+        if (!boundary?.feature || !boundary?.rings?.length) {
           throw new Error("Municipal boundary query returned no geometry.");
         }
 
-        municipalBoundaryFeature = feature;
-        municipalBoundaryRings = rings;
+        municipalBoundaryFeature = boundary.feature;
+        municipalBoundaryRings = boundary.rings;
       } catch (err) {
         console.warn("Falling back to embedded North Wildwood boundary.", err);
         municipalBoundaryFeature = null;
@@ -2436,6 +2720,7 @@
       }
 
       updateMunicipalBoundaryLayer();
+      syncLeftPanelLayout();
     }
 
     function updateColorBasemapClip() {
@@ -2466,6 +2751,48 @@
       container.style.clipPath = clip;
       container.style.webkitClipPath = clip;
       container.classList.remove("map-mask-fallback");
+    }
+
+    function getTimelineReservedSpace() {
+      const dock = document.getElementById("timelineDock");
+      if (!dock) return 132;
+      const styles = window.getComputedStyle(dock);
+      const bottom = parseFloat(styles.bottom) || 0;
+      return Math.ceil(dock.offsetHeight + bottom + 12);
+    }
+
+    function syncLeftPanelLayout() {
+      const panel = document.getElementById("leftPanel");
+      if (!panel) return;
+
+      const reserved = Math.max(112, getTimelineReservedSpace());
+      panel.style.bottom = `${reserved}px`;
+      document.documentElement.style.setProperty("--left-panel-bottom", `${reserved}px`);
+      panel.classList.remove("needs-scroll");
+      document.body.classList.remove("observed-tight", "observed-ultra-tight");
+
+      if (currentDataMode !== "observed" || window.innerWidth < 721) return;
+
+      requestAnimationFrame(() => {
+        let overflow = panel.scrollHeight - panel.clientHeight;
+
+        if (window.innerWidth >= 1040 && overflow > 8) {
+          document.body.classList.add("observed-tight");
+          requestAnimationFrame(() => {
+            overflow = panel.scrollHeight - panel.clientHeight;
+            if (window.innerWidth >= 1200 && overflow > 8) {
+              document.body.classList.add("observed-ultra-tight");
+            }
+
+            requestAnimationFrame(() => {
+              const remainingOverflow = panel.scrollHeight - panel.clientHeight;
+              panel.classList.toggle("needs-scroll", remainingOverflow > 8);
+            });
+          });
+        } else {
+          panel.classList.toggle("needs-scroll", overflow > 8);
+        }
+      });
     }
 
     function ensureMap() {
@@ -3201,6 +3528,7 @@
       document.getElementById("nextMonthBtn").disabled = monthIndex === -1 || monthIndex >= observedMonthKeys.length - 1;
       updateDayNav();
       populateCalendarSelectors();
+      syncLeftPanelLayout();
     }
 
     async function loadObservedDay(dateStr, preferredHourIndex = null) {
@@ -3535,6 +3863,7 @@
           map.invalidateSize();
           updateColorBasemapClip();
         }
+        syncLeftPanelLayout();
         positionTimelineBubble();
       });
       requestAnimationFrame(() => {
@@ -3542,6 +3871,7 @@
           map.invalidateSize();
           updateColorBasemapClip();
         }
+        syncLeftPanelLayout();
         positionTimelineBubble();
       });
       await loadMunicipalBoundary();
