@@ -1535,27 +1535,88 @@
     };
 
     const NORTH_WILDWOOD_MASK_RING = [
-      [39.0197, -74.8086],
-      [39.0210, -74.8038],
-      [39.0206, -74.7978],
-      [39.0178, -74.7918],
-      [39.0127, -74.7880],
-      [39.0063, -74.7860],
-      [39.0002, -74.7869],
-      [38.9942, -74.7900],
-      [38.9898, -74.7950],
-      [38.9880, -74.8018],
-      [38.9887, -74.8083],
-      [38.9913, -74.8134],
-      [38.9945, -74.8186],
-      [38.9990, -74.8225],
-      [39.0036, -74.8232],
-      [39.0057, -74.8190],
-      [39.0058, -74.8126],
-      [39.0070, -74.8070],
-      [39.0107, -74.8041],
-      [39.0146, -74.8048],
-      [39.0176, -74.8073]
+      [39.00294, -74.81894],
+      [39.00348, -74.81879],
+      [39.0058, -74.81588],
+      [39.00666, -74.81313],
+      [39.00774, -74.8116],
+      [39.00814, -74.81045],
+      [39.0084, -74.81021],
+      [39.00781, -74.80918],
+      [39.00783, -74.8089],
+      [39.00749, -74.8087],
+      [39.00724, -74.80821],
+      [39.00735, -74.80757],
+      [39.00762, -74.80733],
+      [39.00804, -74.80753],
+      [39.00832, -74.80734],
+      [39.00841, -74.807],
+      [39.00791, -74.80681],
+      [39.00785, -74.8061],
+      [39.00748, -74.80598],
+      [39.00669, -74.80238],
+      [39.00669, -74.80135],
+      [39.00705, -74.79985],
+      [39.00752, -74.79911],
+      [39.00825, -74.79843],
+      [39.00852, -74.79847],
+      [39.0091, -74.79802],
+      [39.01041, -74.7979],
+      [39.01214, -74.79815],
+      [39.01361, -74.7994],
+      [39.01432, -74.80069],
+      [39.0148, -74.80103],
+      [39.01571, -74.80091],
+      [39.01767, -74.80017],
+      [39.01938, -74.80007],
+      [39.02136, -74.80051],
+      [39.0218, -74.80026],
+      [39.02304, -74.80084],
+      [39.02368, -74.80057],
+      [39.02559, -74.79763],
+      [39.02587, -74.7964],
+      [39.02577, -74.79459],
+      [39.02539, -74.793],
+      [39.02439, -74.79151],
+      [39.02247, -74.78948],
+      [39.02132, -74.78994],
+      [39.01992, -74.78989],
+      [39.01912, -74.78968],
+      [39.0183, -74.78915],
+      [39.01753, -74.78821],
+      [39.01284, -74.7928],
+      [39.01209, -74.79163],
+      [39.01179, -74.7916],
+      [39.01143, -74.79204],
+      [39.01111, -74.79207],
+      [39.01021, -74.79093],
+      [39.00957, -74.79058],
+      [39.00856, -74.79031],
+      [39.00435, -74.78806],
+      [39.00124, -74.78618],
+      [38.99975, -74.78653],
+      [38.99861, -74.78838],
+      [38.99595, -74.79023],
+      [38.99389, -74.79132],
+      [38.99199, -74.79272],
+      [38.9884, -74.8019],
+      [38.99823, -74.81541],
+      [38.99928, -74.81437],
+      [38.99928, -74.81356],
+      [38.9995, -74.81325],
+      [38.99965, -74.81382],
+      [39.00013, -74.81384],
+      [39.00066, -74.81339],
+      [39.0013, -74.81337],
+      [39.00191, -74.81314],
+      [39.00209, -74.81325],
+      [39.00211, -74.814],
+      [39.00145, -74.81557],
+      [39.00144, -74.81697],
+      [39.00162, -74.81737],
+      [39.00152, -74.81769],
+      [39.00251, -74.81883],
+      [39.00294, -74.81894]
     ];
 
     const FALLBACK_LATLNG_BOUNDS = L.latLngBounds(
@@ -1616,6 +1677,7 @@
     let basemapGrayLayer = null;
     let basemapColorLayer = null;
     let roadsLayer = null;
+    let cityBoundaryOutline = null;
     let currentFloodLayer = null;
     let pendingFloodLayer = null;
     let floodProjectedBounds = null;
@@ -1938,18 +2000,29 @@
       if (!map || !basemapColorLayer) return;
 
       const container = basemapColorLayer.getContainer();
-      if (!container) return;
+      const mapContainer = map.getContainer();
+      if (!container || !mapContainer) return;
 
       if (!Array.isArray(NORTH_WILDWOOD_MASK_RING) || NORTH_WILDWOOD_MASK_RING.length < 3) {
         container.style.clipPath = "";
+        container.style.webkitClipPath = "";
         return;
       }
 
-      const pts = NORTH_WILDWOOD_MASK_RING.map(([lat, lng]) => map.latLngToContainerPoint([lat, lng]));
-      const clip = `polygon(${pts.map(pt => `${pt.x}px ${pt.y}px`).join(",")})`;
+      const mapRect = mapContainer.getBoundingClientRect();
+      const layerRect = container.getBoundingClientRect();
+      const offsetX = layerRect.left - mapRect.left;
+      const offsetY = layerRect.top - mapRect.top;
+
+      const pts = NORTH_WILDWOOD_MASK_RING.map(([lat, lng]) => {
+        const p = map.latLngToContainerPoint([lat, lng]);
+        return { x: p.x - offsetX, y: p.y - offsetY };
+      });
+
+      const clip = `polygon(${pts.map(pt => `${pt.x.toFixed(2)}px ${pt.y.toFixed(2)}px`).join(",")})`;
       container.style.clipPath = clip;
       container.style.webkitClipPath = clip;
-      container.classList.add("map-mask-fallback");
+      container.classList.remove("map-mask-fallback");
     }
 
     function ensureMap() {
@@ -1966,10 +2039,12 @@
 
       map.createPane("basemapGrayPane");
       map.createPane("basemapColorPane");
+      map.createPane("boundaryPane");
       map.createPane("floodPane");
       map.createPane("roadsPane");
       map.getPane("basemapGrayPane").style.zIndex = 180;
       map.getPane("basemapColorPane").style.zIndex = 190;
+      map.getPane("boundaryPane").style.zIndex = 195;
       map.getPane("floodPane").style.zIndex = 500;
       map.getPane("roadsPane").style.zIndex = 650;
 
@@ -2008,6 +2083,17 @@
         keepBuffer: 2,
         className: "roads-layer",
         pane: "roadsPane"
+      }).addTo(map);
+
+      cityBoundaryOutline = L.polygon(NORTH_WILDWOOD_MASK_RING, {
+        pane: "boundaryPane",
+        interactive: false,
+        stroke: true,
+        color: "rgba(255,255,255,0.42)",
+        weight: 1.25,
+        opacity: 1,
+        fill: false,
+        smoothFactor: 0
       }).addTo(map);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
