@@ -27,7 +27,7 @@
       --minor:#d58a00;
       --moderate:#d84b67;
       --major:#7c5ce0;
-      --below:#239b68;
+      --below:#79DD5A;
 
       --depth-0:#CFEFFF;
       --depth-1:#2769DB;
@@ -128,20 +128,21 @@
     #leftPanel{
       position:fixed;
       top:16px;
+      bottom:132px;
       left:16px;
       z-index:1250;
-      width:288px;
+      width:320px;
       max-width:calc(100vw - 32px);
-      max-height:calc(100vh - 148px);
       display:flex;
       flex-direction:column;
       gap:10px;
       overflow-y:auto;
       overflow-x:hidden;
-      padding:0;
+      padding:0 4px 4px 0;
       pointer-events:none;
       background:none;
       border:0;
+      scrollbar-gutter:stable;
     }
 
     .panel-card{
@@ -153,6 +154,8 @@
       backdrop-filter:blur(14px);
       -webkit-backdrop-filter:blur(16px);
       pointer-events:auto;
+      flex:0 0 auto;
+      min-height:fit-content;
     }
 
     .brand{
@@ -529,7 +532,7 @@
     #legendDock{
       position:fixed;
       top:16px;
-      left:320px;
+      left:352px;
       width:182px;
       padding:12px;
     }
@@ -574,14 +577,16 @@
     #rightRail{
       position:fixed;
       top:16px;
+      bottom:132px;
       right:16px;
       width:208px;
-      max-height:calc(100vh - 148px);
       overflow-y:auto;
       overflow-x:hidden;
       padding:12px;
       display:grid;
       gap:10px;
+      align-content:start;
+      scrollbar-gutter:stable;
     }
 
     .rail-card{
@@ -973,14 +978,37 @@
     }
 
     .leaflet-bottom.leaflet-right .leaflet-control-zoom{
-      margin-right:222px;
-      margin-bottom:128px;
+      margin-right:16px;
+      margin-bottom:112px;
     }
 
     .leaflet-pane.roads-bright img,
     .leaflet-layer.roads-bright{
       filter:grayscale(1) brightness(2.4) contrast(2.05);
       mix-blend-mode:screen;
+    }
+
+    .compact-card select{
+      width:100%;
+      padding:0 12px;
+    }
+
+    .datum-card select{
+      background:rgba(255,255,255,.06);
+    }
+
+    .basemap-gray-layer{
+      filter:grayscale(100%) brightness(.9) contrast(1.03);
+      -webkit-filter:grayscale(100%) brightness(.9) contrast(1.03);
+    }
+
+    .basemap-color-layer{
+      filter:none;
+      -webkit-filter:none;
+    }
+
+    .map-mask-fallback{
+      outline:1px solid rgba(255,255,255,.08);
     }
 
 
@@ -1023,10 +1051,10 @@
 
     @media (max-width: 1320px){
       #leftPanel{
-        width:276px;
+        width:300px;
       }
       #legendDock{
-        left:304px;
+        left:332px;
         width:180px;
       }
       #rightRail{
@@ -1036,13 +1064,12 @@
 
     @media (max-width: 1180px){
       #leftPanel{
-        width:256px;
-        max-height:calc(100vh - 132px);
+        width:284px;
       }
 
       #legendDock{
         top:16px;
-        left:286px;
+        left:312px;
         width:170px;
       }
 
@@ -1050,7 +1077,6 @@
         top:16px;
         right:16px;
         width:190px;
-        max-height:calc(100vh - 132px);
       }
 
       #timelineDock{
@@ -1068,14 +1094,14 @@
       }
 
       #leftPanel{
-        width:min(284px, calc(58vw - 18px));
-        max-height:calc(100vh - 178px);
+        width:min(304px, calc(58vw - 18px));
+        bottom:138px;
       }
 
       #rightRail{
         display:grid;
         width:min(216px, calc(42vw - 18px));
-        max-height:calc(100vh - 178px);
+        bottom:138px;
         top:16px;
         right:16px;
       }
@@ -1122,10 +1148,22 @@
       #leftPanel{
         left:8px;
         right:8px;
+        top:8px;
+        bottom:114px;
         width:auto;
         max-width:none;
-        max-height:calc(100vh - 104px);
-        gap:7px;
+        gap:8px;
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        align-content:start;
+        padding-right:0;
+      }
+
+      #leftPanel .brand,
+      #leftPanel .snapshot-card,
+      #leftPanel .calendar-card.active,
+      #leftPanel .mobile-top-tides-card{
+        grid-column:1 / -1;
       }
 
       #rightRail,
@@ -1144,7 +1182,7 @@
       }
 
       .brand{
-        min-height:104px;
+        min-height:92px;
         padding:12px 14px;
       }
 
@@ -1172,8 +1210,8 @@
       }
 
       .calendar-day{
-        min-height:42px;
-        font-size:15px;
+        min-height:40px;
+        font-size:14px;
       }
 
       .day-nav-center{
@@ -1200,11 +1238,20 @@
         font-size:11px;
         padding:6px 10px;
       }
+
+      .leaflet-bottom.leaflet-right .leaflet-control-zoom{
+        margin-right:10px;
+        margin-bottom:102px;
+      }
     }
 
     @media (max-width: 420px){
       h1{
         font-size:clamp(20px, 9vw, 30px);
+      }
+
+      #leftPanel{
+        grid-template-columns:1fr;
       }
 
       .button-grid-2{
@@ -1224,8 +1271,8 @@
       }
 
       .calendar-day{
-        min-height:38px;
-        font-size:14px;
+        min-height:36px;
+        font-size:13px;
       }
     }
   </style>
@@ -1248,7 +1295,7 @@
         </div>
       </section>
 
-      <section class="panel-card">
+      <section class="panel-card compact-card">
         <div class="section-title">
           <h2>Data source</h2>
           <span id="dataModePill" class="pill">Forecast</span>
@@ -1259,7 +1306,7 @@
         </div>
       </section>
 
-      <section class="panel-card">
+      <section class="panel-card compact-card">
         <div class="section-title">
           <h2>Overlay</h2>
           <span id="overlayModePill" class="pill">Flood Depth</span>
@@ -1267,6 +1314,19 @@
         <div class="button-grid-2">
           <button id="depthModeBtn" class="active" type="button">Flood Depth</button>
           <button id="dynamicModeBtn" type="button">Dynamic Flood</button>
+        </div>
+      </section>
+
+      <section class="panel-card compact-card datum-card">
+        <div class="section-title">
+          <h2>Datum</h2>
+          <span id="datumPill" class="pill">NAVD88</span>
+        </div>
+        <div class="control-row">
+          <select id="datumSelect" aria-label="Select vertical datum">
+            <option value="navd88" selected>NAVD88</option>
+            <option value="mllw">MLLW (+2.75 ft)</option>
+          </select>
         </div>
       </section>
 
@@ -1340,7 +1400,7 @@
         </div>
       </section>
 
-      <section class="panel-card">
+      <section class="panel-card compact-card opacity-card">
         <div class="section-title">
           <h2>Overlay opacity</h2>
           <span id="opacityText" class="pill">75%</span>
@@ -1467,10 +1527,36 @@
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
 
-    const NJ_BASEMAP_URL =
-      "https://maps.nj.gov/arcgis/rest/services/Basemap/Orthos_Natural_2015_NJ/MapServer/tile/{z}/{y}/{x}";
-    const NJ_ROADS_URL =
-      "https://maps.nj.gov/arcgis/rest/services/Basemap/Roads_NJ/MapServer/tile/{z}/{y}/{x}";
+    const OSM_BASEMAP_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png";
+    const DATUM_OFFSETS = {
+      navd88: 0,
+      mllw: 2.75
+    };
+
+    const NORTH_WILDWOOD_MASK_RING = [
+      [39.0197, -74.8086],
+      [39.0210, -74.8038],
+      [39.0206, -74.7978],
+      [39.0178, -74.7918],
+      [39.0127, -74.7880],
+      [39.0063, -74.7860],
+      [39.0002, -74.7869],
+      [38.9942, -74.7900],
+      [38.9898, -74.7950],
+      [38.9880, -74.8018],
+      [38.9887, -74.8083],
+      [38.9913, -74.8134],
+      [38.9945, -74.8186],
+      [38.9990, -74.8225],
+      [39.0036, -74.8232],
+      [39.0057, -74.8190],
+      [39.0058, -74.8126],
+      [39.0070, -74.8070],
+      [39.0107, -74.8041],
+      [39.0146, -74.8048],
+      [39.0176, -74.8073]
+    ];
 
     const FALLBACK_LATLNG_BOUNDS = L.latLngBounds(
       [38.967, -74.835],
@@ -1527,7 +1613,8 @@
     ];
 
     let map = null;
-    let orthoLayer = null;
+    let basemapGrayLayer = null;
+    let basemapColorLayer = null;
     let roadsLayer = null;
     let currentFloodLayer = null;
     let pendingFloodLayer = null;
@@ -1553,6 +1640,7 @@
     let currentTopTideIndex = null;
     let currentRangeLabel = "--";
     let currentBaseModeBeforeTopTide = "observed";
+    let currentDatum = "navd88";
 
     let playTimer = null;
     let overlayOpacity = DEFAULT_OPACITY;
@@ -1599,6 +1687,51 @@
     function setOpacityText() {
       document.getElementById("opacityText").textContent = `${Math.round(overlayOpacity * 100)}%`;
     }
+
+    function getDatumLabel() {
+      return currentDatum === "mllw" ? "MLLW" : "NAVD88";
+    }
+
+    function getDatumLongLabel() {
+      return currentDatum === "mllw" ? "MLLW (+2.75 ft)" : "NAVD88";
+    }
+
+    function convertStageForDisplay(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+      return n + (DATUM_OFFSETS[currentDatum] || 0);
+    }
+
+    function formatStageForDisplay(value, digits = 2) {
+      const converted = convertStageForDisplay(value);
+      return Number.isFinite(converted) ? `${converted.toFixed(digits)} ft` : "--";
+    }
+
+    function updateDatumUI() {
+      const pill = document.getElementById("datumPill");
+      const select = document.getElementById("datumSelect");
+      const stageSub = document.getElementById("stageSubText");
+      if (pill) pill.textContent = getDatumLabel();
+      if (select) select.value = currentDatum;
+      if (stageSub) stageSub.textContent = getDatumLongLabel();
+    }
+
+    function refreshCurrentDisplayText() {
+      updateDatumUI();
+      renderTopTides();
+      if (currentDataMode === "observed" && observedData) {
+        renderCalendar();
+        updateDayNav();
+      }
+      const entry = currentSeriesHours[currentHourIndex];
+      if (entry) {
+        const rawStage = getStageValue(entry);
+        const displayStage = getOverlayStage(rawStage);
+        renderSelectionMeta(entry, rawStage, displayStage);
+        renderTimelineMeta(entry);
+      }
+    }
+
 
     function updateModeButtons() {
       document.getElementById("depthModeBtn").classList.toggle("active", currentOverlayMode === "depth");
@@ -1800,60 +1933,96 @@
       );
     }
 
+    function updateColorBasemapClip() {
+      if (!map || !basemapColorLayer) return;
+
+      const container = basemapColorLayer.getContainer();
+      if (!container) return;
+
+      if (!Array.isArray(NORTH_WILDWOOD_MASK_RING) || NORTH_WILDWOOD_MASK_RING.length < 3) {
+        container.style.clipPath = "";
+        return;
+      }
+
+      const pts = NORTH_WILDWOOD_MASK_RING.map(([lat, lng]) => map.latLngToContainerPoint([lat, lng]));
+      const clip = `polygon(${pts.map(pt => `${pt.x}px ${pt.y}px`).join(",")})`;
+      container.style.clipPath = clip;
+      container.style.webkitClipPath = clip;
+      container.classList.add("map-mask-fallback");
+    }
+
     function ensureMap() {
       if (map) return;
 
       map = L.map("map", {
-        crs: NJSP_CRS,
         zoomControl: false,
-        minZoom: 0,
-        maxZoom: 12,
-        continuousWorld: true,
-        worldCopyJump: false,
+        minZoom: 11,
+        maxZoom: 19,
         zoomSnap: 1,
-        zoomDelta: 1
+        zoomDelta: 1,
+        preferCanvas: true
       });
 
-      map.createPane("orthoPane");
+      map.createPane("basemapGrayPane");
+      map.createPane("basemapColorPane");
       map.createPane("floodPane");
       map.createPane("roadsPane");
-      map.getPane("orthoPane").style.zIndex = 200;
+      map.getPane("basemapGrayPane").style.zIndex = 180;
+      map.getPane("basemapColorPane").style.zIndex = 190;
       map.getPane("floodPane").style.zIndex = 500;
       map.getPane("roadsPane").style.zIndex = 650;
 
-      orthoLayer = L.tileLayer(NJ_BASEMAP_URL, {
-        attribution: "NJ OGIS Orthophoto 2015",
-        tileSize: 512,
-        minZoom: 0,
-        maxZoom: 12,
-        noWrap: true,
+      basemapGrayLayer = L.tileLayer(OSM_BASEMAP_URL, {
+        attribution: "&copy; OpenStreetMap contributors",
+        minZoom: 11,
+        maxZoom: 19,
+        subdomains: "abc",
+        crossOrigin: true,
         updateWhenIdle: true,
-        keepBuffer: 2,
-        className: "grayscale-tiles",
-        pane: "orthoPane"
+        keepBuffer: 3,
+        className: "basemap-gray-layer",
+        pane: "basemapGrayPane"
       }).addTo(map);
 
-      roadsLayer = L.tileLayer(NJ_ROADS_URL, {
-        attribution: "NJ Roads_NJ",
-        tileSize: 512,
-        minZoom: 0,
-        maxZoom: 12,
-        noWrap: true,
+      basemapColorLayer = L.tileLayer(OSM_BASEMAP_URL, {
+        attribution: "&copy; OpenStreetMap contributors",
+        minZoom: 11,
+        maxZoom: 19,
+        subdomains: "abc",
+        crossOrigin: true,
+        updateWhenIdle: true,
+        keepBuffer: 3,
+        className: "basemap-color-layer",
+        pane: "basemapColorPane"
+      }).addTo(map);
+
+      roadsLayer = L.tileLayer(ROAD_LABELS_URL, {
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+        minZoom: 11,
+        maxZoom: 20,
+        subdomains: "abcd",
+        crossOrigin: true,
+        opacity: 0,
         updateWhenIdle: true,
         keepBuffer: 2,
-        opacity: 0,
         className: "roads-layer",
         pane: "roadsPane"
       }).addTo(map);
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
-      map.on("zoomend", updateRoadLayerAppearance);
+      map.on("zoomend moveend resize", () => {
+        updateRoadLayerAppearance();
+        updateColorBasemapClip();
+      });
       updateRoadLayerAppearance();
+      updateColorBasemapClip();
 
       map.fitBounds(FALLBACK_LATLNG_BOUNDS, { padding: [20, 20] });
-      requestAnimationFrame(() => map.invalidateSize());
+      requestAnimationFrame(() => {
+        map.invalidateSize();
+        updateColorBasemapClip();
+      });
     }
-
 
     function updateRoadLayerAppearance() {
       if (!map || !roadsLayer) return;
@@ -1861,9 +2030,9 @@
       const toggle = document.getElementById("roadsToggle");
       const roadsEnabled = !toggle || toggle.classList.contains("on");
       const zoom = map.getZoom() || 0;
-      const showLabels = roadsEnabled && zoom >= ROAD_LABEL_ZOOM;
+      const showLabels = roadsEnabled && zoom >= 13;
 
-      roadsLayer.setOpacity(showLabels ? 0.96 : 0);
+      roadsLayer.setOpacity(showLabels ? 0.92 : 0);
 
       const pane = map.getPane("roadsPane");
       if (pane) pane.classList.toggle("roads-bright", showLabels);
@@ -2134,7 +2303,7 @@
 
       const day = getObservedDayRecord(selectedObservedDate);
       center.textContent = day?.peakNAVD88 != null
-        ? `${selectedObservedDate} • ${Number(day.peakNAVD88).toFixed(2)} ft`
+        ? `${selectedObservedDate} • ${formatStageForDisplay(day.peakNAVD88)}`
         : selectedObservedDate;
       prevBtn.disabled = !getNeighborObservedDate(selectedObservedDate, -1);
       nextBtn.disabled = !getNeighborObservedDate(selectedObservedDate, 1);
@@ -2204,7 +2373,7 @@
           entry,
           peakStage: getStageValue(entry),
           title: formatHourEntryDateShort(entry),
-          subtitle: `${getStageValue(entry).toFixed(2)} ft`,
+          subtitle: "",
           series,
           peakLocalIndex: flatIdx - startIdx
         });
@@ -2236,7 +2405,7 @@
           btn.innerHTML = `
             <div class="top-tide-rank">#${event.rank}</div>
             <div class="top-tide-main">${event.title}</div>
-            <div class="top-tide-sub">${event.subtitle}</div>
+            <div class="top-tide-sub">${formatStageForDisplay(event.peakStage)}</div>
           `;
           btn.addEventListener("click", () => {
             loadTopTideEvent(idx).catch(err => toast(err.message));
@@ -2289,8 +2458,8 @@
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").innerHTML = formatSnapshotTime(entry);
-      document.getElementById("stageText").textContent = Number.isFinite(rawStage) ? `${rawStage.toFixed(2)} ft` : "--";
-      document.getElementById("stageSubText").textContent = "NAVD88";
+      document.getElementById("stageText").textContent = formatStageForDisplay(rawStage);
+      document.getElementById("stageSubText").textContent = getDatumLongLabel();
       document.getElementById("selectedText").textContent = currentSelectedLabel;
       document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
       document.getElementById("timeSubText").textContent = currentViewType === "forecast"
@@ -2331,9 +2500,9 @@
       }
 
       const previousLayer = currentFloodLayer;
-      const nextLayer = L.Proj.imageOverlay(
+      const nextLayer = L.imageOverlay(
         overlayUrl,
-        floodProjectedBounds,
+        floodLatLngBounds,
         {
           opacity: 0,
           interactive: false,
@@ -2498,7 +2667,7 @@
         const cls = meta.classification || "none";
         btn.classList.add(`day-${cls}`);
         if (selectedObservedDate === dateStr && currentViewType !== "top-tide") btn.classList.add("selected");
-        btn.title = `${dateStr} • ${cls}${meta.peakNAVD88 != null ? ` • Peak ${Number(meta.peakNAVD88).toFixed(2)} ft` : ""}`;
+        btn.title = `${dateStr} • ${cls}${meta.peakNAVD88 != null ? ` • Peak ${formatStageForDisplay(meta.peakNAVD88)}` : ""}`;
         btn.addEventListener("click", () => {
           loadObservedDay(dateStr).catch(err => toast(err.message));
         });
@@ -2528,7 +2697,7 @@
       currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
       currentSelectedSubLabel = dayRecord.peakNAVD88 != null
-        ? `${Number(dayRecord.peakNAVD88).toFixed(2)} ft peak`
+        ? `${formatStageForDisplay(dayRecord.peakNAVD88)} peak`
         : (dayRecord.classification || "Observed");
       currentRangeLabel = `${dateStr}`;
 
@@ -2553,7 +2722,7 @@
       currentViewType = "top-tide";
       currentTopTideIndex = index;
       currentSelectedLabel = `Crest #${event.rank}`;
-      currentSelectedSubLabel = `${event.peakStage.toFixed(2)} ft`;
+      currentSelectedSubLabel = formatStageForDisplay(event.peakStage);
       currentRangeLabel = `${event.title}`;
       selectedObservedDate = event.entry.observedDate;
       currentMonthKey = event.entry.observedDate.slice(0, 7);
@@ -2761,6 +2930,11 @@
         applyOverlayOpacity();
       });
 
+      document.getElementById("datumSelect").addEventListener("change", e => {
+        currentDatum = e.target.value === "mllw" ? "mllw" : "navd88";
+        refreshCurrentDisplayText();
+      });
+
       document.getElementById("forecastDataBtn").addEventListener("click", () => {
         switchDataMode("forecast").catch(err => toast(err.message));
       });
@@ -2823,16 +2997,23 @@
     async function main() {
       ensureMap();
       setOpacityText();
+      updateDatumUI();
       updateModeButtons();
       updateDataModeButtons();
       wireEvents();
       updateRoadLayerAppearance();
       window.addEventListener('resize', () => {
-        if (map) map.invalidateSize();
+        if (map) {
+          map.invalidateSize();
+          updateColorBasemapClip();
+        }
         positionTimelineBubble();
       });
       requestAnimationFrame(() => {
-        if (map) map.invalidateSize();
+        if (map) {
+          map.invalidateSize();
+          updateColorBasemapClip();
+        }
         positionTimelineBubble();
       });
       await reloadAll();
