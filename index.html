@@ -217,25 +217,25 @@
     .segmented-control{
       display:grid;
       grid-template-columns:repeat(2, minmax(0, 1fr));
-      gap:6px;
-      padding:5px;
-      border:1px solid var(--line);
-      border-radius:16px;
-      background:rgba(255,255,255,.04);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+      gap:5px;
+      padding:4px;
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:15px;
+      background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
     }
 
     .segmented-control button{
-      min-height:44px;
-      border-radius:12px;
-      border:1px solid transparent;
+      min-height:40px;
+      border-radius:11px;
+      border:1px solid rgba(255,255,255,.02);
       background:transparent;
       box-shadow:none;
-      font-size:13px;
+      font-size:12.5px;
       font-weight:850;
       letter-spacing:-.02em;
       color:#dbe8ff;
-      padding:10px 12px;
+      padding:9px 10px;
     }
 
     .segmented-control button:hover:not(:disabled){
@@ -1052,16 +1052,29 @@
     }
 
     .datum-card{
-      padding-bottom:12px;
+      padding-bottom:11px;
     }
 
     .datum-card .section-title{
-      margin-bottom:10px;
+      margin-bottom:8px;
     }
 
     .datum-card .segmented-control{
-      background:rgba(255,255,255,.03);
-      border-color:rgba(255,255,255,.09);
+      background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
+      border-color:rgba(191,219,254,.12);
+    }
+
+    .datum-card .segmented-control button{
+      min-height:38px;
+      padding:8px 10px;
+      font-size:12px;
+      color:#d6e6ff;
+    }
+
+    .datum-card .segmented-control button.active{
+      background:linear-gradient(180deg, rgba(96,165,250,.2), rgba(96,165,250,.12));
+      border-color:rgba(191,219,254,.34);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 8px 18px rgba(0,0,0,.12);
     }
 
     .basemap-gray-layer{
@@ -1188,6 +1201,141 @@
       border:2px solid transparent;
       background-clip:padding-box;
     }
+
+    @media (min-width: 1100px) and (max-height: 1080px){
+      body.observed-mode #leftPanel{
+        width:388px;
+        bottom:118px;
+        display:grid;
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        align-content:start;
+        gap:8px;
+        padding-right:0;
+      }
+
+      body.observed-mode #leftPanel .brand,
+      body.observed-mode #leftPanel .datum-card,
+      body.observed-mode #leftPanel .snapshot-card,
+      body.observed-mode #leftPanel .calendar-card.active,
+      body.observed-mode #leftPanel .opacity-card,
+      body.observed-mode #leftPanel .mobile-top-tides-card{
+        grid-column:1 / -1;
+      }
+
+      body.observed-mode .brand{
+        min-height:74px;
+        padding:10px 12px;
+      }
+
+      body.observed-mode .panel-card{
+        padding:9px 11px;
+        border-radius:18px;
+      }
+
+      body.observed-mode .section-title{
+        margin-bottom:7px;
+      }
+
+      body.observed-mode .section-title h2{
+        font-size:13px;
+      }
+
+      body.observed-mode .pill{
+        min-height:22px;
+        padding:0 7px;
+        font-size:10px;
+      }
+
+      body.observed-mode .button-grid-2{
+        gap:6px;
+      }
+
+      body.observed-mode button,
+      body.observed-mode select{
+        min-height:36px;
+        font-size:12px;
+      }
+
+      body.observed-mode .datum-card .segmented-control button{
+        min-height:34px;
+        font-size:11.5px;
+      }
+
+      body.observed-mode .snapshot-card .stat-grid{
+        gap:6px;
+      }
+
+      body.observed-mode .snapshot-card .stat-box{
+        padding:10px 8px;
+        gap:4px;
+        border-radius:15px;
+      }
+
+      body.observed-mode .stat-label{
+        font-size:10px;
+      }
+
+      body.observed-mode #timeText,
+      body.observed-mode #stageText{
+        font-size:20px;
+      }
+
+      body.observed-mode .calendar-card{
+        gap:6px;
+      }
+
+      body.observed-mode .calendar-toolbar{
+        grid-template-columns:34px 1fr 34px;
+        gap:4px;
+      }
+
+      body.observed-mode .calendar-toolbar > button,
+      body.observed-mode .calendar-title-btn{
+        min-height:34px;
+      }
+
+      body.observed-mode .calendar-head div{
+        font-size:10px;
+      }
+
+      body.observed-mode .calendar-grid{
+        gap:3px;
+      }
+
+      body.observed-mode .calendar-day{
+        min-height:29px;
+        font-size:11px;
+        border-radius:9px;
+      }
+
+      body.observed-mode .day-nav{
+        gap:5px;
+      }
+
+      body.observed-mode .day-nav button{
+        min-height:32px;
+        font-size:11px;
+      }
+
+      body.observed-mode .day-nav-center{
+        font-size:10px;
+        max-width:none;
+      }
+
+      body.observed-mode .opacity-card{
+        padding-top:8px;
+        padding-bottom:8px;
+      }
+
+      body.observed-mode .opacity-card .muted{
+        display:none;
+      }
+
+      body.observed-mode #legendDock{
+        left:420px;
+      }
+    }
+
 
     @media (max-width: 1320px){
       #leftPanel{
@@ -1703,12 +1851,14 @@
 
     const OSM_BASEMAP_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
     const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png";
+    const MUNICIPAL_BOUNDARY_QUERY_URL = "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/NJ_Municipalities_3857/FeatureServer/0/query";
+    const MUNICIPAL_BOUNDARY_WHERE = "NAME = 'North Wildwood City'";
     const DATUM_OFFSETS = {
       navd88: 0,
       mllw: 2.75
     };
 
-    const NORTH_WILDWOOD_MASK_RING = [
+    const FALLBACK_NORTH_WILDWOOD_MASK_RING = [
       [39.00294, -74.81894],
       [39.00348, -74.81879],
       [39.0058, -74.81588],
@@ -1852,6 +2002,8 @@
     let basemapColorLayer = null;
     let roadsLayer = null;
     let cityBoundaryOutline = null;
+    let municipalBoundaryFeature = null;
+    let municipalBoundaryRings = [FALLBACK_NORTH_WILDWOOD_MASK_RING];
     let currentFloodLayer = null;
     let pendingFloodLayer = null;
     let floodProjectedBounds = null;
@@ -2181,6 +2333,111 @@
       );
     }
 
+
+    function getPrimaryMunicipalBoundaryRing() {
+      return Array.isArray(municipalBoundaryRings) && municipalBoundaryRings.length ? municipalBoundaryRings[0] : FALLBACK_NORTH_WILDWOOD_MASK_RING;
+    }
+
+    function approximateRingArea(ring) {
+      if (!Array.isArray(ring) || ring.length < 3) return 0;
+      let area = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const [lat1, lng1] = ring[i];
+        const [lat2, lng2] = ring[(i + 1) % ring.length];
+        area += (lng1 * lat2) - (lng2 * lat1);
+      }
+      return Math.abs(area / 2);
+    }
+
+    function normalizeBoundaryRingsFromGeoJSON(geometry) {
+      if (!geometry) return [];
+      const polygons = [];
+
+      if (geometry.type === "Polygon" && Array.isArray(geometry.coordinates)) {
+        polygons.push(geometry.coordinates);
+      } else if (geometry.type === "MultiPolygon" && Array.isArray(geometry.coordinates)) {
+        geometry.coordinates.forEach(coords => polygons.push(coords));
+      }
+
+      const outerRings = polygons
+        .map(polygon => Array.isArray(polygon) && polygon.length ? polygon[0] : null)
+        .filter(Boolean)
+        .map(ring => ring
+          .filter(coord => Array.isArray(coord) && coord.length >= 2)
+          .map(([lng, lat]) => [lat, lng])
+        )
+        .map(ring => {
+          if (ring.length > 1) {
+            const first = ring[0];
+            const last = ring[ring.length - 1];
+            if (first[0] === last[0] && first[1] === last[1]) ring.pop();
+          }
+          return ring;
+        })
+        .filter(ring => ring.length >= 3)
+        .sort((a, b) => approximateRingArea(b) - approximateRingArea(a));
+
+      return outerRings;
+    }
+
+    function updateMunicipalBoundaryLayer() {
+      if (!map) return;
+
+      if (cityBoundaryOutline && map.hasLayer(cityBoundaryOutline)) {
+        map.removeLayer(cityBoundaryOutline);
+      }
+
+      if (municipalBoundaryFeature) {
+        cityBoundaryOutline = L.geoJSON(municipalBoundaryFeature, {
+          pane: "boundaryPane",
+          interactive: false,
+          style: {
+            color: "rgba(0,0,0,0.58)",
+            weight: 1,
+            opacity: 1,
+            dashArray: "6 4 1 4",
+            fill: false
+          }
+        }).addTo(map);
+      } else {
+        cityBoundaryOutline = L.polygon(getPrimaryMunicipalBoundaryRing(), {
+          pane: "boundaryPane",
+          interactive: false,
+          stroke: true,
+          color: "rgba(0,0,0,0.58)",
+          weight: 1,
+          opacity: 1,
+          dashArray: "6 4 1 4",
+          fill: false,
+          smoothFactor: 0
+        }).addTo(map);
+      }
+
+      updateColorBasemapClip();
+    }
+
+    async function loadMunicipalBoundary() {
+      try {
+        const url = `${MUNICIPAL_BOUNDARY_QUERY_URL}?f=geojson&where=${encodeURIComponent(MUNICIPAL_BOUNDARY_WHERE)}&outFields=NAME,COUNTY,MUN,MUN_LABEL,MUN_TYPE&returnGeometry=true&outSR=4326`;
+        const geojson = await fetchJson(url);
+        const feature = Array.isArray(geojson?.features) ? geojson.features[0] : null;
+        const rings = normalizeBoundaryRingsFromGeoJSON(feature?.geometry);
+
+        if (!feature || !rings.length) {
+          throw new Error("Municipal boundary query returned no geometry.");
+        }
+
+        municipalBoundaryFeature = feature;
+        municipalBoundaryRings = rings;
+      } catch (err) {
+        console.warn("Falling back to embedded North Wildwood boundary.", err);
+        municipalBoundaryFeature = null;
+        municipalBoundaryRings = [FALLBACK_NORTH_WILDWOOD_MASK_RING];
+      }
+
+      updateMunicipalBoundaryLayer();
+    }
+
     function updateColorBasemapClip() {
       if (!map || !basemapColorLayer) return;
 
@@ -2188,7 +2445,8 @@
       const mapContainer = map.getContainer();
       if (!container || !mapContainer) return;
 
-      if (!Array.isArray(NORTH_WILDWOOD_MASK_RING) || NORTH_WILDWOOD_MASK_RING.length < 3) {
+      const clipRing = getPrimaryMunicipalBoundaryRing();
+      if (!Array.isArray(clipRing) || clipRing.length < 3) {
         container.style.clipPath = "";
         container.style.webkitClipPath = "";
         return;
@@ -2199,7 +2457,7 @@
       const offsetX = layerRect.left - mapRect.left;
       const offsetY = layerRect.top - mapRect.top;
 
-      const pts = NORTH_WILDWOOD_MASK_RING.map(([lat, lng]) => {
+      const pts = clipRing.map(([lat, lng]) => {
         const p = map.latLngToContainerPoint([lat, lng]);
         return { x: p.x - offsetX, y: p.y - offsetY };
       });
@@ -2270,16 +2528,7 @@
         pane: "roadsPane"
       }).addTo(map);
 
-      cityBoundaryOutline = L.polygon(NORTH_WILDWOOD_MASK_RING, {
-        pane: "boundaryPane",
-        interactive: false,
-        stroke: true,
-        color: "rgba(255,255,255,0.42)",
-        weight: 1.25,
-        opacity: 1,
-        fill: false,
-        smoothFactor: 0
-      }).addTo(map);
+      updateMunicipalBoundaryLayer();
 
       L.control.zoom({ position: "bottomright" }).addTo(map);
       map.on("zoomend moveend resize", () => {
@@ -3295,6 +3544,7 @@
         }
         positionTimelineBubble();
       });
+      await loadMunicipalBoundary();
       await reloadAll();
     }
 
