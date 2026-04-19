@@ -206,6 +206,64 @@
       gap:8px;
     }
 
+    .compact-card{
+      padding:10px 12px;
+    }
+
+    .compact-card .section-title{
+      margin-bottom:8px;
+    }
+
+    .segmented-control{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:6px;
+      padding:5px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:rgba(255,255,255,.04);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03);
+    }
+
+    .segmented-control button{
+      min-height:44px;
+      border-radius:12px;
+      border:1px solid transparent;
+      background:transparent;
+      box-shadow:none;
+      font-size:13px;
+      font-weight:850;
+      letter-spacing:-.02em;
+      color:#dbe8ff;
+      padding:10px 12px;
+    }
+
+    .segmented-control button:hover:not(:disabled){
+      transform:none;
+      box-shadow:none;
+      background:rgba(255,255,255,.04);
+    }
+
+    .segmented-control button.active{
+      background:linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.12));
+      border-color:rgba(191,219,254,.55);
+      color:#eef6ff;
+      box-shadow:0 8px 18px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    .segmented-control button .datum-offset{
+      display:block;
+      margin-top:2px;
+      font-size:10px;
+      font-weight:800;
+      letter-spacing:.04em;
+      color:var(--muted);
+    }
+
+    .segmented-control button.active .datum-offset{
+      color:#cfe4ff;
+    }
+
     button,
     select{
       appearance:none;
@@ -993,8 +1051,17 @@
       padding:0 12px;
     }
 
-    .datum-card select{
-      background:rgba(255,255,255,.06);
+    .datum-card{
+      padding-bottom:12px;
+    }
+
+    .datum-card .section-title{
+      margin-bottom:10px;
+    }
+
+    .datum-card .segmented-control{
+      background:rgba(255,255,255,.03);
+      border-color:rgba(255,255,255,.09);
     }
 
     .basemap-gray-layer{
@@ -1009,6 +1076,79 @@
 
     .map-mask-fallback{
       outline:1px solid rgba(255,255,255,.08);
+    }
+
+    body.observed-mode #leftPanel{
+      gap:8px;
+    }
+
+    body.observed-mode .brand{
+      min-height:92px;
+      padding:12px 14px;
+    }
+
+    body.observed-mode .panel-card{
+      padding:10px 12px;
+    }
+
+    body.observed-mode .snapshot-card .stat-grid{
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+
+    body.observed-mode .snapshot-card .stat-box{
+      min-height:0;
+      padding:12px 10px;
+      gap:5px;
+    }
+
+    body.observed-mode #timeText,
+    body.observed-mode #stageText{
+      font-size:clamp(18px, 1.65vw, 24px);
+      line-height:1.02;
+    }
+
+    body.observed-mode .calendar-card{
+      gap:8px;
+    }
+
+    body.observed-mode .calendar-toolbar{
+      grid-template-columns:36px 1fr 36px;
+      gap:5px;
+    }
+
+    body.observed-mode .calendar-toolbar > button,
+    body.observed-mode .calendar-title-btn{
+      min-height:36px;
+    }
+
+    body.observed-mode .calendar-popover{
+      padding:10px;
+      gap:8px;
+    }
+
+    body.observed-mode .calendar-head div{
+      font-size:10px;
+      padding:0;
+    }
+
+    body.observed-mode .calendar-grid{
+      gap:3px;
+    }
+
+    body.observed-mode .calendar-day{
+      min-height:33px;
+      font-size:12px;
+      border-radius:10px;
+    }
+
+    body.observed-mode .day-nav button{
+      min-height:34px;
+    }
+
+    body.observed-mode .opacity-card{
+      padding-top:9px;
+      padding-bottom:9px;
     }
 
 
@@ -1239,6 +1379,38 @@
         padding:6px 10px;
       }
 
+      body.observed-mode #leftPanel{
+        gap:6px;
+        bottom:108px;
+      }
+
+      body.observed-mode .brand{
+        min-height:78px;
+        padding:10px 12px;
+      }
+
+      body.observed-mode .snapshot-card .stat-grid{
+        grid-template-columns:1fr 1fr;
+      }
+
+      body.observed-mode .snapshot-card .stat-box{
+        padding:10px 8px;
+      }
+
+      body.observed-mode #timeText,
+      body.observed-mode #stageText{
+        font-size:22px;
+      }
+
+      body.observed-mode .calendar-day{
+        min-height:30px;
+        font-size:12px;
+      }
+
+      body.observed-mode .mobile-top-tides-card{
+        display:none;
+      }
+
       .leaflet-bottom.leaflet-right .leaflet-control-zoom{
         margin-right:10px;
         margin-bottom:102px;
@@ -1252,6 +1424,10 @@
 
       #leftPanel{
         grid-template-columns:1fr;
+      }
+
+      body.observed-mode .snapshot-card .stat-grid{
+        grid-template-columns:1fr 1fr;
       }
 
       .button-grid-2{
@@ -1322,11 +1498,9 @@
           <h2>Datum</h2>
           <span id="datumPill" class="pill">NAVD88</span>
         </div>
-        <div class="control-row">
-          <select id="datumSelect" aria-label="Select vertical datum">
-            <option value="navd88" selected>NAVD88</option>
-            <option value="mllw">MLLW (+2.75 ft)</option>
-          </select>
+        <div class="segmented-control" role="tablist" aria-label="Vertical datum">
+          <button id="datumNavd88Btn" type="button" class="active" data-datum="navd88" aria-pressed="true">NAVD88</button>
+          <button id="datumMllwBtn" type="button" data-datum="mllw" aria-pressed="false">MLLW<span class="datum-offset">+2.75 ft</span></button>
         </div>
       </section>
 
@@ -1771,10 +1945,20 @@
 
     function updateDatumUI() {
       const pill = document.getElementById("datumPill");
-      const select = document.getElementById("datumSelect");
+      const navdBtn = document.getElementById("datumNavd88Btn");
+      const mllwBtn = document.getElementById("datumMllwBtn");
       const stageSub = document.getElementById("stageSubText");
       if (pill) pill.textContent = getDatumLabel();
-      if (select) select.value = currentDatum;
+      if (navdBtn) {
+        const isActive = currentDatum === "navd88";
+        navdBtn.classList.toggle("active", isActive);
+        navdBtn.setAttribute("aria-pressed", String(isActive));
+      }
+      if (mllwBtn) {
+        const isActive = currentDatum === "mllw";
+        mllwBtn.classList.toggle("active", isActive);
+        mllwBtn.setAttribute("aria-pressed", String(isActive));
+      }
       if (stageSub) stageSub.textContent = getDatumLongLabel();
     }
 
@@ -1809,6 +1993,7 @@
       document.getElementById("dataModePill").textContent =
         currentDataMode === "forecast" ? "Forecast" : "Observed";
       document.getElementById("calendarCard").classList.toggle("active", currentDataMode === "observed");
+      document.body.classList.toggle("observed-mode", currentDataMode === "observed");
     }
 
     function renderLegend() {
@@ -3017,8 +3202,15 @@
         applyOverlayOpacity();
       });
 
-      document.getElementById("datumSelect").addEventListener("change", e => {
-        currentDatum = e.target.value === "mllw" ? "mllw" : "navd88";
+      document.getElementById("datumNavd88Btn").addEventListener("click", () => {
+        if (currentDatum === "navd88") return;
+        currentDatum = "navd88";
+        refreshCurrentDisplayText();
+      });
+
+      document.getElementById("datumMllwBtn").addEventListener("click", () => {
+        if (currentDatum === "mllw") return;
+        currentDatum = "mllw";
         refreshCurrentDisplayText();
       });
 
