@@ -1573,7 +1573,7 @@
     };
 
     const NJSP_PROJ4 =
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
 
     const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
@@ -1835,7 +1835,8 @@
     }
 
     function projectedPointToLatLng(x, y) {
-      return NJSP_CRS.unproject(L.point(x, y));
+      const result = proj4(NJSP_PROJ4, "EPSG:4326", [x, y]);
+      return L.latLng(result[1], result[0]);
     }
 
     function computeProjectedBounds(width, height) {
