@@ -553,8 +553,8 @@
 
     .calendar-day.selected{
       outline:none;
-      border-color:rgba(245,158,11,.98);
-      box-shadow:0 0 0 2px rgba(245,158,11,.34), inset 0 1px 0 rgba(255,255,255,.06);
+      border-color:rgba(255,255,255,.98);
+      box-shadow:0 0 0 2px rgba(255,255,255,.28), inset 0 1px 0 rgba(255,255,255,.08);
     }
 
     .calendar-day.selected::after{
@@ -562,7 +562,7 @@
       position:absolute;
       inset:4px;
       border-radius:9px;
-      border:1px solid rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.32);
       pointer-events:none;
     }
 
@@ -1180,15 +1180,86 @@
       color:#ffffff !important;
     }
 
-    .leaflet-bottom.leaflet-right .leaflet-control-zoom{
-      margin-right:16px;
-      margin-bottom:112px;
+    .leaflet-top.leaflet-right .leaflet-control-zoom{
+      margin-top:16px;
+      margin-right:240px;
     }
 
-    .leaflet-pane.roads-bright img,
-    .leaflet-layer.roads-bright{
-      filter:grayscale(1) brightness(2.4) contrast(2.05);
-      mix-blend-mode:screen;
+    .leaflet-pane.roads-dark img,
+    .leaflet-layer.roads-dark{
+      filter:grayscale(1) brightness(.16) contrast(3.1);
+      mix-blend-mode:multiply;
+      opacity:1;
+    }
+
+    #timeText{
+      white-space:nowrap;
+      font-size:clamp(17px, 1.45vw, 22px);
+      line-height:1.08;
+      letter-spacing:-.02em;
+    }
+
+    #timeSubText{
+      white-space:nowrap;
+    }
+
+    .title-with-help{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      min-width:0;
+    }
+
+    .help-btn{
+      width:24px;
+      min-width:24px;
+      height:24px;
+      min-height:24px;
+      padding:0;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      font-size:12px;
+      font-weight:900;
+      background:rgba(255,255,255,.06);
+      color:#ffffff;
+      border:1px solid rgba(255,255,255,.16);
+      box-shadow:none;
+      transform:none !important;
+    }
+
+    .help-btn:hover:not(:disabled){
+      background:rgba(255,255,255,.12);
+      box-shadow:none;
+    }
+
+    .datum-help-panel{
+      display:none;
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid rgba(191,219,254,.18);
+      background:rgba(255,255,255,.04);
+      color:#dbe8ff;
+      font-size:11px;
+      line-height:1.45;
+    }
+
+    .datum-help-panel.open{
+      display:block;
+    }
+
+    .datum-help-panel strong{
+      color:#ffffff;
+    }
+
+    .observed-resolution-card{
+      display:none;
+    }
+
+    body.observed-mode .observed-resolution-card{
+      display:block;
     }
 
     .compact-card select{
@@ -1258,6 +1329,7 @@
     }
 
     body.observed-mode .data-source-card,
+    body.observed-mode .observed-resolution-card,
     body.observed-mode .overlay-card,
     body.observed-mode .datum-card,
     body.observed-mode .opacity-card{
@@ -1287,7 +1359,11 @@
       gap:5px;
     }
 
-    body.observed-mode #timeText,
+    body.observed-mode #timeText{
+      font-size:clamp(15px, 1.25vw, 19px);
+      line-height:1.08;
+    }
+
     body.observed-mode #stageText{
       font-size:clamp(18px, 1.65vw, 24px);
       line-height:1.02;
@@ -1371,14 +1447,16 @@
 
     body.observed-tight #leftPanel .brand{ order:1; }
     body.observed-tight #leftPanel .data-source-card{ order:2; }
-    body.observed-tight #leftPanel .overlay-card{ order:3; }
-    body.observed-tight #leftPanel .datum-card{ order:4; }
-    body.observed-tight #leftPanel .opacity-card{ order:5; }
-    body.observed-tight #leftPanel .snapshot-card{ order:6; }
-    body.observed-tight #leftPanel .calendar-card.active{ order:7; }
-    body.observed-tight #leftPanel .mobile-top-tides-card{ order:8; }
+    body.observed-tight #leftPanel .observed-resolution-card{ order:3; }
+    body.observed-tight #leftPanel .overlay-card{ order:4; }
+    body.observed-tight #leftPanel .datum-card{ order:5; }
+    body.observed-tight #leftPanel .opacity-card{ order:6; }
+    body.observed-tight #leftPanel .snapshot-card{ order:7; }
+    body.observed-tight #leftPanel .calendar-card.active{ order:8; }
+    body.observed-tight #leftPanel .mobile-top-tides-card{ order:9; }
 
     body.observed-tight #leftPanel .data-source-card,
+    body.observed-tight #leftPanel .observed-resolution-card,
     body.observed-tight #leftPanel .overlay-card,
     body.observed-tight #leftPanel .datum-card,
     body.observed-tight #leftPanel .opacity-card{
@@ -1470,7 +1548,11 @@
       font-size:10px;
     }
 
-    body.observed-tight #timeText,
+    body.observed-tight #timeText{
+      font-size:15px;
+      line-height:1.08;
+    }
+
     body.observed-tight #stageText{
       font-size:18px;
       line-height:1.02;
@@ -1606,7 +1688,10 @@
       font-size:10px;
     }
 
-    body.observed-tight.observed-ultra-tight #timeText,
+    body.observed-tight.observed-ultra-tight #timeText{
+      font-size:14px;
+    }
+
     body.observed-tight.observed-ultra-tight #stageText{
       font-size:17px;
     }
@@ -1747,7 +1832,10 @@
         font-size:10px;
       }
 
-      body.observed-mode #timeText,
+      body.observed-mode #timeText{
+        font-size:16px;
+      }
+
       body.observed-mode #stageText{
         font-size:20px;
       }
@@ -1905,6 +1993,10 @@
         right:16px;
         bottom:16px;
       }
+
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-right:222px;
+      }
     }
 
     @media (max-width: 860px){
@@ -2055,6 +2147,10 @@
         padding:24px 10px 8px;
       }
 
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-right:10px;
+      }
+
       #timelineBubble{
         font-size:11px;
         padding:6px 10px;
@@ -2080,7 +2176,10 @@
         padding:10px 10px;
       }
 
-      body.observed-mode #timeText,
+      body.observed-mode #timeText{
+        font-size:17px;
+      }
+
       body.observed-mode #stageText{
         font-size:22px;
       }
@@ -2094,9 +2193,9 @@
         display:none;
       }
 
-      .leaflet-bottom.leaflet-right .leaflet-control-zoom{
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-top:10px;
         margin-right:10px;
-        margin-bottom:102px;
       }
     }
 
@@ -2122,7 +2221,7 @@
       }
 
       #timeText{
-        font-size:26px;
+        font-size:16px;
       }
 
       #stageText{
@@ -2165,6 +2264,17 @@
         </div>
       </section>
 
+      <section id="observedResolutionCard" class="panel-card compact-card observed-resolution-card">
+        <div class="section-title">
+          <h2>Observed interval</h2>
+          <span id="observedResolutionPill" class="pill">15 min</span>
+        </div>
+        <div class="button-grid-2">
+          <button id="observed15MinBtn" class="active" type="button">15 min</button>
+          <button id="observed1HourBtn" type="button">1 hour</button>
+        </div>
+      </section>
+
       <section class="panel-card compact-card overlay-card">
         <div class="section-title">
           <h2>Overlay</h2>
@@ -2178,12 +2288,20 @@
 
       <section class="panel-card compact-card datum-card">
         <div class="section-title">
-          <h2>Datum</h2>
+          <div class="title-with-help">
+            <h2>Datum</h2>
+            <button id="datumHelpBtn" class="help-btn" type="button" aria-expanded="false" aria-controls="datumHelpPanel" title="Explain datum">?</button>
+          </div>
           <span id="datumPill" class="pill">NAVD88</span>
         </div>
         <div class="segmented-control" role="tablist" aria-label="Vertical datum">
           <button id="datumNavd88Btn" type="button" class="active" data-datum="navd88" aria-pressed="true">NAVD88</button>
           <button id="datumMllwBtn" type="button" data-datum="mllw" aria-pressed="false">MLLW<span class="datum-offset">+2.75 ft</span></button>
+        </div>
+        <div id="datumHelpPanel" class="datum-help-panel" hidden>
+          <strong>NAVD88</strong> is a land elevation datum used for surveyed ground heights and flood mapping.<br>
+          <strong>MLLW</strong> means Mean Lower Low Water, a tide-based datum commonly used for marine water levels.<br>
+          In this app, MLLW is shown as NAVD88 + 2.75 ft.
         </div>
       </section>
 
@@ -2520,7 +2638,20 @@
     const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const MONTH_NAMES_LONG = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const NEW_YORK_TIME_ZONE = "America/New_York";
     const EST_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+    const NY_PARTS_FORMATTER = new Intl.DateTimeFormat("en-US", {
+      timeZone: NEW_YORK_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZoneName: "short"
+    });
 
     const DEPTH_LEGEND = [
       { label: "< 0.10 ft", color: "var(--depth-0)" },
@@ -2577,6 +2708,8 @@
     let currentRangeLabel = "--";
     let currentBaseModeBeforeTopTide = "observed";
     let currentDatum = "navd88";
+    let currentObservedResolution = "15min";
+    let currentRawSeriesHours = [];
 
     let playTimer = null;
     let overlayOpacity = DEFAULT_OPACITY;
@@ -2662,6 +2795,150 @@
       if (stageSub) stageSub.textContent = getDatumLongLabel();
     }
 
+    function updateObservedResolutionUI() {
+      const pill = document.getElementById("observedResolutionPill");
+      const btn15 = document.getElementById("observed15MinBtn");
+      const btn1h = document.getElementById("observed1HourBtn");
+      const label = currentObservedResolution === "1hour" ? "1 hour" : "15 min";
+      if (pill) pill.textContent = label;
+      if (btn15) btn15.classList.toggle("active", currentObservedResolution === "15min");
+      if (btn1h) btn1h.classList.toggle("active", currentObservedResolution === "1hour");
+    }
+
+    function getNyParts(date) {
+      if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+      const parts = {};
+      for (const part of NY_PARTS_FORMATTER.formatToParts(date)) {
+        if (part.type !== "literal") parts[part.type] = part.value;
+      }
+      const hour12 = Number(parts.hour || 0) % 12;
+      const dayPeriod = String(parts.dayPeriod || "").toUpperCase();
+      parts.hour24 = String(dayPeriod === "PM" ? hour12 + 12 : hour12);
+      return parts;
+    }
+
+    function getNyDateTimeLabel(date, options = {}) {
+      const parts = getNyParts(date);
+      if (!parts) return "--";
+      const weekday = parts.weekday || "";
+      const month = parts.month || "00";
+      const day = parts.day || "00";
+      const year = parts.year || "0000";
+      const hour = parts.hour || "--";
+      const minute = parts.minute || "00";
+      const tz = parts.timeZoneName || "ET";
+      const includeWeekday = options.includeWeekday !== false;
+      const includeDate = options.includeDate !== false;
+      const includeZone = options.includeZone !== false;
+      const compact = options.compact === true;
+      const dateText = includeDate ? `${month}/${day}/${year}` : "";
+      const timeText = compact ? `${hour}:${minute} ${parts.dayPeriod || ""}`.trim() : `(${hour}:${minute} ${parts.dayPeriod || ""})`;
+      return [
+        includeWeekday ? weekday : "",
+        dateText,
+        timeText,
+        includeZone ? tz : ""
+      ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+    }
+
+    function parseStoredLocalNyToDate(timeEST) {
+      const match = String(timeEST || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+      if (!match) return null;
+      const [, y, m, d, hh, mm] = match;
+      const targetLocalMs = Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm));
+      let guessUtcMs = targetLocalMs;
+      for (let i = 0; i < 5; i++) {
+        const parts = getNyParts(new Date(guessUtcMs));
+        if (!parts) break;
+        const actualLocalMs = Date.UTC(
+          Number(parts.year),
+          Number(parts.month) - 1,
+          Number(parts.day),
+          Number(parts.hour24),
+          Number(parts.minute)
+        );
+        const diff = targetLocalMs - actualLocalMs;
+        guessUtcMs += diff;
+        if (diff === 0) break;
+      }
+      return new Date(guessUtcMs);
+    }
+
+    function getObservedDisplaySeries(entries = []) {
+      if (!Array.isArray(entries)) return [];
+      if (currentObservedResolution !== "1hour") {
+        return entries.map(entry => ({ ...entry, observationInterval: "15min" }));
+      }
+
+      const buckets = new Map();
+      entries.forEach((entry, idx) => {
+        const d = getEntryESTDate(entry);
+        if (!d) return;
+        const parts = getNyParts(d);
+        if (!parts) return;
+        const key = `${parts.year}-${parts.month}-${parts.day}-${pad2(Number(parts.hour24))}`;
+        const minute = Number(parts.minute || 0);
+        const score = Math.abs(minute);
+        const existing = buckets.get(key);
+        if (!existing || score < existing.score || (score === existing.score && idx < existing.idx)) {
+          buckets.set(key, { entry, idx, score });
+        }
+      });
+
+      return Array.from(buckets.values())
+        .sort((a, b) => {
+          const ta = entryTimeMs(a.entry) ?? 0;
+          const tb = entryTimeMs(b.entry) ?? 0;
+          return ta - tb;
+        })
+        .map(item => ({ ...item.entry, observationInterval: "1hour" }));
+    }
+
+    function findClosestEntryIndex(series, referenceEntry) {
+      if (!Array.isArray(series) || !series.length || !referenceEntry) return 0;
+      const target = entryTimeMs(referenceEntry);
+      if (target == null) return 0;
+      let bestIndex = 0;
+      let bestDiff = Infinity;
+      series.forEach((entry, idx) => {
+        const t = entryTimeMs(entry);
+        if (t == null) return;
+        const diff = Math.abs(t - target);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestIndex = idx;
+        }
+      });
+      return bestIndex;
+    }
+
+    async function switchObservedResolution(mode) {
+      if (mode === currentObservedResolution) return;
+      currentObservedResolution = mode;
+      updateObservedResolutionUI();
+
+      if (currentDataMode !== "observed") return;
+
+      const currentEntry = currentSeriesHours[currentHourIndex] || null;
+      if (currentViewType === "top-tide" && currentTopTideIndex != null) {
+        await loadTopTideEvent(currentTopTideIndex, currentEntry);
+        return;
+      }
+
+      if (selectedObservedDate) {
+        await loadObservedDay(selectedObservedDate, null, currentEntry);
+      }
+    }
+
+    function setDatumHelpOpen(isOpen) {
+      const panel = document.getElementById("datumHelpPanel");
+      const btn = document.getElementById("datumHelpBtn");
+      if (!panel || !btn) return;
+      panel.hidden = !isOpen;
+      panel.classList.toggle("open", isOpen);
+      btn.setAttribute("aria-expanded", String(isOpen));
+    }
+
     function refreshCurrentDisplayText() {
       updateDatumUI();
       renderTopTides();
@@ -2694,6 +2971,7 @@
         currentDataMode === "forecast" ? "Forecast" : "Observed";
       document.getElementById("calendarCard").classList.toggle("active", currentDataMode === "observed");
       document.body.classList.toggle("observed-mode", currentDataMode === "observed");
+      updateObservedResolutionUI();
       syncLeftPanelLayout();
     }
 
@@ -3212,7 +3490,7 @@
 
       updateMunicipalBoundaryLayer();
 
-      L.control.zoom({ position: "bottomright" }).addTo(map);
+      L.control.zoom({ position: "topright" }).addTo(map);
       map.on("zoomend moveend resize", () => {
         updateRoadLayerAppearance();
         updateColorBasemapClip();
@@ -3233,12 +3511,12 @@
       const toggle = document.getElementById("roadsToggle");
       const roadsEnabled = !toggle || toggle.classList.contains("on");
       const zoom = map.getZoom() || 0;
-      const showLabels = roadsEnabled && zoom >= 13;
+      const showLabels = roadsEnabled && zoom >= ROAD_LABEL_ZOOM;
 
-      roadsLayer.setOpacity(showLabels ? 0.92 : 0);
+      roadsLayer.setOpacity(showLabels ? 0.98 : 0);
 
       const pane = map.getPane("roadsPane");
-      if (pane) pane.classList.toggle("roads-bright", showLabels);
+      if (pane) pane.classList.toggle("roads-dark", showLabels);
     }
 
     function clearFloodLayer() {
@@ -3260,34 +3538,20 @@
       if (!isoString) return "--";
       const d = new Date(isoString);
       if (Number.isNaN(d.getTime())) return "--";
-      const est = new Date(d.getTime() - EST_OFFSET_MS);
-      const month = MONTH_NAMES[est.getUTCMonth()];
-      const day = est.getUTCDate();
-      let hour = est.getUTCHours();
-      const minute = pad2(est.getUTCMinutes());
-      const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12 || 12;
-      return `${month} ${day}, ${hour}:${minute} ${ampm} EST`;
+      const parts = getNyParts(d);
+      if (!parts) return "--";
+      return `${MONTH_NAMES[Number(parts.month) - 1]} ${Number(parts.day)}, ${parts.hour}:${parts.minute} ${parts.dayPeriod || ""} ${parts.timeZoneName || "ET"}`.replace(/\s+/g, " ").trim();
     }
 
     function formatStoredEST(timeEST) {
       if (!timeEST) return "--";
-      const match = String(timeEST).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!match) return String(timeEST);
-      const month = MONTH_NAMES[Number(match[2]) - 1];
-      const day = Number(match[3]);
-      let hour = Number(match[4]);
-      const minute = match[5];
-      const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12 || 12;
-      return `${month} ${day}, ${hour}:${minute} ${ampm} EST`;
+      const d = parseStoredLocalNyToDate(timeEST);
+      if (!d) return String(timeEST);
+      return formatFixedESTFromUtc(d.toISOString());
     }
 
     function parseStoredESTToDate(timeEST) {
-      const match = String(timeEST || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
-      if (!match) return null;
-      const [ , y, m, d, hh, mm ] = match;
-      return new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh) + 5, Number(mm)));
+      return parseStoredLocalNyToDate(timeEST);
     }
 
     function formatHourEntryTime(entry) {
@@ -3299,57 +3563,59 @@
     }
 
     function formatHourEntryTimeCompact(entry) {
-      return formatHourEntryTime(entry).replace(",", "").replace(" EST", "");
+      const d = getEntryESTDate(entry);
+      if (!d) return "--";
+      const parts = getNyParts(d);
+      if (!parts) return "--";
+      return `${parts.month}/${parts.day} ${parts.hour}:${parts.minute} ${parts.dayPeriod || ""}`.replace(/\s+/g, " ").trim();
     }
 
     function formatSnapshotTime(entry) {
       const est = getEntryESTDate(entry);
       if (!est) return "--";
-      const month = MONTH_NAMES[est.getUTCMonth()];
-      const day = est.getUTCDate();
-      let hour = est.getUTCHours();
-      const minute = pad2(est.getUTCMinutes());
-      const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12 || 12;
-      return `${month} ${day}<br>${hour}:${minute} ${ampm}<br>EST`;
+      return getNyDateTimeLabel(est, { includeWeekday: true, includeDate: true, includeZone: true, compact: false });
     }
 
     function formatHourEntryDateShort(entry) {
       const d = entry?.timeEST ? parseStoredESTToDate(entry.timeEST) : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
       if (!d || Number.isNaN(d.getTime())) return "--";
-      const est = new Date(d.getTime() - EST_OFFSET_MS);
-      const yy = String(est.getUTCFullYear()).slice(-2);
-      return `${est.getUTCMonth() + 1}/${est.getUTCDate()}/${yy}`;
+      const parts = getNyParts(d);
+      if (!parts) return "--";
+      const yy = String(parts.year || "").slice(-2);
+      return `${Number(parts.month)}/${Number(parts.day)}/${yy}`;
     }
 
     function getEntryESTDate(entry) {
       const d = entry?.timeEST ? parseStoredESTToDate(entry.timeEST) : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
       if (!d || Number.isNaN(d.getTime())) return null;
-      return new Date(d.getTime() - EST_OFFSET_MS);
+      return d;
     }
 
     function formatTimelineBubbleText(entry) {
       const est = getEntryESTDate(entry);
       if (!est) return "--";
-      let hour = est.getUTCHours();
-      const minute = est.getUTCMinutes();
-      const ampm = hour >= 12 ? "PM" : "AM";
-      hour = hour % 12 || 12;
-      const minuteText = minute ? `:${pad2(minute)}` : "";
-      return `${DAY_NAMES[est.getUTCDay()]} ${est.getUTCDate()} · ${hour}${minuteText} ${ampm}`;
+      const parts = getNyParts(est);
+      if (!parts) return "--";
+      const minuteText = parts.minute === "00" ? "" : `:${parts.minute}`;
+      return `${parts.weekday} ${Number(parts.day)} · ${parts.hour}${minuteText} ${parts.dayPeriod || ""}`.replace(/\s+/g, " ").trim();
     }
 
     function formatTimelineDayLabel(entry) {
       const est = getEntryESTDate(entry);
       if (!est) return "--";
-      return `${DAY_NAMES[est.getUTCDay()]} ${est.getUTCDate()}`;
+      const parts = getNyParts(est);
+      if (!parts) return "--";
+      return `${parts.weekday} ${Number(parts.day)}`;
     }
 
     function sameEntryESTDay(a, b) {
       const da = getEntryESTDate(a);
       const db = getEntryESTDate(b);
       if (!da || !db) return false;
-      return da.getUTCFullYear() === db.getUTCFullYear() && da.getUTCMonth() === db.getUTCMonth() && da.getUTCDate() === db.getUTCDate();
+      const pa = getNyParts(da);
+      const pb = getNyParts(db);
+      if (!pa || !pb) return false;
+      return pa.year === pb.year && pa.month === pb.month && pa.day === pb.day;
     }
 
     function positionTimelineBubble() {
@@ -3650,9 +3916,9 @@
       if (currentViewType === "forecast") {
         label.textContent = "Forecast";
       } else if (currentViewType === "observed-day") {
-        label.textContent = "Observed";
+        label.textContent = currentObservedResolution === "1hour" ? "Observed • 1 hour" : "Observed • 15 min";
       } else {
-        label.textContent = "Historic crest";
+        label.textContent = currentObservedResolution === "1hour" ? "Historic crest • 1 hour" : "Historic crest • 15 min";
       }
 
       timelineMeta.textContent = "";
@@ -3664,7 +3930,7 @@
     }
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
-      document.getElementById("timeText").innerHTML = formatSnapshotTime(entry);
+      document.getElementById("timeText").textContent = formatSnapshotTime(entry);
       document.getElementById("stageText").textContent = formatStageForDisplay(rawStage);
       document.getElementById("stageSubText").textContent = getDatumLongLabel();
       document.getElementById("selectedText").textContent = currentSelectedLabel;
@@ -3672,8 +3938,8 @@
       document.getElementById("timeSubText").textContent = currentViewType === "forecast"
         ? "Forecast"
         : currentViewType === "top-tide"
-          ? "Historic"
-          : (selectedObservedDate || "Observed");
+          ? `Historic • ${currentObservedResolution === "1hour" ? "1 hour" : "15 min"}`
+          : (selectedObservedDate ? `${selectedObservedDate} • ${currentObservedResolution === "1hour" ? "1 hour" : "15 min"}` : "Observed");
     }
 
     async function setFloodLayer(mode, stageValue, token) {
@@ -3788,7 +4054,8 @@
 
     async function loadForecast() {
       forecastData = await fetchJson(FORECAST_URL);
-      currentSeriesHours = Array.isArray(forecastData.hours) ? forecastData.hours : [];
+      currentRawSeriesHours = Array.isArray(forecastData.hours) ? forecastData.hours : [];
+      currentSeriesHours = currentRawSeriesHours.slice();
       currentViewType = "forecast";
       currentTopTideIndex = null;
       currentSelectedLabel = "Forecast";
@@ -3890,7 +4157,7 @@
       syncLeftPanelLayout();
     }
 
-    async function loadObservedDay(dateStr, preferredHourIndex = null) {
+    async function loadObservedDay(dateStr, preferredHourIndex = null, preferredEntry = null) {
       const dayRecord = getObservedDayRecord(dateStr);
       if (!dayRecord) throw new Error(`Observed day not found: ${dateStr}`);
 
@@ -3900,7 +4167,8 @@
 
       selectedObservedDate = dateStr;
       currentMonthKey = dateStr.slice(0, 7);
-      currentSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
+      currentRawSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
+      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours);
       currentViewType = "observed-day";
       currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
@@ -3910,7 +4178,13 @@
       currentRangeLabel = `${dateStr}`;
 
       syncSliderBounds();
-      currentHourIndex = preferredHourIndex != null ? preferredHourIndex : getPeakHourIndex(currentSeriesHours);
+      if (preferredEntry) {
+        currentHourIndex = findClosestEntryIndex(currentSeriesHours, preferredEntry);
+      } else if (preferredHourIndex != null) {
+        currentHourIndex = Math.max(0, Math.min(preferredHourIndex, Math.max(0, currentSeriesHours.length - 1)));
+      } else {
+        currentHourIndex = getPeakHourIndex(currentSeriesHours);
+      }
       document.getElementById("hourSlider").value = String(currentHourIndex);
 
       await renderCalendar();
@@ -3918,7 +4192,7 @@
       renderTopTides();
     }
 
-    async function loadTopTideEvent(index) {
+    async function loadTopTideEvent(index, preferredEntry = null) {
       if (!topTideEvents[index]) throw new Error("Top-tide window not available.");
       stopPlayback();
 
@@ -3934,10 +4208,13 @@
       currentRangeLabel = `${event.title}`;
       selectedObservedDate = event.entry.observedDate;
       currentMonthKey = event.entry.observedDate.slice(0, 7);
-      currentSeriesHours = event.series;
+      currentRawSeriesHours = event.series;
+      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours);
 
       syncSliderBounds();
-      currentHourIndex = event.peakLocalIndex;
+      currentHourIndex = preferredEntry
+        ? findClosestEntryIndex(currentSeriesHours, preferredEntry)
+        : findClosestEntryIndex(currentSeriesHours, event.entry);
       document.getElementById("hourSlider").value = String(currentHourIndex);
 
       await renderCalendar();
@@ -4027,26 +4304,35 @@
       }
     }
 
-    async function stepPlaybackForward() {
+    async function stepSeriesBy(delta) {
       if (!currentSeriesHours.length) return;
 
-      let nextIndex = currentHourIndex + 1;
-
-      if (nextIndex < currentSeriesHours.length) {
+      const nextIndex = currentHourIndex + delta;
+      if (nextIndex >= 0 && nextIndex < currentSeriesHours.length) {
         await renderHour(nextIndex);
         return;
       }
 
-      if (currentViewType === "observed-day") {
-        const nextDate = getNeighborObservedDate(selectedObservedDate, 1);
-        if (nextDate) {
-          await loadObservedDay(nextDate, 0);
+      if (currentViewType === "observed-day" && selectedObservedDate) {
+        const neighborDate = getNeighborObservedDate(selectedObservedDate, delta > 0 ? 1 : -1);
+        if (neighborDate) {
+          await loadObservedDay(neighborDate, delta > 0 ? 0 : null);
+          if (delta < 0 && currentSeriesHours.length) {
+            await renderHour(currentSeriesHours.length - 1);
+          }
           return;
         }
       }
 
-      nextIndex = 0;
-      await renderHour(nextIndex);
+      if (delta > 0) {
+        await renderHour(0);
+      } else {
+        await renderHour(Math.max(0, currentSeriesHours.length - 1));
+      }
+    }
+
+    async function stepPlaybackForward() {
+      await stepSeriesBy(1);
     }
 
     function startPlayback() {
@@ -4188,6 +4474,28 @@
         }
       });
 
+      document.getElementById("observed15MinBtn").addEventListener("click", () => {
+        switchObservedResolution("15min").catch(err => toast(err.message));
+      });
+
+      document.getElementById("observed1HourBtn").addEventListener("click", () => {
+        switchObservedResolution("1hour").catch(err => toast(err.message));
+      });
+
+      document.getElementById("datumHelpBtn").addEventListener("click", e => {
+        e.stopPropagation();
+        const isOpen = document.getElementById("datumHelpPanel")?.classList.contains("open");
+        setDatumHelpOpen(!isOpen);
+      });
+
+      document.addEventListener("click", e => {
+        const panel = document.getElementById("datumHelpPanel");
+        const btn = document.getElementById("datumHelpBtn");
+        if (!panel || !btn || panel.hidden) return;
+        if (panel.contains(e.target) || btn.contains(e.target)) return;
+        setDatumHelpOpen(false);
+      });
+
       document.getElementById("prevDayBtn").addEventListener("click", () => {
         const date = getNeighborObservedDate(selectedObservedDate, -1);
         if (date) loadObservedDay(date).catch(err => toast(err.message));
@@ -4206,6 +4514,30 @@
         goToCalendarSelection().catch(err => toast(err.message));
       });
 
+      document.getElementById("timelineDock").addEventListener("wheel", e => {
+        if (currentDataMode !== "observed" || !currentSeriesHours.length) return;
+        e.preventDefault();
+        stopPlayback();
+        stepSeriesBy(e.deltaY > 0 ? 1 : -1).catch(err => toast(err.message));
+      }, { passive: false });
+
+      document.addEventListener("keydown", e => {
+        if (currentDataMode !== "observed" || !currentSeriesHours.length) return;
+        const tag = String(document.activeElement?.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "select" || tag === "textarea") return;
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          stopPlayback();
+          stepSeriesBy(1).catch(err => toast(err.message));
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          stopPlayback();
+          stepSeriesBy(-1).catch(err => toast(err.message));
+        } else if (e.key === "Escape") {
+          setDatumHelpOpen(false);
+        }
+      });
+
       wireLayerToggles();
     }
 
@@ -4213,8 +4545,10 @@
       ensureMap();
       setOpacityText();
       updateDatumUI();
+      updateObservedResolutionUI();
       updateModeButtons();
       updateDataModeButtons();
+      setDatumHelpOpen(false);
       wireEvents();
       updateRoadLayerAppearance();
       window.addEventListener('resize', () => {
