@@ -1077,6 +1077,24 @@
       color:var(--text);
     }
 
+    .download-range-grid{
+      display:grid;
+      gap:8px;
+    }
+
+    .download-range-grid[hidden]{
+      display:none !important;
+    }
+
+    .download-range-hint{
+      min-height:16px;
+      font-size:10px;
+      line-height:1.35;
+      color:var(--muted);
+      text-transform:none;
+      letter-spacing:normal;
+    }
+
     .download-summary{
       min-height:40px;
       padding:10px 12px;
@@ -2601,9 +2619,21 @@
               <select id="downloadScopeSelect">
                 <option value="current">Current map</option>
                 <option value="forward">From selected time</option>
-                <option value="view">Selected view</option>
+                <option value="range">Date range</option>
+                <option value="view">Loaded view</option>
               </select>
             </label>
+            <div id="downloadRangeFields" class="download-range-grid" hidden>
+              <label class="download-field">
+                Start date
+                <select id="downloadStartSelect"></select>
+              </label>
+              <label class="download-field">
+                End date
+                <select id="downloadEndSelect"></select>
+              </label>
+              <div class="download-range-hint">Choose up to 4 days per export.</div>
+            </div>
             <label class="download-field">
               Format
               <select id="downloadFormatSelect">
@@ -2703,7 +2733,8 @@
     const TOP_TIDE_SELECT_COUNT = 10;
     const TOP_TIDE_WINDOW_HOURS = 12;
     const ROAD_LABEL_ZOOM = 10;
-    const EXPORT_FRAME_LIMIT = 72;
+    const EXPORT_DAY_LIMIT = 4;
+    const EXPORT_FRAME_LIMIT = EXPORT_DAY_LIMIT * 24;
     const EXPORT_CAPTURE_DELAY_MS = 220;
     const EXPORT_MOV_FPS = 2;
 
@@ -3640,8 +3671,8 @@
         smoothFactor: 0,
         stroke: false,
         fill: true,
-        fillColor: "#bcbcbc",
-        fillOpacity: 0.92,
+        fillColor: "#d9d9d9",
+        fillOpacity: 0.58,
         bubblingMouseEvents: false
       }).addTo(map);
     }
@@ -3870,34 +3901,168 @@
       return raw.replace(/[:\s]/g, "-").replace(/[^a-z0-9\-_]+/gi, "").toLowerCase();
     }
 
-    function getDownloadIndices(scope = null) {
+    function getEntryDateKey(entry) {
+      const d = getEntryESTDate(entry);
+      if (!d) return "";
+      const parts = getNyParts(d);
+      if (!parts) return "";
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    }
+
+    function parseDateKeyUtc(dateKey) {
+      const match = String(dateKey || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      return Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+
+    function getMaxDateKeyForRangeStart(startKey, availableKeys) {
+      const startMs = parseDateKeyUtc(startKey);
+      if (startMs == null) return startKey;
+      const maxMs = startMs + ((EXPORT_DAY_LIMIT - 1) * 24 * 60 * 60 * 1000);
+      let best = startKey;
+      availableKeys.forEach(key => {
+        const ms = parseDateKeyUtc(key);
+        if (ms != null && ms >= startMs && ms <= maxMs) {
+          best = key;
+        }
+      });
+      return best;
+    }
+
+    function getAvailableDownloadDateKeys() {
+      if (currentDataMode === "observed" && observedFlatHours.length) {
+        return Array.from(new Set(observedFlatHours.map(getEntryDateKey).filter(Boolean))).sort();
+      }
+      return Array.from(new Set(currentSeriesHours.map(getEntryDateKey).filter(Boolean))).sort();
+    }
+
+    function populateDownloadDateSelectors() {
+      const startSelect = document.getElementById("downloadStartSelect");
+      const endSelect = document.getElementById("downloadEndSelect");
+      const rangeWrap = document.getElementById("downloadRangeFields");
+      const scope = document.getElementById("downloadScopeSelect")?.value || "current";
+      if (!startSelect || !endSelect || !rangeWrap) return;
+
+      const availableKeys = getAvailableDownloadDateKeys();
+      rangeWrap.hidden = scope !== "range";
+
+      if (!availableKeys.length) {
+        startSelect.innerHTML = '<option value="">No dates</option>';
+        endSelect.innerHTML = '<option value="">No dates</option>';
+        startSelect.disabled = true;
+        endSelect.disabled = true;
+        return;
+      }
+
+      const currentKey = getEntryDateKey(currentSeriesHours[currentHourIndex]) || availableKeys[availableKeys.length - 1];
+      const previousStart = availableKeys.includes(startSelect.value) ? startSelect.value : currentKey;
+      const effectiveStart = availableKeys.includes(previousStart) ? previousStart : availableKeys[0];
+      const maxEndForStart = getMaxDateKeyForRangeStart(effectiveStart, availableKeys);
+      let previousEnd = availableKeys.includes(endSelect.value) ? endSelect.value : effectiveStart;
+      if (parseDateKeyUtc(previousEnd) < parseDateKeyUtc(effectiveStart) || parseDateKeyUtc(previousEnd) > parseDateKeyUtc(maxEndForStart)) {
+        previousEnd = maxEndForStart;
+      }
+
+      startSelect.innerHTML = availableKeys.map(key => `<option value="${key}">${formatSelectedObservedDate(key)}</option>`).join("");
+      startSelect.value = effectiveStart;
+      startSelect.disabled = false;
+
+      const endKeys = availableKeys.filter(key => parseDateKeyUtc(key) >= parseDateKeyUtc(effectiveStart) && parseDateKeyUtc(key) <= parseDateKeyUtc(maxEndForStart));
+      endSelect.innerHTML = endKeys.map(key => `<option value="${key}">${formatSelectedObservedDate(key)}</option>`).join("");
+      endSelect.value = endKeys.includes(previousEnd) ? previousEnd : endKeys[endKeys.length - 1];
+      endSelect.disabled = false;
+    }
+
+    function getValidatedDownloadRange() {
+      populateDownloadDateSelectors();
+      const startKey = document.getElementById("downloadStartSelect")?.value || "";
+      const endKey = document.getElementById("downloadEndSelect")?.value || "";
+      const startMs = parseDateKeyUtc(startKey);
+      const endMs = parseDateKeyUtc(endKey);
+      if (startMs == null || endMs == null) {
+        throw new Error("Choose a valid export start and end date.");
+      }
+      if (endMs < startMs) {
+        throw new Error("The export end date must be on or after the start date.");
+      }
+      const daySpan = Math.round((endMs - startMs) / (24 * 60 * 60 * 1000)) + 1;
+      if (daySpan > EXPORT_DAY_LIMIT) {
+        throw new Error(`Exports are limited to ${EXPORT_DAY_LIMIT} days at a time.`);
+      }
+      return { startKey, endKey, daySpan };
+    }
+
+    function buildSeriesFrames(indices) {
+      return indices
+        .filter(index => Number.isInteger(index) && index >= 0 && index < currentSeriesHours.length)
+        .map(index => ({ kind: "series-index", index, entry: currentSeriesHours[index] }));
+    }
+
+    function getDownloadFrames(scope = null) {
       const mode = scope || document.getElementById("downloadScopeSelect")?.value || "current";
+      if (mode === "range") {
+        const { startKey, endKey } = getValidatedDownloadRange();
+        if (currentDataMode === "observed" && observedFlatHours.length) {
+          return observedFlatHours
+            .filter(entry => {
+              const key = getEntryDateKey(entry);
+              return key && key >= startKey && key <= endKey;
+            })
+            .slice(0, EXPORT_FRAME_LIMIT)
+            .map(entry => ({ kind: "observed-entry", entry }));
+        }
+
+        const indexedSeries = currentSeriesHours.map((entry, index) => ({ entry, index }));
+        return indexedSeries
+          .filter(item => {
+            const key = getEntryDateKey(item.entry);
+            return key && key >= startKey && key <= endKey;
+          })
+          .slice(0, EXPORT_FRAME_LIMIT)
+          .map(item => ({ kind: "series-index", index: item.index, entry: item.entry }));
+      }
+
       if (!currentSeriesHours.length) return [];
-      if (mode === "current") return [currentHourIndex];
+      if (mode === "current") return buildSeriesFrames([currentHourIndex]);
       if (mode === "forward") {
         const end = Math.min(currentSeriesHours.length, currentHourIndex + EXPORT_FRAME_LIMIT);
-        return Array.from({ length: Math.max(0, end - currentHourIndex) }, (_, i) => currentHourIndex + i);
+        return buildSeriesFrames(Array.from({ length: Math.max(0, end - currentHourIndex) }, (_, i) => currentHourIndex + i));
       }
-      return Array.from({ length: Math.min(currentSeriesHours.length, EXPORT_FRAME_LIMIT) }, (_, i) => i);
+      return buildSeriesFrames(Array.from({ length: Math.min(currentSeriesHours.length, EXPORT_FRAME_LIMIT) }, (_, i) => i));
     }
 
     function updateDownloadSummary() {
+      populateDownloadDateSelectors();
       const summary = document.getElementById("downloadSummary");
       if (!summary) return;
       const scope = document.getElementById("downloadScopeSelect")?.value || "current";
       const format = String(document.getElementById("downloadFormatSelect")?.value || "png").toUpperCase();
-      const indices = getDownloadIndices(scope);
-      if (!indices.length) {
+      let frames = [];
+      try {
+        frames = getDownloadFrames(scope);
+      } catch (err) {
+        summary.textContent = err.message || "Choose a valid export range.";
+        return;
+      }
+      if (!frames.length) {
         summary.textContent = "No frames are available for export.";
         return;
       }
-      if (indices.length === 1) {
-        summary.textContent = `${format} export of the current map at ${formatHourEntryTime(currentSeriesHours[indices[0]])}.`;
+      if (frames.length === 1) {
+        summary.textContent = `${format} export of the current map at ${formatHourEntryTime(frames[0].entry)}.`;
         return;
       }
-      const first = currentSeriesHours[indices[0]];
-      const last = currentSeriesHours[indices[indices.length - 1]];
-      summary.textContent = `${format} export of ${indices.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
+      const first = frames[0].entry;
+      const last = frames[frames.length - 1].entry;
+      if (scope === "range") {
+        summary.textContent = `${format} export of ${frames.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
+        return;
+      }
+      if (scope === "forward") {
+        summary.textContent = `${format} export from the selected time through ${formatHourEntryTime(last)} using ${frames.length} hourly frames.`;
+        return;
+      }
+      summary.textContent = `${format} export of ${frames.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
     }
 
     function setDownloadBusy(isBusy, message = "") {
@@ -3905,12 +4070,16 @@
       const btn = document.getElementById("downloadBtn");
       const scope = document.getElementById("downloadScopeSelect");
       const format = document.getElementById("downloadFormatSelect");
+      const start = document.getElementById("downloadStartSelect");
+      const end = document.getElementById("downloadEndSelect");
       if (btn) {
         btn.disabled = isBusy;
         btn.textContent = isBusy ? "Working..." : "Download";
       }
       if (scope) scope.disabled = isBusy;
       if (format) format.disabled = isBusy;
+      if (start) start.disabled = isBusy || start.options.length <= 1;
+      if (end) end.disabled = isBusy || end.options.length <= 1;
       setDownloadStatus(message, false);
     }
 
@@ -3959,36 +4128,86 @@
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
 
-    async function withExportFrames(indices, onFrame) {
-      const originalIndex = currentHourIndex;
+    function getCurrentRenderState() {
+      return {
+        dataMode: currentDataMode,
+        viewType: currentViewType,
+        hourIndex: currentHourIndex,
+        selectedObservedDate,
+        topTideIndex: currentTopTideIndex,
+        currentEntry: currentSeriesHours[currentHourIndex] || null
+      };
+    }
+
+    async function restoreRenderState(state) {
+      if (!state) return;
+
+      if (state.dataMode === "forecast") {
+        currentDataMode = "forecast";
+        updateDataModeButtons();
+        await loadForecast();
+        const targetIndex = Math.max(0, Math.min(state.hourIndex || 0, Math.max(0, currentSeriesHours.length - 1)));
+        await renderHour(targetIndex);
+        renderTopTides();
+        return;
+      }
+
+      currentDataMode = "observed";
+      updateDataModeButtons();
+      await loadObserved();
+
+      if (state.viewType === "top-tide" && Number.isInteger(state.topTideIndex) && topTideEvents[state.topTideIndex]) {
+        await loadTopTideEvent(state.topTideIndex, state.currentEntry);
+        return;
+      }
+
+      const targetDate = state.selectedObservedDate || getLatestObservedDate();
+      if (targetDate) {
+        await loadObservedDay(targetDate, state.hourIndex, state.currentEntry);
+      }
+    }
+
+    async function renderDownloadFrame(frame) {
+      if (!frame) throw new Error("Export frame is missing.");
+
+      if (frame.kind === "observed-entry") {
+        if (selectedObservedDate !== frame.entry.observedDate || currentViewType !== "observed-day") {
+          await loadObservedDay(frame.entry.observedDate, null, frame.entry);
+          return;
+        }
+        const targetIndex = findClosestEntryIndex(currentSeriesHours, frame.entry);
+        await renderHour(targetIndex);
+        return;
+      }
+
+      const targetIndex = Number.isInteger(frame.index) ? frame.index : currentHourIndex;
+      await renderHour(targetIndex);
+    }
+
+    async function withExportFrames(frames, onFrame) {
+      const originalState = getCurrentRenderState();
       try {
-        for (let i = 0; i < indices.length; i++) {
-          const frameIndex = indices[i];
-          setDownloadStatus(`Capturing frame ${i + 1} of ${indices.length}...`);
-          if (currentHourIndex !== frameIndex) {
-            await renderHour(frameIndex);
-          } else {
-            renderSelectionMeta(currentSeriesHours[frameIndex], getStageValue(currentSeriesHours[frameIndex]), getOverlayStage(getStageValue(currentSeriesHours[frameIndex])));
-            renderTimelineMeta(currentSeriesHours[frameIndex]);
-          }
+        for (let i = 0; i < frames.length; i++) {
+          const frame = frames[i];
+          setDownloadStatus(`Capturing frame ${i + 1} of ${frames.length}...`);
+          await renderDownloadFrame(frame);
+          const entry = frame.entry || currentSeriesHours[currentHourIndex];
           const canvas = await captureAppCanvas();
-          await onFrame({ sequence: i, index: frameIndex, entry: currentSeriesHours[frameIndex], canvas });
+          await onFrame({ sequence: i, index: currentHourIndex, entry, canvas });
           canvas.width = 1;
           canvas.height = 1;
         }
       } finally {
-        if (currentSeriesHours[originalIndex]) {
-          await renderHour(originalIndex);
-        }
+        await restoreRenderState(originalState);
       }
     }
 
-    async function exportPng(indices) {
+    async function exportPng(frames) {
       const base = getExportBaseName();
-      if (indices.length === 1) {
+      if (frames.length === 1) {
         let singleBlob = null;
         let frameName = base;
-        await withExportFrames(indices, async ({ entry, canvas }) => {
+        await withExportFrames(frames, async ({ entry, canvas }) => {
           frameName = `${base}-${getSafeFrameStamp(entry, 0)}`;
           singleBlob = await canvasToBlob(canvas, "image/png");
         });
@@ -3996,10 +4215,10 @@
         return;
       }
       if (typeof JSZip === "undefined") {
-        throw new Error("JSZip did not load, so multi-frame PNG export is unavailable.");
+        throw new Error("JSZip did not load, so multi frame PNG export is unavailable.");
       }
       const zip = new JSZip();
-      await withExportFrames(indices, async ({ sequence, entry, canvas }) => {
+      await withExportFrames(frames, async ({ sequence, entry, canvas }) => {
         const blob = await canvasToBlob(canvas, "image/png");
         zip.file(`${String(sequence + 1).padStart(3, "0")}-${getSafeFrameStamp(entry, sequence)}.png`, blob);
       });
@@ -4008,7 +4227,7 @@
       downloadBlob(zipBlob, `${base}.zip`);
     }
 
-    async function exportGif(indices) {
+    async function exportGif(frames) {
       if (typeof GIF === "undefined") {
         throw new Error("GIF export library did not load.");
       }
@@ -4017,7 +4236,7 @@
         quality: 10,
         workerScript: "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js"
       });
-      await withExportFrames(indices, async ({ canvas }) => {
+      await withExportFrames(frames, async ({ canvas }) => {
         gif.addFrame(canvas, { delay: 700, copy: true });
       });
       setDownloadStatus("Rendering GIF...");
@@ -4049,10 +4268,10 @@
       return ffmpegClientPromise;
     }
 
-    async function exportMov(indices) {
+    async function exportMov(frames) {
       const ffmpeg = await getFfmpegClient();
       const written = [];
-      await withExportFrames(indices, async ({ sequence, canvas }) => {
+      await withExportFrames(frames, async ({ sequence, canvas }) => {
         const filename = `frame-${String(sequence + 1).padStart(3, "0")}.png`;
         const blob = await canvasToBlob(canvas, "image/png");
         ffmpeg.FS("writeFile", filename, await FFmpeg.fetchFile(blob));
@@ -4081,19 +4300,19 @@
     async function downloadCurrentSelection() {
       if (exportInProgress) return;
       const format = document.getElementById("downloadFormatSelect")?.value || "png";
-      const indices = getDownloadIndices();
-      if (!indices.length) {
+      const frames = getDownloadFrames();
+      if (!frames.length) {
         toast("No frames are available for export.");
         return;
       }
       setDownloadBusy(true, "Preparing export...");
       try {
         if (format === "gif") {
-          await exportGif(indices);
+          await exportGif(frames);
         } else if (format === "mov") {
-          await exportMov(indices);
+          await exportMov(frames);
         } else {
-          await exportPng(indices);
+          await exportPng(frames);
         }
         setDownloadStatus(`Downloaded ${String(format).toUpperCase()} export.`);
       } catch (err) {
@@ -5137,6 +5356,8 @@
 
       document.getElementById("downloadScopeSelect").addEventListener("change", updateDownloadSummary);
       document.getElementById("downloadFormatSelect").addEventListener("change", updateDownloadSummary);
+      document.getElementById("downloadStartSelect").addEventListener("change", updateDownloadSummary);
+      document.getElementById("downloadEndSelect").addEventListener("change", updateDownloadSummary);
       document.getElementById("downloadBtn").addEventListener("click", () => {
         downloadCurrentSelection().catch(err => {
           toast(err.message);
