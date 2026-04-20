@@ -2662,6 +2662,8 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js"></script>
+  <script src="https://unpkg.com/esri-leaflet-vector@4.3.2/dist/esri-leaflet-vector.js"></script>
   <script src="https://unpkg.com/proj4@2.11.0/dist/proj4.js"></script>
   <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -2708,8 +2710,11 @@
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
 
-    // Label-free HTML basemap with building footprints and street geometry baked into the tiles.
-    const OSM_BASEMAP_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png";
+    // Esri-hosted OSM vector tiles carry a denser building footprint drawing than the prior raster basemap.
+    // We hide the Esri text layers in-client so the app keeps a single road-label layer with stronger contrast.
+    const ESRI_API_KEY = window.ESRI_API_KEY || "";
+    const ESRI_OSM_VECTOR_TILE_URL = "https://basemaps.arcgis.com/arcgis/rest/services/OpenStreetMap_v2/VectorTileServer";
+    const FALLBACK_BASEMAP_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png";
     const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png";
     const MUNICIPAL_BOUNDARY_QUERY_URL = "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/NJ_Municipalities_3857/FeatureServer/0/query";
     const MUNICIPAL_BOUNDARY_OUTFIELDS = "NAME,COUNTY,MUN,MUN_LABEL,MUN_TYPE,GNIS_NAME";
@@ -2875,6 +2880,65 @@
       { label: "Major", color: "var(--major)" },
       { label: "Areas Below Grade But Not Likely Flooded", color: "var(--below)" }
     ];
+
+    function cloneStyleObject(value) {
+      return JSON.parse(JSON.stringify(value || {}));
+    }
+
+    function styleEsriBuildingBasemap(style) {
+      const next = cloneStyleObject(style);
+      if (!Array.isArray(next.layers)) return next;
+
+      next.layers = next.layers.map(layer => {
+        const id = String(layer?.id || "").toLowerCase();
+        const sourceLayer = String(layer?.["source-layer"] || "").toLowerCase();
+        const joined = `${id} ${sourceLayer}`;
+        const isSymbolTextLayer = layer?.type === "symbol";
+        const isBuildingLayer = /(building|footprint|structure)/.test(joined);
+
+        if (isSymbolTextLayer || /(label|poi|place-name|road-name|road-label|reference-label|admin-label|marine-label|water-label)/.test(joined)) {
+          return {
+            ...layer,
+            layout: {
+              ...(layer.layout || {}),
+              visibility: "none"
+            }
+          };
+        }
+
+        if (isBuildingLayer) {
+          const paint = { ...(layer.paint || {}) };
+          if (layer.type === "fill") {
+            paint["fill-color"] = "#d8d2c6";
+            paint["fill-opacity"] = 0.98;
+            paint["fill-outline-color"] = "#c5bcae";
+          }
+          if (layer.type === "line") {
+            paint["line-color"] = "#c5bcae";
+            paint["line-opacity"] = 0.95;
+            paint["line-width"] = 1;
+          }
+          return { ...layer, paint };
+        }
+
+        return layer;
+      });
+
+      return next;
+    }
+
+    function makeEsriBuildingBasemapLayer() {
+      if (!(window.L && L.esri && L.esri.Vector && L.esri.Vector.vectorTileLayer)) return null;
+
+      const options = {
+        pane: "basemapColorPane",
+        preserveDrawingBuffer: true,
+        style: styleEsriBuildingBasemap
+      };
+      if (ESRI_API_KEY) options.apikey = ESRI_API_KEY;
+
+      return L.esri.Vector.vectorTileLayer(ESRI_OSM_VECTOR_TILE_URL, options);
+    }
 
     let map = null;
     let basemapGrayLayer = null;
@@ -3591,33 +3655,11 @@
     }
 
     function updateColorBasemapClip() {
-      if (!map || !basemapColorLayer) return;
-
+      if (!basemapColorLayer || typeof basemapColorLayer.getContainer !== "function") return;
       const container = basemapColorLayer.getContainer();
-      const mapContainer = map.getContainer();
-      if (!container || !mapContainer) return;
-
-      const clipRing = getPrimaryMunicipalBoundaryRing();
-      if (!Array.isArray(clipRing) || clipRing.length < 3) {
-        container.style.clipPath = "";
-        container.style.webkitClipPath = "";
-        return;
-      }
-
-      const mapRect = mapContainer.getBoundingClientRect();
-      const layerRect = container.getBoundingClientRect();
-      const offsetX = layerRect.left - mapRect.left;
-      const offsetY = layerRect.top - mapRect.top;
-
-      const pts = clipRing.map(([lat, lng]) => {
-        const p = map.latLngToContainerPoint([lat, lng]);
-        return { x: p.x - offsetX, y: p.y - offsetY };
-      });
-
-      const clip = `polygon(${pts.map(pt => `${pt.x.toFixed(2)}px ${pt.y.toFixed(2)}px`).join(",")})`;
-      container.style.clipPath = clip;
-      container.style.webkitClipPath = clip;
-      container.classList.remove("map-mask-fallback");
+      if (!container) return;
+      container.style.clipPath = "";
+      container.style.webkitClipPath = "";
     }
 
     function getTimelineReservedSpace() {
@@ -3686,29 +3728,40 @@
       map.getPane("floodPane").style.zIndex = 500;
       map.getPane("roadsPane").style.zIndex = 620;
 
-      basemapGrayLayer = L.tileLayer(OSM_BASEMAP_URL, {
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-        minZoom: 11,
-        maxZoom: 19,
-        subdomains: "abc",
-        crossOrigin: true,
-        updateWhenIdle: true,
-        keepBuffer: 3,
-        className: "basemap-gray-layer",
-        pane: "basemapGrayPane"
-      }).addTo(map);
+      basemapGrayLayer = null;
+      basemapColorLayer = makeEsriBuildingBasemapLayer();
 
-      basemapColorLayer = L.tileLayer(OSM_BASEMAP_URL, {
-        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
-        minZoom: 11,
-        maxZoom: 19,
-        subdomains: "abc",
-        crossOrigin: true,
-        updateWhenIdle: true,
-        keepBuffer: 3,
-        className: "basemap-color-layer",
-        pane: "basemapColorPane"
-      }).addTo(map);
+      if (basemapColorLayer) {
+        basemapColorLayer.on("error", () => {
+          if (basemapColorLayer && map.hasLayer(basemapColorLayer)) {
+            map.removeLayer(basemapColorLayer);
+          }
+          basemapColorLayer = L.tileLayer(FALLBACK_BASEMAP_URL, {
+            attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+            minZoom: 11,
+            maxZoom: 19,
+            subdomains: "abc",
+            crossOrigin: true,
+            updateWhenIdle: true,
+            keepBuffer: 3,
+            className: "basemap-color-layer",
+            pane: "basemapColorPane"
+          }).addTo(map);
+        });
+        basemapColorLayer.addTo(map);
+      } else {
+        basemapColorLayer = L.tileLayer(FALLBACK_BASEMAP_URL, {
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+          minZoom: 11,
+          maxZoom: 19,
+          subdomains: "abc",
+          crossOrigin: true,
+          updateWhenIdle: true,
+          keepBuffer: 3,
+          className: "basemap-color-layer",
+          pane: "basemapColorPane"
+        }).addTo(map);
+      }
 
       roadsLayer = L.tileLayer(ROAD_LABELS_URL, {
         attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
