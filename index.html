@@ -350,6 +350,37 @@
       grid-column:auto;
     }
 
+    .snapshot-card{
+      padding:12px 14px 14px;
+    }
+
+    .snapshot-card .section-title{
+      margin-bottom:10px;
+    }
+
+    .snapshot-card .stat-grid{
+      gap:10px;
+    }
+
+    .snapshot-card .stat-box{
+      min-height:0;
+      padding:16px 18px;
+      border-radius:20px;
+      justify-items:start;
+      align-content:start;
+      text-align:left;
+      gap:6px;
+      background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.035));
+    }
+
+    .snapshot-card .stat-label,
+    .snapshot-card .stat-value,
+    .snapshot-card .stat-sub{
+      width:100%;
+      min-width:0;
+      text-align:left;
+    }
+
     .stat-label{
       font-size:11px;
       font-weight:850;
@@ -372,13 +403,19 @@
     }
 
     #timeText{
-      font-size:clamp(22px, 1.9vw, 30px);
-      line-height:1.03;
+      display:block;
+      max-width:100%;
+      white-space:nowrap;
+      overflow:hidden;
+      font-size:clamp(15px, 1.28vw, 20px);
+      line-height:1.1;
+      letter-spacing:-.02em;
     }
 
     #stageText{
-      font-size:clamp(20px, 1.7vw, 28px);
-      line-height:1.03;
+      font-size:clamp(24px, 1.95vw, 32px);
+      line-height:1.02;
+      letter-spacing:-.03em;
     }
 
     .control-row{
@@ -1193,14 +1230,19 @@
     }
 
     #timeText{
+      display:block;
+      max-width:100%;
       white-space:nowrap;
-      font-size:clamp(17px, 1.45vw, 22px);
-      line-height:1.08;
+      overflow:hidden;
+      font-size:clamp(15px, 1.28vw, 20px);
+      line-height:1.1;
       letter-spacing:-.02em;
     }
 
     #timeSubText{
-      white-space:nowrap;
+      white-space:normal;
+      font-size:12px;
+      line-height:1.35;
     }
 
     .title-with-help{
@@ -1349,23 +1391,23 @@
 
     body.observed-mode .snapshot-card .stat-grid{
       grid-template-columns:1fr;
-      gap:8px;
+      gap:10px;
     }
 
     body.observed-mode .snapshot-card .stat-box{
       width:100%;
-      min-height:112px;
-      padding:12px 12px;
-      gap:5px;
+      min-height:88px;
+      padding:14px 16px;
+      gap:6px;
     }
 
     body.observed-mode #timeText{
-      font-size:clamp(15px, 1.25vw, 19px);
-      line-height:1.08;
+      font-size:clamp(13px, 1.02vw, 17px);
+      line-height:1.1;
     }
 
     body.observed-mode #stageText{
-      font-size:clamp(18px, 1.65vw, 24px);
+      font-size:clamp(22px, 1.55vw, 28px);
       line-height:1.02;
     }
 
@@ -1538,8 +1580,8 @@
 
     body.observed-tight .snapshot-card .stat-box{
       width:100%;
-      min-height:90px;
-      padding:10px 10px;
+      min-height:74px;
+      padding:11px 12px;
       gap:4px;
       border-radius:15px;
     }
@@ -1822,8 +1864,8 @@
 
       body.observed-mode .snapshot-card .stat-box{
         width:100%;
-        min-height:92px;
-        padding:10px 10px;
+        min-height:78px;
+        padding:11px 12px;
         gap:4px;
         border-radius:15px;
       }
@@ -2172,12 +2214,12 @@
 
       body.observed-mode .snapshot-card .stat-box{
         width:100%;
-        min-height:88px;
-        padding:10px 10px;
+        min-height:76px;
+        padding:11px 12px;
       }
 
       body.observed-mode #timeText{
-        font-size:17px;
+        font-size:14px;
       }
 
       body.observed-mode #stageText{
@@ -2841,6 +2883,49 @@
       ].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
     }
 
+    function formatNyLocalIso(date) {
+      const parts = getNyParts(date);
+      if (!parts) return "";
+      return `${parts.year}-${parts.month}-${parts.day}T${pad2(Number(parts.hour24))}:${parts.minute}`;
+    }
+
+    function roundDownToQuarterHourMs(ms) {
+      const step = 15 * 60 * 1000;
+      return Math.floor(ms / step) * step;
+    }
+
+    function roundUpToQuarterHourMs(ms) {
+      const step = 15 * 60 * 1000;
+      return Math.ceil(ms / step) * step;
+    }
+
+    function detectSeriesResolutionMinutes(entries = []) {
+      const times = entries
+        .map(entryTimeMs)
+        .filter(t => Number.isFinite(t))
+        .sort((a, b) => a - b);
+
+      const diffs = [];
+      for (let i = 1; i < times.length; i++) {
+        const diffMinutes = (times[i] - times[i - 1]) / 60000;
+        if (diffMinutes > 0) diffs.push(diffMinutes);
+      }
+      if (!diffs.length) return null;
+      diffs.sort((a, b) => a - b);
+      return diffs[Math.floor(diffs.length / 2)];
+    }
+
+    function buildDisplayEntryFromNearest(entry, slotMs, observationInterval, sourceResolutionMinutes = null) {
+      return {
+        ...entry,
+        displayTimeEST: formatNyLocalIso(new Date(slotMs)),
+        displayTimeUtc: new Date(slotMs).toISOString(),
+        observationInterval,
+        isResampledNearest: true,
+        sourceResolutionMinutes
+      };
+    }
+
     function parseStoredLocalNyToDate(timeEST) {
       const match = String(timeEST || "").match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
       if (!match) return null;
@@ -2864,10 +2949,39 @@
       return new Date(guessUtcMs);
     }
 
-    function getObservedDisplaySeries(entries = []) {
+    function getObservedDisplaySeries(entries = [], options = {}) {
       if (!Array.isArray(entries)) return [];
+
+      const valid = entries
+        .map((entry, idx) => ({ entry, idx, t: entryTimeMs(entry) }))
+        .filter(item => item.t != null)
+        .sort((a, b) => a.t - b.t);
+
+      if (!valid.length) return entries.map(entry => ({ ...entry, observationInterval: currentObservedResolution }));
+
+      const sourceResolutionMinutes = detectSeriesResolutionMinutes(entries);
+
       if (currentObservedResolution !== "1hour") {
-        return entries.map(entry => ({ ...entry, observationInterval: "15min" }));
+        if (sourceResolutionMinutes != null && sourceResolutionMinutes <= 20) {
+          return valid.map(item => ({ ...item.entry, observationInterval: "15min", sourceResolutionMinutes }));
+        }
+
+        let rangeStartMs = Number.isFinite(options.rangeStartMs) ? options.rangeStartMs : roundDownToQuarterHourMs(valid[0].t);
+        let rangeEndMs = Number.isFinite(options.rangeEndMs) ? options.rangeEndMs : roundUpToQuarterHourMs(valid[valid.length - 1].t);
+        if (rangeEndMs < rangeStartMs) [rangeStartMs, rangeEndMs] = [rangeEndMs, rangeStartMs];
+
+        const series = [];
+        let pointer = 0;
+        for (let slotMs = rangeStartMs; slotMs <= rangeEndMs; slotMs += 15 * 60 * 1000) {
+          while (pointer < valid.length - 1 && valid[pointer + 1].t <= slotMs) pointer += 1;
+          let best = valid[pointer];
+          if (pointer < valid.length - 1) {
+            const next = valid[pointer + 1];
+            if (Math.abs(next.t - slotMs) < Math.abs(best.t - slotMs)) best = next;
+          }
+          series.push(buildDisplayEntryFromNearest(best.entry, slotMs, "15min", sourceResolutionMinutes));
+        }
+        return series;
       }
 
       const buckets = new Map();
@@ -2881,17 +2995,18 @@
         const score = Math.abs(minute);
         const existing = buckets.get(key);
         if (!existing || score < existing.score || (score === existing.score && idx < existing.idx)) {
-          buckets.set(key, { entry, idx, score });
+          buckets.set(key, { entry, idx, score, slotIso: `${parts.year}-${parts.month}-${parts.day}T${pad2(Number(parts.hour24))}:00` });
         }
       });
 
       return Array.from(buckets.values())
-        .sort((a, b) => {
-          const ta = entryTimeMs(a.entry) ?? 0;
-          const tb = entryTimeMs(b.entry) ?? 0;
-          return ta - tb;
-        })
-        .map(item => ({ ...item.entry, observationInterval: "1hour" }));
+        .sort((a, b) => a.slotIso.localeCompare(b.slotIso))
+        .map(item => ({
+          ...item.entry,
+          displayTimeEST: item.slotIso,
+          observationInterval: "1hour",
+          sourceResolutionMinutes
+        }));
     }
 
     function findClosestEntryIndex(series, referenceEntry) {
@@ -2952,6 +3067,7 @@
         const displayStage = getOverlayStage(rawStage);
         renderSelectionMeta(entry, rawStage, displayStage);
         renderTimelineMeta(entry);
+        requestAnimationFrame(fitSnapshotTimeText);
       }
     }
 
@@ -3555,11 +3671,9 @@
     }
 
     function formatHourEntryTime(entry) {
-      if (!entry) return "--";
-      if (entry.timeEST) return formatStoredEST(entry.timeEST);
-      if (entry.timeEst) return formatStoredEST(entry.timeEst);
-      if (entry.timeUtc) return formatFixedESTFromUtc(entry.timeUtc);
-      return "--";
+      const d = getEntryESTDate(entry);
+      if (!d) return "--";
+      return formatFixedESTFromUtc(d.toISOString());
     }
 
     function formatHourEntryTimeCompact(entry) {
@@ -3586,7 +3700,17 @@
     }
 
     function getEntryESTDate(entry) {
-      const d = entry?.timeEST ? parseStoredESTToDate(entry.timeEST) : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
+      const d = entry?.displayTimeEST
+        ? parseStoredESTToDate(entry.displayTimeEST)
+        : entry?.displayTimeEst
+          ? parseStoredESTToDate(entry.displayTimeEst)
+          : entry?.displayTimeUtc
+            ? new Date(entry.displayTimeUtc)
+            : entry?.timeEST
+              ? parseStoredESTToDate(entry.timeEST)
+              : entry?.timeEst
+                ? parseStoredESTToDate(entry.timeEst)
+                : (entry?.timeUtc ? new Date(entry.timeUtc) : null);
       if (!d || Number.isNaN(d.getTime())) return null;
       return d;
     }
@@ -3634,6 +3758,23 @@
       const bubbleHalf = Math.max(72, (bubble.offsetWidth / 2) + 8);
       const safe = Math.max(bubbleHalf, Math.min(dockRect.width - bubbleHalf, x));
       bubble.style.left = `${safe}px`;
+    }
+
+    function fitTextToSingleLine(el, maxPx, minPx = 11) {
+      if (!el) return;
+      el.style.fontSize = `${maxPx}px`;
+      while (el.scrollWidth > el.clientWidth + 1 && maxPx > minPx) {
+        maxPx -= 0.5;
+        el.style.fontSize = `${maxPx}px`;
+      }
+    }
+
+    function fitSnapshotTimeText() {
+      const timeEl = document.getElementById("timeText");
+      if (!timeEl) return;
+      timeEl.style.fontSize = "";
+      const observed = document.body.classList.contains("observed-mode");
+      fitTextToSingleLine(timeEl, observed ? 17 : 20, 11.5);
     }
 
     function renderTimelineDays() {
@@ -3801,15 +3942,8 @@
     }
 
     function entryTimeMs(entry) {
-      if (entry.timeEST) {
-        const d = parseStoredESTToDate(entry.timeEST);
-        if (d) return d.getTime();
-      }
-      if (entry.timeUtc) {
-        const d = new Date(entry.timeUtc);
-        if (!Number.isNaN(d.getTime())) return d.getTime();
-      }
-      return null;
+      const d = getEntryESTDate(entry);
+      return d ? d.getTime() : null;
     }
 
     function buildTopTideEvents() {
@@ -3929,17 +4063,25 @@
       requestAnimationFrame(positionTimelineBubble);
     }
 
+    function getSnapshotSubLabel(entry) {
+      if (currentViewType === "forecast") return "Forecast";
+      const intervalLabel = currentObservedResolution === "1hour" ? "1 hour" : "15 min";
+      const nearestLabel = currentObservedResolution === "15min" && entry?.isResampledNearest && Number(entry?.sourceResolutionMinutes) > 20
+        ? `${intervalLabel} nearest`
+        : intervalLabel;
+
+      if (currentViewType === "top-tide") return `Historic crest window • ${nearestLabel}`;
+      return `Observed archive • ${nearestLabel}`;
+    }
+
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").textContent = formatSnapshotTime(entry);
       document.getElementById("stageText").textContent = formatStageForDisplay(rawStage);
       document.getElementById("stageSubText").textContent = getDatumLongLabel();
       document.getElementById("selectedText").textContent = currentSelectedLabel;
       document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
-      document.getElementById("timeSubText").textContent = currentViewType === "forecast"
-        ? "Forecast"
-        : currentViewType === "top-tide"
-          ? `Historic • ${currentObservedResolution === "1hour" ? "1 hour" : "15 min"}`
-          : (selectedObservedDate ? `${selectedObservedDate} • ${currentObservedResolution === "1hour" ? "1 hour" : "15 min"}` : "Observed");
+      document.getElementById("timeSubText").textContent = getSnapshotSubLabel(entry);
+      requestAnimationFrame(fitSnapshotTimeText);
     }
 
     async function setFloodLayer(mode, stageValue, token) {
@@ -4168,7 +4310,12 @@
       selectedObservedDate = dateStr;
       currentMonthKey = dateStr.slice(0, 7);
       currentRawSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
-      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours);
+      const dayStart = parseStoredLocalNyToDate(`${dateStr}T00:00`);
+      const dayEnd = parseStoredLocalNyToDate(`${dateStr}T23:45`);
+      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours, {
+        rangeStartMs: dayStart ? dayStart.getTime() : null,
+        rangeEndMs: dayEnd ? dayEnd.getTime() : null
+      });
       currentViewType = "observed-day";
       currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
@@ -4209,7 +4356,12 @@
       selectedObservedDate = event.entry.observedDate;
       currentMonthKey = event.entry.observedDate.slice(0, 7);
       currentRawSeriesHours = event.series;
-      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours);
+      const eventStart = event.series.length ? entryTimeMs(event.series[0]) : null;
+      const eventEnd = event.series.length ? entryTimeMs(event.series[event.series.length - 1]) : null;
+      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours, {
+        rangeStartMs: eventStart != null ? roundDownToQuarterHourMs(eventStart) : null,
+        rangeEndMs: eventEnd != null ? roundUpToQuarterHourMs(eventEnd) : null
+      });
 
       syncSliderBounds();
       currentHourIndex = preferredEntry
@@ -4558,6 +4710,7 @@
         }
         syncLeftPanelLayout();
         positionTimelineBubble();
+        fitSnapshotTimeText();
       });
       requestAnimationFrame(() => {
         if (map) {
@@ -4566,6 +4719,7 @@
         }
         syncLeftPanelLayout();
         positionTimelineBubble();
+        fitSnapshotTimeText();
       });
       await loadMunicipalBoundary();
       await reloadAll();
