@@ -807,9 +807,10 @@
       width:208px;
       padding:0;
       display:grid;
+      grid-template-rows:auto minmax(0, 1fr) auto;
       gap:12px;
-      align-content:start;
-      align-items:start;
+      align-content:stretch;
+      align-items:stretch;
       background:none;
       border:0;
       box-shadow:none;
@@ -870,7 +871,8 @@
       display:grid;
       grid-template-rows:auto minmax(0, 1fr);
       min-height:0;
-      max-height:calc(100vh - 218px);
+      height:100%;
+      max-height:none;
       overflow:hidden;
     }
 
@@ -1044,6 +1046,73 @@
     .top-tide-list-mobile{
       display:grid;
       gap:10px;
+    }
+
+    .download-card{
+      display:grid;
+      gap:10px;
+      align-content:start;
+    }
+
+    .download-grid{
+      display:grid;
+      gap:8px;
+    }
+
+    .download-field{
+      display:grid;
+      gap:5px;
+      font-size:10px;
+      font-weight:850;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .download-field select{
+      width:100%;
+      padding:0 12px;
+      text-transform:none;
+      letter-spacing:normal;
+      color:var(--text);
+    }
+
+    .download-summary{
+      min-height:40px;
+      padding:10px 12px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.045);
+      color:#dbe8ff;
+      font-size:11px;
+      line-height:1.35;
+    }
+
+    .download-actions{
+      display:grid;
+      grid-template-columns:1fr;
+      gap:8px;
+    }
+
+    .download-btn{
+      min-height:40px;
+      font-weight:850;
+    }
+
+    .download-status{
+      min-height:16px;
+      font-size:11px;
+      line-height:1.35;
+      color:var(--muted);
+    }
+
+    .download-status.error{
+      color:#fecaca;
+    }
+
+    .exporting #downloadCard,
+    .exporting #toast{
+      visibility:hidden !important;
     }
 
     #timelineDock{
@@ -2031,10 +2100,6 @@
         padding:11px;
       }
 
-      .top-tides-card{
-        max-height:calc(100vh - 236px);
-      }
-
       .top-tide-item{
         padding:10px 9px;
       }
@@ -2047,10 +2112,6 @@
 
       .layer-item{
         padding:9px 10px;
-      }
-
-      .top-tides-card{
-        max-height:calc(100vh - 248px);
       }
 
       .top-tide-item{
@@ -2527,6 +2588,37 @@
           </div>
           <div id="topTideList" class="top-tide-list"></div>
         </section>
+
+        <section id="downloadCard" class="rail-card download-card">
+          <div class="rail-head">
+            <div>
+              <h3>Download</h3>
+            </div>
+          </div>
+          <div class="download-grid">
+            <label class="download-field">
+              Scope
+              <select id="downloadScopeSelect">
+                <option value="current">Current map</option>
+                <option value="forward">From selected time</option>
+                <option value="view">Selected view</option>
+              </select>
+            </label>
+            <label class="download-field">
+              Format
+              <select id="downloadFormatSelect">
+                <option value="png">PNG</option>
+                <option value="gif">GIF</option>
+                <option value="mov">MOV</option>
+              </select>
+            </label>
+            <div id="downloadSummary" class="download-summary">Current map at the selected time.</div>
+            <div class="download-actions">
+              <button id="downloadBtn" class="download-btn active" type="button">Download</button>
+            </div>
+            <div id="downloadStatus" class="download-status" aria-live="polite"></div>
+          </div>
+        </section>
       </aside>
 
       <section id="timelineDock" class="map-floating">
@@ -2555,7 +2647,6 @@
     </main>
   </div>
 
-
   <div id="datumModal" class="datum-modal" hidden>
     <div class="datum-modal-card" role="dialog" aria-modal="true" aria-labelledby="datumModalTitle">
       <div class="datum-modal-head">
@@ -2573,6 +2664,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/proj4@2.11.0/dist/proj4.js"></script>
   <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
@@ -2606,12 +2701,16 @@
     const TOP_TIDE_SELECT_COUNT = 10;
     const TOP_TIDE_WINDOW_HOURS = 12;
     const ROAD_LABEL_ZOOM = 10;
+    const EXPORT_FRAME_LIMIT = 72;
+    const EXPORT_CAPTURE_DELAY_MS = 220;
+    const EXPORT_MOV_FPS = 2;
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
 
-    const OSM_BASEMAP_URL = "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png";
-    const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png";
+    // Label-free HTML basemap with building footprints and street geometry baked into the tiles.
+    const OSM_BASEMAP_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png";
+    const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png";
     const MUNICIPAL_BOUNDARY_QUERY_URL = "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/NJ_Municipalities_3857/FeatureServer/0/query";
     const MUNICIPAL_BOUNDARY_OUTFIELDS = "NAME,COUNTY,MUN,MUN_LABEL,MUN_TYPE,GNIS_NAME";
     const MUNICIPAL_BOUNDARY_QUERY_CANDIDATES = [
@@ -2819,6 +2918,8 @@
     let imageExistsCache = new Map();
     let overlayRecordCache = new Map();
     let preloadPromiseCache = new Map();
+    let exportInProgress = false;
+    let ffmpegClientPromise = null;
 
     function pad2(n) {
       return String(n).padStart(2, "0");
@@ -3583,7 +3684,7 @@
       map.getPane("basemapColorPane").style.zIndex = 190;
       map.getPane("boundaryPane").style.zIndex = 195;
       map.getPane("floodPane").style.zIndex = 500;
-      map.getPane("roadsPane").style.zIndex = 650;
+      map.getPane("roadsPane").style.zIndex = 620;
 
       basemapGrayLayer = L.tileLayer(OSM_BASEMAP_URL, {
         attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
@@ -3651,6 +3752,264 @@
 
       const pane = map.getPane("roadsPane");
       if (pane) pane.classList.toggle("roads-dark", showLabels);
+    }
+
+    function setDownloadStatus(message = "", isError = false) {
+      const el = document.getElementById("downloadStatus");
+      if (!el) return;
+      el.textContent = message;
+      el.classList.toggle("error", Boolean(isError));
+    }
+
+    function getExportBaseName() {
+      const mode = currentOverlayMode === "dynamic" ? "impact-thresholds" : "flood-depth";
+      const view = currentViewType === "forecast"
+        ? "forecast"
+        : currentViewType === "observed-day"
+          ? (selectedObservedDate || "observed")
+          : "historic-crest";
+      return `north-wildwood-${view}-${mode}`.replace(/[^a-z0-9\-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+    }
+
+    function getSafeFrameStamp(entry, sequence) {
+      const raw = String(entry?.displayTimeEST || entry?.timeEST || entry?.timeEst || entry?.timeUtc || `frame-${sequence + 1}`);
+      return raw.replace(/[:\s]/g, "-").replace(/[^a-z0-9\-_]+/gi, "").toLowerCase();
+    }
+
+    function getDownloadIndices(scope = null) {
+      const mode = scope || document.getElementById("downloadScopeSelect")?.value || "current";
+      if (!currentSeriesHours.length) return [];
+      if (mode === "current") return [currentHourIndex];
+      if (mode === "forward") {
+        const end = Math.min(currentSeriesHours.length, currentHourIndex + EXPORT_FRAME_LIMIT);
+        return Array.from({ length: Math.max(0, end - currentHourIndex) }, (_, i) => currentHourIndex + i);
+      }
+      return Array.from({ length: Math.min(currentSeriesHours.length, EXPORT_FRAME_LIMIT) }, (_, i) => i);
+    }
+
+    function updateDownloadSummary() {
+      const summary = document.getElementById("downloadSummary");
+      if (!summary) return;
+      const scope = document.getElementById("downloadScopeSelect")?.value || "current";
+      const format = String(document.getElementById("downloadFormatSelect")?.value || "png").toUpperCase();
+      const indices = getDownloadIndices(scope);
+      if (!indices.length) {
+        summary.textContent = "No frames are available for export.";
+        return;
+      }
+      if (indices.length === 1) {
+        summary.textContent = `${format} export of the current map at ${formatHourEntryTime(currentSeriesHours[indices[0]])}.`;
+        return;
+      }
+      const first = currentSeriesHours[indices[0]];
+      const last = currentSeriesHours[indices[indices.length - 1]];
+      summary.textContent = `${format} export of ${indices.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
+    }
+
+    function setDownloadBusy(isBusy, message = "") {
+      exportInProgress = isBusy;
+      const btn = document.getElementById("downloadBtn");
+      const scope = document.getElementById("downloadScopeSelect");
+      const format = document.getElementById("downloadFormatSelect");
+      if (btn) {
+        btn.disabled = isBusy;
+        btn.textContent = isBusy ? "Working..." : "Download";
+      }
+      if (scope) scope.disabled = isBusy;
+      if (format) format.disabled = isBusy;
+      setDownloadStatus(message, false);
+    }
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function waitForStableRender() {
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await wait(EXPORT_CAPTURE_DELAY_MS);
+    }
+
+    async function captureAppCanvas() {
+      if (typeof html2canvas !== "function") {
+        throw new Error("html2canvas did not load, so map export is unavailable.");
+      }
+      document.body.classList.add("exporting");
+      try {
+        await waitForStableRender();
+        return await html2canvas(document.getElementById("app"), {
+          backgroundColor: null,
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+          scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1))
+        });
+      } finally {
+        document.body.classList.remove("exporting");
+      }
+    }
+
+    function canvasToBlob(canvas, type = "image/png", quality) {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Canvas export failed.")), type, quality);
+      });
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    async function withExportFrames(indices, onFrame) {
+      const originalIndex = currentHourIndex;
+      try {
+        for (let i = 0; i < indices.length; i++) {
+          const frameIndex = indices[i];
+          setDownloadStatus(`Capturing frame ${i + 1} of ${indices.length}...`);
+          if (currentHourIndex !== frameIndex) {
+            await renderHour(frameIndex);
+          } else {
+            renderSelectionMeta(currentSeriesHours[frameIndex], getStageValue(currentSeriesHours[frameIndex]), getOverlayStage(getStageValue(currentSeriesHours[frameIndex])));
+            renderTimelineMeta(currentSeriesHours[frameIndex]);
+          }
+          const canvas = await captureAppCanvas();
+          await onFrame({ sequence: i, index: frameIndex, entry: currentSeriesHours[frameIndex], canvas });
+          canvas.width = 1;
+          canvas.height = 1;
+        }
+      } finally {
+        if (currentSeriesHours[originalIndex]) {
+          await renderHour(originalIndex);
+        }
+      }
+    }
+
+    async function exportPng(indices) {
+      const base = getExportBaseName();
+      if (indices.length === 1) {
+        let singleBlob = null;
+        let frameName = base;
+        await withExportFrames(indices, async ({ entry, canvas }) => {
+          frameName = `${base}-${getSafeFrameStamp(entry, 0)}`;
+          singleBlob = await canvasToBlob(canvas, "image/png");
+        });
+        downloadBlob(singleBlob, `${frameName}.png`);
+        return;
+      }
+      if (typeof JSZip === "undefined") {
+        throw new Error("JSZip did not load, so multi-frame PNG export is unavailable.");
+      }
+      const zip = new JSZip();
+      await withExportFrames(indices, async ({ sequence, entry, canvas }) => {
+        const blob = await canvasToBlob(canvas, "image/png");
+        zip.file(`${String(sequence + 1).padStart(3, "0")}-${getSafeFrameStamp(entry, sequence)}.png`, blob);
+      });
+      setDownloadStatus("Packing PNG files...");
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(zipBlob, `${base}.zip`);
+    }
+
+    async function exportGif(indices) {
+      if (typeof GIF === "undefined") {
+        throw new Error("GIF export library did not load.");
+      }
+      const gif = new GIF({
+        workers: 2,
+        quality: 10,
+        workerScript: "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js"
+      });
+      await withExportFrames(indices, async ({ canvas }) => {
+        gif.addFrame(canvas, { delay: 700, copy: true });
+      });
+      setDownloadStatus("Rendering GIF...");
+      const blob = await new Promise((resolve, reject) => {
+        gif.on("finished", resolve);
+        gif.on("abort", () => reject(new Error("GIF export was aborted.")));
+        try {
+          gif.render();
+        } catch (err) {
+          reject(err);
+        }
+      });
+      downloadBlob(blob, `${getExportBaseName()}.gif`);
+    }
+
+    async function getFfmpegClient() {
+      if (ffmpegClientPromise) return ffmpegClientPromise;
+      if (typeof FFmpeg === "undefined" || typeof FFmpeg.createFFmpeg !== "function") {
+        throw new Error("FFmpeg did not load, so MOV export is unavailable.");
+      }
+      ffmpegClientPromise = (async () => {
+        const client = FFmpeg.createFFmpeg({
+          log: false,
+          corePath: "https://unpkg.com/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js"
+        });
+        await client.load();
+        return client;
+      })();
+      return ffmpegClientPromise;
+    }
+
+    async function exportMov(indices) {
+      const ffmpeg = await getFfmpegClient();
+      const written = [];
+      await withExportFrames(indices, async ({ sequence, canvas }) => {
+        const filename = `frame-${String(sequence + 1).padStart(3, "0")}.png`;
+        const blob = await canvasToBlob(canvas, "image/png");
+        ffmpeg.FS("writeFile", filename, await FFmpeg.fetchFile(blob));
+        written.push(filename);
+      });
+      setDownloadStatus("Encoding MOV... this can take a minute.");
+      const outName = "north-wildwood-export.mov";
+      try {
+        await ffmpeg.run(
+          "-y",
+          "-framerate", String(EXPORT_MOV_FPS),
+          "-i", "frame-%03d.png",
+          "-c:v", "mpeg4",
+          "-pix_fmt", "yuv420p",
+          outName
+        );
+        const data = ffmpeg.FS("readFile", outName);
+        downloadBlob(new Blob([data.buffer], { type: "video/quicktime" }), `${getExportBaseName()}.mov`);
+      } finally {
+        for (const name of [...written, outName]) {
+          try { ffmpeg.FS("unlink", name); } catch (err) {}
+        }
+      }
+    }
+
+    async function downloadCurrentSelection() {
+      if (exportInProgress) return;
+      const format = document.getElementById("downloadFormatSelect")?.value || "png";
+      const indices = getDownloadIndices();
+      if (!indices.length) {
+        toast("No frames are available for export.");
+        return;
+      }
+      setDownloadBusy(true, "Preparing export...");
+      try {
+        if (format === "gif") {
+          await exportGif(indices);
+        } else if (format === "mov") {
+          await exportMov(indices);
+        } else {
+          await exportPng(indices);
+        }
+        setDownloadStatus(`Downloaded ${String(format).toUpperCase()} export.`);
+      } catch (err) {
+        console.error(err);
+        toast(err.message || "Download failed.");
+        setDownloadStatus(err.message || "Download failed.", true);
+      } finally {
+        setDownloadBusy(false, document.getElementById("downloadStatus")?.textContent || "");
+        updateDownloadSummary();
+      }
     }
 
     function clearFloodLayer() {
@@ -4078,6 +4437,7 @@
       timelineEnd.textContent = last ? formatHourEntryTimeCompact(last) : "--";
       if (bubble) bubble.textContent = formatTimelineBubbleText(entry);
       renderTimelineDays();
+      updateDownloadSummary();
       requestAnimationFrame(positionTimelineBubble);
     }
 
@@ -4681,6 +5041,15 @@
         goToCalendarSelection().catch(err => toast(err.message));
       });
 
+      document.getElementById("downloadScopeSelect").addEventListener("change", updateDownloadSummary);
+      document.getElementById("downloadFormatSelect").addEventListener("change", updateDownloadSummary);
+      document.getElementById("downloadBtn").addEventListener("click", () => {
+        downloadCurrentSelection().catch(err => {
+          toast(err.message);
+          setDownloadStatus(err.message, true);
+        });
+      });
+
       document.getElementById("timelineDock").addEventListener("wheel", e => {
         if (currentDataMode !== "observed" || !currentSeriesHours.length) return;
         e.preventDefault();
@@ -4718,6 +5087,7 @@
       setDatumHelpOpen(false);
       wireEvents();
       updateRoadLayerAppearance();
+      updateDownloadSummary();
       window.addEventListener('resize', () => {
         if (map) {
           map.invalidateSize();
