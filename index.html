@@ -213,7 +213,7 @@
 
     .datum-card,
     .opacity-card{
-      min-height:132px;
+      min-height:148px;
       display:flex;
       flex-direction:column;
       justify-content:space-between;
@@ -225,6 +225,21 @@
 
     .compact-card .control-row{
       min-height:0;
+    }
+
+    .opacity-card{
+      padding-bottom:11px;
+    }
+
+    .opacity-card .section-title{
+      margin-bottom:8px;
+    }
+
+    .opacity-card .control-row{
+      flex:1 1 auto;
+      display:grid;
+      align-content:center;
+      gap:8px;
     }
 
     .segmented-control{
@@ -1714,7 +1729,7 @@
     body.observed-tight .opacity-card{
       padding-top:8px;
       padding-bottom:8px;
-      align-self:start;
+      align-self:stretch;
     }
 
     body.observed-tight .opacity-card .section-title{
@@ -2601,8 +2616,9 @@
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
 
-    const OSM_BASEMAP_URL = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+    const OSM_BASEMAP_URL = "https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png";
     const ROAD_LABELS_URL = "https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png";
+    const BUILDING_FOOTPRINTS_OVERPASS_URL = "https://overpass-api.de/api/interpreter";
     const MUNICIPAL_BOUNDARY_QUERY_URL = "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/NJ_Municipalities_3857/FeatureServer/0/query";
     const MUNICIPAL_BOUNDARY_OUTFIELDS = "NAME,COUNTY,MUN,MUN_LABEL,MUN_TYPE,GNIS_NAME";
     const MUNICIPAL_BOUNDARY_QUERY_CANDIDATES = [
@@ -2772,6 +2788,8 @@
     let basemapGrayLayer = null;
     let basemapColorLayer = null;
     let roadsLayer = null;
+    let buildingsLayer = null;
+    let buildingsFetchPromise = null;
     let cityBoundaryOutline = null;
     let cityBoundaryGuide = null;
     let municipalBoundaryFeature = null;
@@ -3477,6 +3495,7 @@
       }
 
       updateMunicipalBoundaryLayer();
+      await loadBuildingsLayer();
       syncLeftPanelLayout();
     }
 
@@ -3569,15 +3588,17 @@
       map.createPane("basemapColorPane");
       map.createPane("boundaryPane");
       map.createPane("floodPane");
+      map.createPane("buildingsPane");
       map.createPane("roadsPane");
       map.getPane("basemapGrayPane").style.zIndex = 180;
       map.getPane("basemapColorPane").style.zIndex = 190;
       map.getPane("boundaryPane").style.zIndex = 195;
       map.getPane("floodPane").style.zIndex = 500;
+      map.getPane("buildingsPane").style.zIndex = 560;
       map.getPane("roadsPane").style.zIndex = 650;
 
       basemapGrayLayer = L.tileLayer(OSM_BASEMAP_URL, {
-        attribution: "&copy; OpenStreetMap contributors",
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         minZoom: 11,
         maxZoom: 19,
         subdomains: "abc",
@@ -3589,7 +3610,7 @@
       }).addTo(map);
 
       basemapColorLayer = L.tileLayer(OSM_BASEMAP_URL, {
-        attribution: "&copy; OpenStreetMap contributors",
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
         minZoom: 11,
         maxZoom: 19,
         subdomains: "abc",
@@ -3618,9 +3639,11 @@
       L.control.zoom({ position: "topright" }).addTo(map);
       map.on("zoomend moveend resize", () => {
         updateRoadLayerAppearance();
+        updateBuildingsLayerAppearance();
         updateColorBasemapClip();
       });
       updateRoadLayerAppearance();
+      updateBuildingsLayerAppearance();
       updateColorBasemapClip();
 
       map.fitBounds(FALLBACK_LATLNG_BOUNDS, { padding: [20, 20] });
@@ -3642,6 +3665,146 @@
 
       const pane = map.getPane("roadsPane");
       if (pane) pane.classList.toggle("roads-dark", showLabels);
+    }
+
+    function getLatLngBoundsForRing(ring = []) {
+      const lats = [];
+      const lngs = [];
+      ring.forEach(([lat, lng]) => {
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          lats.push(lat);
+          lngs.push(lng);
+        }
+      });
+      if (!lats.length || !lngs.length) return null;
+      return {
+        south: Math.min(...lats),
+        west: Math.min(...lngs),
+        north: Math.max(...lats),
+        east: Math.max(...lngs)
+      };
+    }
+
+    function pointInRing(lat, lng, ring = []) {
+      if (!Array.isArray(ring) || ring.length < 3) return false;
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const yi = ring[i][0];
+        const xi = ring[i][1];
+        const yj = ring[j][0];
+        const xj = ring[j][1];
+        const intersects = ((yi > lat) !== (yj > lat))
+          && (lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || Number.EPSILON) + xi);
+        if (intersects) inside = !inside;
+      }
+      return inside;
+    }
+
+    function getFeatureCentroidLatLng(coords = []) {
+      if (!Array.isArray(coords) || !coords.length) return null;
+      let latSum = 0;
+      let lngSum = 0;
+      let count = 0;
+      coords.forEach(([lng, lat]) => {
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+          latSum += lat;
+          lngSum += lng;
+          count += 1;
+        }
+      });
+      if (!count) return null;
+      return { lat: latSum / count, lng: lngSum / count };
+    }
+
+    function getNorthWildwoodBuildingQueryUrl() {
+      const ring = getPrimaryMunicipalBoundaryRing();
+      const bounds = getLatLngBoundsForRing(ring);
+      if (!bounds) return null;
+      const query = [
+        "[out:json][timeout:25];",
+        `way["building"](${bounds.south},${bounds.west},${bounds.north},${bounds.east});`,
+        "out geom;"
+      ].join("");
+      return `${BUILDING_FOOTPRINTS_OVERPASS_URL}?data=${encodeURIComponent(query)}`;
+    }
+
+    async function loadBuildingsLayer() {
+      if (!map || buildingsLayer || buildingsFetchPromise) return buildingsFetchPromise;
+      const queryUrl = getNorthWildwoodBuildingQueryUrl();
+      if (!queryUrl) return null;
+
+      const primaryRing = getPrimaryMunicipalBoundaryRing();
+      buildingsFetchPromise = fetch(queryUrl, {
+        headers: { "Accept": "application/json" }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error(`Building footprint request failed (${res.status}).`);
+          return res.json();
+        })
+        .then(data => {
+          const features = (Array.isArray(data?.elements) ? data.elements : [])
+            .filter(el => el?.type === "way" && Array.isArray(el.geometry) && el.geometry.length >= 3)
+            .map(el => {
+              const coords = el.geometry
+                .map(pt => [Number(pt.lon), Number(pt.lat)])
+                .filter(([lng, lat]) => Number.isFinite(lat) && Number.isFinite(lng));
+              if (coords.length < 3) return null;
+              const first = coords[0];
+              const last = coords[coords.length - 1];
+              if (first[0] !== last[0] || first[1] !== last[1]) coords.push([...first]);
+              const centroid = getFeatureCentroidLatLng(coords);
+              if (!centroid || !pointInRing(centroid.lat, centroid.lng, primaryRing)) return null;
+              return {
+                type: "Feature",
+                properties: {
+                  osm_id: el.id,
+                  building: el.tags?.building || "yes"
+                },
+                geometry: {
+                  type: "Polygon",
+                  coordinates: [coords]
+                }
+              };
+            })
+            .filter(Boolean);
+
+          buildingsLayer = L.geoJSON({ type: "FeatureCollection", features }, {
+            pane: "buildingsPane",
+            interactive: false,
+            style: () => ({
+              color: "#000000",
+              weight: 0.8,
+              opacity: 0.72,
+              fillColor: "#000000",
+              fillOpacity: 0.10
+            })
+          }).addTo(map);
+
+          updateBuildingsLayerAppearance();
+          return buildingsLayer;
+        })
+        .catch(err => {
+          console.warn("Building footprints unavailable.", err);
+          return null;
+        })
+        .finally(() => {
+          buildingsFetchPromise = null;
+        });
+
+      return buildingsFetchPromise;
+    }
+
+    function updateBuildingsLayerAppearance() {
+      const toggle = document.getElementById("buildingsToggle");
+      const showBuildings = !!buildingsLayer && (!toggle || toggle.classList.contains("on"));
+      if (!buildingsLayer) return;
+      buildingsLayer.setStyle({
+        color: "#000000",
+        weight: 0.8,
+        opacity: showBuildings ? 0.72 : 0,
+        fillColor: "#000000",
+        fillOpacity: showBuildings ? 0.10 : 0
+      });
     }
 
     function clearFloodLayer() {
@@ -4074,8 +4237,8 @@
 
     function getSnapshotSubLabel(entry) {
       if (currentViewType === "forecast") return "Forecast";
-      if (currentViewType === "top-tide") return "Historic crest window • 1 hour";
-      return "Observed archive • 1 hour";
+      if (currentViewType === "top-tide") return "Historic crest window";
+      return "";
     }
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
@@ -4084,7 +4247,10 @@
       document.getElementById("stageSubText").textContent = getDatumLongLabel();
       document.getElementById("selectedText").textContent = currentSelectedLabel;
       document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
-      document.getElementById("timeSubText").textContent = getSnapshotSubLabel(entry);
+      const snapshotSubLabel = getSnapshotSubLabel(entry);
+      const timeSubText = document.getElementById("timeSubText");
+      timeSubText.textContent = snapshotSubLabel;
+      timeSubText.style.display = snapshotSubLabel ? "" : "none";
       requestAnimationFrame(fitSnapshotTimeText);
     }
 
@@ -4564,6 +4730,7 @@
         el.addEventListener("click", () => {
           el.classList.toggle("on");
           if (id === "roadsToggle") updateRoadLayerAppearance();
+          if (id === "buildingsToggle") updateBuildingsLayerAppearance();
         });
       });
     }
