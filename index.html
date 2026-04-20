@@ -1023,7 +1023,6 @@
       gap:10px;
     }
 
-
     #timelineDock{
       position:fixed;
       left:16px;
@@ -1191,7 +1190,6 @@
       cursor:pointer;
     }
 
-
     .leaflet-control-zoom{
       border:none !important;
       box-shadow:0 16px 30px rgba(0,0,0,.28);
@@ -1296,14 +1294,6 @@
       color:#ffffff;
     }
 
-    .observed-resolution-card{
-      display:none;
-    }
-
-    body.observed-mode .observed-resolution-card{
-      display:block;
-    }
-
     .compact-card select{
       width:100%;
       padding:0 12px;
@@ -1371,7 +1361,7 @@
     }
 
     body.observed-mode .data-source-card,
-    body.observed-mode .observed-resolution-card,
+
     body.observed-mode .overlay-card,
     body.observed-mode .datum-card,
     body.observed-mode .opacity-card{
@@ -1468,7 +1458,6 @@
       padding-bottom:9px;
     }
 
-
     body.observed-tight #leftPanel{
       width:min(392px, calc(100vw - 32px));
       display:grid;
@@ -1489,16 +1478,14 @@
 
     body.observed-tight #leftPanel .brand{ order:1; }
     body.observed-tight #leftPanel .data-source-card{ order:2; }
-    body.observed-tight #leftPanel .observed-resolution-card{ order:3; }
-    body.observed-tight #leftPanel .overlay-card{ order:4; }
-    body.observed-tight #leftPanel .datum-card{ order:5; }
-    body.observed-tight #leftPanel .opacity-card{ order:6; }
-    body.observed-tight #leftPanel .snapshot-card{ order:7; }
-    body.observed-tight #leftPanel .calendar-card.active{ order:8; }
-    body.observed-tight #leftPanel .mobile-top-tides-card{ order:9; }
+    body.observed-tight #leftPanel .overlay-card{ order:3; }
+    body.observed-tight #leftPanel .datum-card{ order:4; }
+    body.observed-tight #leftPanel .opacity-card{ order:5; }
+    body.observed-tight #leftPanel .snapshot-card{ order:6; }
+    body.observed-tight #leftPanel .calendar-card.active{ order:7; }
+    body.observed-tight #leftPanel .mobile-top-tides-card{ order:8; }
 
     body.observed-tight #leftPanel .data-source-card,
-    body.observed-tight #leftPanel .observed-resolution-card,
     body.observed-tight #leftPanel .overlay-card,
     body.observed-tight #leftPanel .datum-card,
     body.observed-tight #leftPanel .opacity-card{
@@ -1954,7 +1941,6 @@
       }
     }
 
-
     @media (max-height: 980px){
       #rightRail{
         bottom:144px;
@@ -2303,17 +2289,6 @@
         <div class="button-grid-2">
           <button id="forecastDataBtn" class="active" type="button">Forecast</button>
           <button id="observedDataBtn" type="button">Observed</button>
-        </div>
-      </section>
-
-      <section id="observedResolutionCard" class="panel-card compact-card observed-resolution-card">
-        <div class="section-title">
-          <h2>Observed interval</h2>
-          <span id="observedResolutionPill" class="pill">15 min</span>
-        </div>
-        <div class="button-grid-2">
-          <button id="observed15MinBtn" class="active" type="button">15 min</button>
-          <button id="observed1HourBtn" type="button">1 hour</button>
         </div>
       </section>
 
@@ -2750,7 +2725,7 @@
     let currentRangeLabel = "--";
     let currentBaseModeBeforeTopTide = "observed";
     let currentDatum = "navd88";
-    let currentObservedResolution = "15min";
+    let currentObservedResolution = "1hour";
     let currentRawSeriesHours = [];
 
     let playTimer = null;
@@ -2838,13 +2813,7 @@
     }
 
     function updateObservedResolutionUI() {
-      const pill = document.getElementById("observedResolutionPill");
-      const btn15 = document.getElementById("observed15MinBtn");
-      const btn1h = document.getElementById("observed1HourBtn");
-      const label = currentObservedResolution === "1hour" ? "1 hour" : "15 min";
-      if (pill) pill.textContent = label;
-      if (btn15) btn15.classList.toggle("active", currentObservedResolution === "15min");
-      if (btn1h) btn1h.classList.toggle("active", currentObservedResolution === "1hour");
+      currentObservedResolution = "1hour";
     }
 
     function getNyParts(date) {
@@ -2957,33 +2926,9 @@
         .filter(item => item.t != null)
         .sort((a, b) => a.t - b.t);
 
-      if (!valid.length) return entries.map(entry => ({ ...entry, observationInterval: currentObservedResolution }));
+      if (!valid.length) return entries.map(entry => ({ ...entry, observationInterval: "1hour" }));
 
       const sourceResolutionMinutes = detectSeriesResolutionMinutes(entries);
-
-      if (currentObservedResolution !== "1hour") {
-        if (sourceResolutionMinutes != null && sourceResolutionMinutes <= 20) {
-          return valid.map(item => ({ ...item.entry, observationInterval: "15min", sourceResolutionMinutes }));
-        }
-
-        let rangeStartMs = Number.isFinite(options.rangeStartMs) ? options.rangeStartMs : roundDownToQuarterHourMs(valid[0].t);
-        let rangeEndMs = Number.isFinite(options.rangeEndMs) ? options.rangeEndMs : roundUpToQuarterHourMs(valid[valid.length - 1].t);
-        if (rangeEndMs < rangeStartMs) [rangeStartMs, rangeEndMs] = [rangeEndMs, rangeStartMs];
-
-        const series = [];
-        let pointer = 0;
-        for (let slotMs = rangeStartMs; slotMs <= rangeEndMs; slotMs += 15 * 60 * 1000) {
-          while (pointer < valid.length - 1 && valid[pointer + 1].t <= slotMs) pointer += 1;
-          let best = valid[pointer];
-          if (pointer < valid.length - 1) {
-            const next = valid[pointer + 1];
-            if (Math.abs(next.t - slotMs) < Math.abs(best.t - slotMs)) best = next;
-          }
-          series.push(buildDisplayEntryFromNearest(best.entry, slotMs, "15min", sourceResolutionMinutes));
-        }
-        return series;
-      }
-
       const buckets = new Map();
       entries.forEach((entry, idx) => {
         const d = getEntryESTDate(entry);
@@ -3027,22 +2972,9 @@
       return bestIndex;
     }
 
-    async function switchObservedResolution(mode) {
-      if (mode === currentObservedResolution) return;
-      currentObservedResolution = mode;
+    async function switchObservedResolution() {
+      currentObservedResolution = "1hour";
       updateObservedResolutionUI();
-
-      if (currentDataMode !== "observed") return;
-
-      const currentEntry = currentSeriesHours[currentHourIndex] || null;
-      if (currentViewType === "top-tide" && currentTopTideIndex != null) {
-        await loadTopTideEvent(currentTopTideIndex, currentEntry);
-        return;
-      }
-
-      if (selectedObservedDate) {
-        await loadObservedDay(selectedObservedDate, null, currentEntry);
-      }
     }
 
     function setDatumHelpOpen(isOpen) {
@@ -3070,7 +3002,6 @@
         requestAnimationFrame(fitSnapshotTimeText);
       }
     }
-
 
     function updateModeButtons() {
       document.getElementById("depthModeBtn").classList.toggle("active", currentOverlayMode === "depth");
@@ -3283,7 +3214,6 @@
         projectedPointToLatLng(b.east, b.north)
       );
     }
-
 
     function getPrimaryMunicipalBoundaryRing() {
       return Array.isArray(municipalBoundaryRings) && municipalBoundaryRings.length ? municipalBoundaryRings[0] : FALLBACK_NORTH_WILDWOOD_MASK_RING;
@@ -4050,9 +3980,9 @@
       if (currentViewType === "forecast") {
         label.textContent = "Forecast";
       } else if (currentViewType === "observed-day") {
-        label.textContent = currentObservedResolution === "1hour" ? "Observed • 1 hour" : "Observed • 15 min";
+        label.textContent = "Observed • 1 hour";
       } else {
-        label.textContent = currentObservedResolution === "1hour" ? "Historic crest • 1 hour" : "Historic crest • 15 min";
+        label.textContent = "Historic crest • 1 hour";
       }
 
       timelineMeta.textContent = "";
@@ -4065,13 +3995,8 @@
 
     function getSnapshotSubLabel(entry) {
       if (currentViewType === "forecast") return "Forecast";
-      const intervalLabel = currentObservedResolution === "1hour" ? "1 hour" : "15 min";
-      const nearestLabel = currentObservedResolution === "15min" && entry?.isResampledNearest && Number(entry?.sourceResolutionMinutes) > 20
-        ? `${intervalLabel} nearest`
-        : intervalLabel;
-
-      if (currentViewType === "top-tide") return `Historic crest window • ${nearestLabel}`;
-      return `Observed archive • ${nearestLabel}`;
+      if (currentViewType === "top-tide") return "Historic crest window • 1 hour";
+      return "Observed archive • 1 hour";
     }
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
@@ -4624,14 +4549,6 @@
           currentMonthKey = observedMonthKeys[idx + 1];
           renderCalendar().catch(err => toast(err.message));
         }
-      });
-
-      document.getElementById("observed15MinBtn").addEventListener("click", () => {
-        switchObservedResolution("15min").catch(err => toast(err.message));
-      });
-
-      document.getElementById("observed1HourBtn").addEventListener("click", () => {
-        switchObservedResolution("1hour").catch(err => toast(err.message));
       });
 
       document.getElementById("datumHelpBtn").addEventListener("click", e => {
