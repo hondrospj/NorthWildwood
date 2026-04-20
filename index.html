@@ -2945,6 +2945,7 @@
     let basemapColorLayer = null;
     let roadsLayer = null;
     let cityBoundaryOutline = null;
+    let cityBoundaryMask = null;
     let cityBoundaryGuide = null;
     let municipalBoundaryFeature = null;
     let municipalBoundaryRings = [FALLBACK_NORTH_WILDWOOD_MASK_RING];
@@ -3613,16 +3614,54 @@
       });
     }
 
+    function createBoundaryMaskGeometry() {
+      const outerWorldRing = [
+        [85, -180],
+        [85, 180],
+        [-85, 180],
+        [-85, -180]
+      ];
+      const innerRings = Array.isArray(municipalBoundaryRings) && municipalBoundaryRings.length
+        ? municipalBoundaryRings
+        : [FALLBACK_NORTH_WILDWOOD_MASK_RING];
+      return [outerWorldRing, ...innerRings];
+    }
+
+    function updateBoundaryMaskLayer() {
+      if (!map) return;
+
+      if (cityBoundaryMask && map.hasLayer(cityBoundaryMask)) {
+        map.removeLayer(cityBoundaryMask);
+      }
+
+      cityBoundaryMask = L.polygon(createBoundaryMaskGeometry(), {
+        pane: "maskPane",
+        interactive: false,
+        smoothFactor: 0,
+        stroke: false,
+        fill: true,
+        fillColor: "#bcbcbc",
+        fillOpacity: 0.92,
+        bubblingMouseEvents: false
+      }).addTo(map);
+    }
+
     function updateMunicipalBoundaryLayer() {
       if (!map) return;
 
       if (cityBoundaryOutline && map.hasLayer(cityBoundaryOutline)) {
         map.removeLayer(cityBoundaryOutline);
       }
+      if (cityBoundaryMask && map.hasLayer(cityBoundaryMask)) {
+        map.removeLayer(cityBoundaryMask);
+        cityBoundaryMask = null;
+      }
       if (cityBoundaryGuide && map.hasLayer(cityBoundaryGuide)) {
         map.removeLayer(cityBoundaryGuide);
         cityBoundaryGuide = null;
       }
+
+      updateBoundaryMaskLayer();
 
       cityBoundaryOutline = makeBoundaryVector({
         color: getComputedStyle(document.documentElement).getPropertyValue("--boundary-red").trim() || "#ef4444",
@@ -3722,11 +3761,13 @@
       map.createPane("boundaryPane");
       map.createPane("floodPane");
       map.createPane("roadsPane");
+      map.createPane("maskPane");
       map.getPane("basemapGrayPane").style.zIndex = 180;
       map.getPane("basemapColorPane").style.zIndex = 190;
-      map.getPane("boundaryPane").style.zIndex = 195;
+      map.getPane("boundaryPane").style.zIndex = 640;
       map.getPane("floodPane").style.zIndex = 500;
       map.getPane("roadsPane").style.zIndex = 620;
+      map.getPane("maskPane").style.zIndex = 630;
 
       basemapGrayLayer = null;
       basemapColorLayer = makeEsriBuildingBasemapLayer();
