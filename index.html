@@ -2799,18 +2799,18 @@
       <div class="download-grid">
         <label class="download-field">
           Scope
-          <select id="downloadScopeSelect">
-            <option value="current">Current map</option>
-            <option value="range">Time range</option>
-          </select>
+          <div id="downloadScopeControl" class="export-segmented" role="tablist" aria-label="Export scope">
+                <button id="exportScopeCurrentBtn" type="button" class="active" data-scope="current" aria-pressed="true">Current map</button>
+                <button id="exportScopeRangeBtn" type="button" data-scope="range" aria-pressed="false">Time range</button>
+              </div>
         </label>
         <label class="download-field">
           Format
-          <select id="downloadFormatSelect">
-            <option value="png">PNG</option>
-            <option value="gif">GIF</option>
-            <option value="mov">MOV</option>
-          </select>
+          <div id="downloadFormatControl" class="export-segmented export-segmented-3" role="tablist" aria-label="Export format">
+                <button id="exportFormatPngBtn" type="button" class="active" data-format="png" aria-pressed="true">PNG</button>
+                <button id="exportFormatGifBtn" type="button" data-format="gif" aria-pressed="false">GIF</button>
+                <button id="exportFormatMovBtn" type="button" data-format="mov" aria-pressed="false">MOV</button>
+              </div>
         </label>
         <div id="downloadRangeFields" class="download-range-grid" hidden>
           <label class="download-field">
@@ -2822,8 +2822,11 @@
             <input id="downloadEndInput" type="datetime-local" step="3600" />
           </label>
         </div>
-        <div id="downloadRangeNote" class="download-note"></div>
-        <div id="downloadSummary" class="download-summary">Current map at the selected time.</div>
+        <p class="export-modal-copy">Export a range of times out to 84 hours.</p>
+            <div id="downloadRangeNote" class="download-note"></div>
+        <input id="downloadScopeSelect" type="hidden" value="current" />
+            <input id="downloadFormatSelect" type="hidden" value="png" />
+            <div id="downloadSummary" class="download-summary">Current map at the selected time.</div>
         <div class="download-actions">
           <button id="downloadBtn" class="download-btn active" type="button">Download</button>
         </div>
@@ -2875,7 +2878,7 @@
     const TOP_TIDE_WINDOW_HOURS = 12;
     const ROAD_LABEL_ZOOM = 10;
     const EXPORT_FRAME_LIMIT = 72;
-    const EXPORT_RANGE_MAX_HOURS = 96;
+    const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 220;
     const EXPORT_MOV_FPS = 2;
@@ -4249,12 +4252,28 @@
         return;
       }
       if (scope === "current" || items.length === 1) {
-        summary.textContent = `${format} export of the map and legend at ${formatHourEntryTime(items[0].entry)}.`;
+        summary.textContent = `${format} export at ${formatHourEntryTime(items[0].entry)}.`;
         return;
       }
       const first = items[0].entry;
       const last = items[items.length - 1].entry;
-      summary.textContent = `${format} export of the map and legend for ${items.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
+      summary.textContent = `${format} export of ${items.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
+    }
+
+    function updateExportSegmentedUI() {
+      const scopeValue = document.getElementById("downloadScopeSelect")?.value || "current";
+      document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
+        const active = btn.dataset.scope === scopeValue;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+
+      const formatValue = document.getElementById("downloadFormatSelect")?.value || "png";
+      document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
+        const active = btn.dataset.format === formatValue;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
     }
 
     function setDownloadBusy(isBusy, message = "") {
@@ -4270,6 +4289,9 @@
       }
       if (scope) scope.disabled = isBusy;
       if (format) format.disabled = isBusy;
+      document.querySelectorAll("#downloadScopeControl button, #downloadFormatControl button").forEach(btn => {
+        btn.disabled = isBusy;
+      });
       if (start) start.disabled = isBusy;
       if (end) end.disabled = isBusy;
       setDownloadStatus(message, false);
@@ -5608,13 +5630,38 @@
         goToCalendarSelection().catch(err => toast(err.message));
       });
 
+      document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const input = document.getElementById("downloadScopeSelect");
+          if (!input) return;
+          input.value = btn.dataset.scope || "current";
+          if (!exportInProgress) setDownloadStatus("", false);
+          updateExportSegmentedUI();
+          syncDownloadRangeInputs(true);
+          updateDownloadSummary();
+        });
+      });
+
+      document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const input = document.getElementById("downloadFormatSelect");
+          if (!input) return;
+          input.value = btn.dataset.format || "png";
+          if (!exportInProgress) setDownloadStatus("", false);
+          updateExportSegmentedUI();
+          updateDownloadSummary();
+        });
+      });
+
       document.getElementById("downloadScopeSelect").addEventListener("change", () => {
         if (!exportInProgress) setDownloadStatus("", false);
+        updateExportSegmentedUI();
         syncDownloadRangeInputs(true);
         updateDownloadSummary();
       });
       document.getElementById("downloadFormatSelect").addEventListener("change", () => {
         if (!exportInProgress) setDownloadStatus("", false);
+        updateExportSegmentedUI();
         updateDownloadSummary();
       });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
@@ -5673,6 +5720,7 @@
       setDownloadModalOpen(false);
       wireEvents();
       updateRoadLayerAppearance();
+      updateExportSegmentedUI();
       syncDownloadRangeInputs(true);
       updateDownloadSummary();
       window.addEventListener('resize', () => {
