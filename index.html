@@ -2741,11 +2741,11 @@
         <section id="downloadCard" class="rail-card download-card download-launch-card">
           <div class="rail-head">
             <div>
-              <h3>Download</h3>
+              <h3>Export as GIF, MOV, PNG</h3>
             </div>
           </div>
           <div class="download-launch-meta">Export only the map and the legend. Use a single timestamp or a time range up to 4 days.</div>
-          <button id="openDownloadModalBtn" class="download-launch-btn active" type="button" aria-expanded="false" aria-controls="downloadModal">Open exporter</button>
+          <button id="openDownloadModalBtn" class="download-launch-btn active" type="button" aria-expanded="false" aria-controls="downloadModal">Open export panel</button>
         </section>
       </aside>
 
@@ -4191,7 +4191,7 @@
       setRangeInputDate("downloadEndInput", endDate);
 
       if (note) {
-        note.textContent = `All times are ET. Time-range exports are limited to 4 days. Available: ${formatHourEntryTime(entries[0])} to ${formatHourEntryTime(entries[entries.length - 1])}.`;
+        note.textContent = "";
       }
     }
 
@@ -4249,12 +4249,12 @@
         return;
       }
       if (scope === "current" || items.length === 1) {
-        summary.textContent = `${format} export of the current map at ${formatHourEntryTime(items[0].entry)}. Exports only include the map and the legend.`;
+        summary.textContent = `${format} export of the map and legend at ${formatHourEntryTime(items[0].entry)}.`;
         return;
       }
       const first = items[0].entry;
       const last = items[items.length - 1].entry;
-      summary.textContent = `${format} export of ${items.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}. Exports only include the map and the legend.`;
+      summary.textContent = `${format} export of the map and legend for ${items.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
     }
 
     function setDownloadBusy(isBusy, message = "") {
