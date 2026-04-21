@@ -3550,17 +3550,15 @@
 
     function getDepthTimelineColor(stageValue) {
       const n = Number(stageValue);
-      if (!Number.isFinite(n)) return "rgba(255,255,255,.08)";
-      if (n < MIN_VISIBLE_STAGE) return TIMELINE_BELOW_COLOR;
-      const stage = getOverlayStage(n);
-      const match = TIMELINE_DEPTH_STOPS.find(stop => stage < stop.max);
-      return match?.color || TIMELINE_DEPTH_STOPS[TIMELINE_DEPTH_STOPS.length - 1].color;
+      if (!Number.isFinite(n)) return "rgba(213,138,0,.92)";
+      if (n < IMPACT_MINOR_MAX_FT) return "rgba(213,138,0,.92)";
+      if (n < IMPACT_MODERATE_MAX_FT) return "rgba(216,75,103,.92)";
+      return "rgba(124,92,224,.92)";
     }
 
     function getImpactTimelineColor(stageValue) {
       const n = Number(stageValue);
-      if (!Number.isFinite(n)) return "rgba(255,255,255,.08)";
-      if (n < MIN_VISIBLE_STAGE) return TIMELINE_BELOW_COLOR;
+      if (!Number.isFinite(n)) return "rgba(213,138,0,.92)";
       if (n < IMPACT_MINOR_MAX_FT) return "rgba(213,138,0,.92)";
       if (n < IMPACT_MODERATE_MAX_FT) return "rgba(216,75,103,.92)";
       return "rgba(124,92,224,.92)";
