@@ -5409,6 +5409,8 @@
       if (token !== lastRenderToken) return;
 
       if (!match) {
+        const attempted = getOverlayCandidates(mode, stageValue);
+        console.warn("Overlay missing", { mode, stageValue, attempted });
         toast(`Overlay missing for ${stageValue.toFixed(1)} ft. Check your folder path or file naming.`);
         return;
       }
