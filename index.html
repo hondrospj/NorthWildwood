@@ -3085,8 +3085,8 @@
       [39.025, -74.755]
     );
 
-    // Shared world file values updated to match the exported PNG aux.xml metadata
-    // EPSG:3424, 5 ft pixels, origin 401465 / 70425
+    // Shared geotransform fallback from exported PNG aux.xml files
+    // EPSG:3424 | 5 ft cells | top-left corner = 401465, 70425
     const SHARED_WORLD = {
       A: 5.0,
       D: 0.0,
@@ -3099,7 +3099,9 @@
     const NJSP_PROJ4 =
       "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
 
-    const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
+const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
+
+    const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
       resolutions: [
         2006.2172023914932, 1003.1086011953124, 501.55430059809026, 250.7771502986111,
@@ -3726,19 +3728,49 @@
     }
 
     function projectedPointToLatLng(x, y) {
-      const result = proj4(NJSP_PROJ4, "EPSG:4326", [x, y]);
+      const result = proj4(NJSP_PROJ4, WGS84_PROJ4, [x, y]);
       return L.latLng(result[1], result[0]);
     }
 
-    function computeProjectedBounds(width, height) {
-      const { A, D, B, E, C, F } = SHARED_WORLD;
-      if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Shared world file contains rotation or skew.");
+    async function fetchOptionalText(url) {
+      try {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) return null;
+        return await response.text();
+      } catch (err) {
+        return null;
       }
-      const west = C - (A / 2);
-      const north = F - (E / 2);
-      const east = C + A * (width - 0.5);
-      const south = F + E * (height - 0.5);
+    }
+
+    function parseAuxXmlGeoTransform(xmlText) {
+      if (!xmlText) return null;
+
+      const geoMatch = xmlText.match(/<GeoTransform>\s*([^<]+)\s*<\/GeoTransform>/i);
+      if (!geoMatch) return null;
+
+      const nums = geoMatch[1]
+        .split(",")
+        .map(v => Number(String(v).trim()))
+        .filter(v => Number.isFinite(v));
+
+      if (nums.length < 6) return null;
+
+      const [C, A, B, F, D, E] = nums;
+      return { A, D, B, E, C, F };
+    }
+
+    function computeProjectedBounds(width, height, world = SHARED_WORLD) {
+      const { A, D, B, E, C, F } = world;
+      if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
+        throw new Error("Overlay geotransform contains rotation or skew.");
+      }
+
+      // PNG aux.xml GeoTransform uses upper-left CORNER coordinates.
+      const west = C;
+      const north = F;
+      const east = C + A * width;
+      const south = F + E * height;
+
       return { west, south, east, north };
     }
 
@@ -3816,13 +3848,27 @@
 
     async function ensureOverlayBounds(sampleOverlayUrl) {
       if (floodProjectedBounds && floodLatLngBounds) return;
+
       const meta = await loadImageMeta(sampleOverlayUrl);
-      const b = computeProjectedBounds(meta.width, meta.height);
+      const auxXmlUrl = `${sampleOverlayUrl}.aux.xml`;
+      const auxXmlText = await fetchOptionalText(auxXmlUrl);
+      const auxWorld = parseAuxXmlGeoTransform(auxXmlText);
+      const world = auxWorld || SHARED_WORLD;
+
+      const b = computeProjectedBounds(meta.width, meta.height, world);
+
       floodProjectedBounds = L.bounds([b.west, b.south], [b.east, b.north]);
       floodLatLngBounds = L.latLngBounds(
         projectedPointToLatLng(b.west, b.south),
         projectedPointToLatLng(b.east, b.north)
       );
+
+      const placementText = document.getElementById("placementText");
+      if (placementText) {
+        placementText.textContent = auxWorld
+          ? "Overlay placement: per-file PNG aux.xml geotransform"
+          : "Overlay placement: shared 5 ft EPSG:3424 fallback geotransform";
+      }
     }
 
     function getPrimaryMunicipalBoundaryRing() {
