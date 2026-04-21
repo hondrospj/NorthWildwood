@@ -3087,6 +3087,8 @@
 
     // Shared geotransform fallback from exported PNG aux.xml files
     // EPSG:3424 | 5 ft cells | upper-left corner = 401465, 70425
+    console.log("PATCHED_HTML_V3_LOADED");
+
     const SHARED_WORLD = {
       A: 5.0,
       D: 0.0,
@@ -5409,8 +5411,6 @@
       if (token !== lastRenderToken) return;
 
       if (!match) {
-        const attempted = getOverlayCandidates(mode, stageValue);
-        console.warn("Overlay missing", { mode, stageValue, attempted });
         toast(`Overlay missing for ${stageValue.toFixed(1)} ft. Check your folder path or file naming.`);
         return;
       }
