@@ -811,13 +811,13 @@
       top:16px;
       bottom:132px;
       right:16px;
-      width:208px;
+      width:220px;
       padding:0;
-      display:grid;
-      grid-template-rows:auto minmax(0, 1fr) auto;
+      display:flex;
+      flex-direction:column;
       gap:12px;
-      align-content:stretch;
       align-items:stretch;
+      align-content:flex-start;
       background:none;
       border:0;
       box-shadow:none;
@@ -878,18 +878,20 @@
 
     .top-tides-card{
       display:grid;
-      grid-template-rows:auto minmax(0, 1fr);
+      grid-template-rows:auto auto;
       min-height:0;
-      height:100%;
+      height:auto;
       max-height:none;
-      overflow:hidden;
+      overflow:visible;
+      align-content:start;
+      flex:0 0 auto;
     }
 
     .top-tide-list{
-      overflow-y:auto;
+      overflow-y:visible;
       overflow-x:hidden;
-      max-height:100%;
-      padding-right:2px;
+      max-height:none;
+      padding-right:0;
       align-content:start;
     }
 
@@ -1056,6 +1058,18 @@
       display:grid;
       gap:10px;
     }
+
+.right-rail-note{
+  margin:0;
+  font-size:11px;
+  line-height:1.45;
+  color:var(--muted);
+}
+
+.right-rail-action{
+  width:100%;
+  min-height:42px;
+}
 
     .download-card{
       display:grid;
@@ -2290,7 +2304,7 @@
       #rightRail{
         top:16px;
         right:16px;
-        width:190px;
+        width:204px;
       }
 
       #timelineDock{
@@ -2318,7 +2332,7 @@
 
       #rightRail{
         display:grid;
-        width:min(216px, calc(42vw - 18px));
+        width:min(224px, calc(42vw - 18px));
         bottom:138px;
         top:16px;
         right:16px;
