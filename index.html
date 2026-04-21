@@ -1358,7 +1358,11 @@
 
     .timeline-day{
       flex:1 1 0;
-      background:transparent;
+      position:relative;
+      overflow:hidden;
+      background-color:rgba(255,255,255,.035);
+      background-repeat:no-repeat;
+      background-size:100% 100%;
       border:0;
       border-right:1px solid var(--line);
       border-radius:0;
@@ -1367,9 +1371,11 @@
       text-align:center;
       font-size:12px;
       font-weight:800;
-      color:#f0d7a1;
+      color:#f8fbff;
+      text-shadow:0 1px 2px rgba(3,8,18,.55);
       box-shadow:none;
       white-space:nowrap;
+      transition:filter .16s ease, box-shadow .16s ease;
     }
 
     .timeline-day:last-child{
@@ -1377,8 +1383,10 @@
     }
 
     .timeline-day.active{
-      background:rgba(255,255,255,.08);
       color:#ffffff;
+      filter:brightness(1.06) saturate(1.05);
+      box-shadow:inset 0 0 0 2px rgba(255,255,255,.40), inset 0 1px 0 rgba(255,255,255,.10);
+      z-index:1;
     }
 
     .timeline-trackRow{
@@ -3058,6 +3066,24 @@
       { label: "Areas Below Grade But Not Likely Flooded", color: "var(--below)" }
     ];
 
+    const TIMELINE_DEPTH_STOPS = [
+      { max: 0.10, color: "rgba(207,239,255,.92)" },
+      { max: 0.25, color: "rgba(39,105,219,.92)" },
+      { max: 0.50, color: "rgba(91,95,214,.92)" },
+      { max: 1.00, color: "rgba(95,45,168,.92)" },
+      { max: 1.50, color: "rgba(124,66,196,.92)" },
+      { max: 2.00, color: "rgba(167,63,161,.92)" },
+      { max: 2.50, color: "rgba(224,90,174,.92)" },
+      { max: 3.00, color: "rgba(177,54,123,.92)" },
+      { max: 4.00, color: "rgba(165,36,64,.94)" },
+      { max: 5.00, color: "rgba(63,0,10,.94)" },
+      { max: Infinity, color: "rgba(58,0,8,.95)" }
+    ];
+
+    const TIMELINE_BELOW_COLOR = "rgba(121,221,90,.88)";
+    const IMPACT_MINOR_MAX_FT = 4.25;
+    const IMPACT_MODERATE_MAX_FT = 5.25;
+
     function cloneStyleObject(value) {
       return JSON.parse(JSON.stringify(value || {}));
     }
@@ -3520,6 +3546,46 @@
       if (!Number.isFinite(n)) return null;
       if (n < MIN_VISIBLE_STAGE) return FORCED_STAGE;
       return clampStage(floorToCatalogStep(clampStage(n)));
+    }
+
+    function getDepthTimelineColor(stageValue) {
+      const n = Number(stageValue);
+      if (!Number.isFinite(n)) return "rgba(255,255,255,.08)";
+      if (n < MIN_VISIBLE_STAGE) return TIMELINE_BELOW_COLOR;
+      const stage = getOverlayStage(n);
+      const match = TIMELINE_DEPTH_STOPS.find(stop => stage < stop.max);
+      return match?.color || TIMELINE_DEPTH_STOPS[TIMELINE_DEPTH_STOPS.length - 1].color;
+    }
+
+    function getImpactTimelineColor(stageValue) {
+      const n = Number(stageValue);
+      if (!Number.isFinite(n)) return "rgba(255,255,255,.08)";
+      if (n < MIN_VISIBLE_STAGE) return TIMELINE_BELOW_COLOR;
+      if (n < IMPACT_MINOR_MAX_FT) return "rgba(213,138,0,.92)";
+      if (n < IMPACT_MODERATE_MAX_FT) return "rgba(216,75,103,.92)";
+      return "rgba(124,92,224,.92)";
+    }
+
+    function getTimelineHourColor(entry) {
+      const rawStage = getStageValue(entry);
+      if (currentOverlayMode === "dynamic") {
+        return getImpactTimelineColor(rawStage);
+      }
+      return getDepthTimelineColor(rawStage);
+    }
+
+    function buildTimelineGroupGradient(startIndex, endIndex) {
+      const entries = currentSeriesHours.slice(startIndex, endIndex + 1);
+      if (!entries.length) return "";
+      const count = entries.length;
+      const stops = [];
+      entries.forEach((entry, idx) => {
+        const color = getTimelineHourColor(entry);
+        const startPct = (idx / count) * 100;
+        const endPct = ((idx + 1) / count) * 100;
+        stops.push(`${color} ${startPct.toFixed(3)}%`, `${color} ${endPct.toFixed(3)}%`);
+      });
+      return `linear-gradient(90deg, ${stops.join(", ")})`;
     }
 
     function stageToCode(stageValue) {
@@ -4753,6 +4819,10 @@
         btn.className = "timeline-day";
         btn.textContent = group.label;
         btn.style.flex = `${Math.max(1, group.hours)} 1 0`;
+        const tideGradient = buildTimelineGroupGradient(group.start, group.end);
+        if (tideGradient) {
+          btn.style.backgroundImage = `linear-gradient(180deg, rgba(10,18,32,.18), rgba(10,18,32,.18)), ${tideGradient}`;
+        }
         if (currentHourIndex >= group.start && currentHourIndex <= group.end) btn.classList.add("active");
         btn.addEventListener("click", () => {
           stopPlayback();
