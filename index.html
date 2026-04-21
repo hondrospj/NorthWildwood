@@ -3086,7 +3086,7 @@
     );
 
     // Shared geotransform fallback from exported PNG aux.xml files
-    // EPSG:3424 | 5 ft cells | top-left corner = 401465, 70425
+    // EPSG:3424 | 5 ft cells | upper-left corner = 401465, 70425
     const SHARED_WORLD = {
       A: 5.0,
       D: 0.0,
@@ -3099,9 +3099,9 @@
     const NJSP_PROJ4 =
       "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
 
-const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
+    const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
 
-    const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
+    const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
       resolutions: [
         2006.2172023914932, 1003.1086011953124, 501.55430059809026, 250.7771502986111,
@@ -3765,7 +3765,7 @@ const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
         throw new Error("Overlay geotransform contains rotation or skew.");
       }
 
-      // PNG aux.xml GeoTransform uses upper-left CORNER coordinates.
+      // PNG aux.xml GeoTransform uses upper-left corner coordinates.
       const west = C;
       const north = F;
       const east = C + A * width;
@@ -3856,19 +3856,11 @@ const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
       const world = auxWorld || SHARED_WORLD;
 
       const b = computeProjectedBounds(meta.width, meta.height, world);
-
       floodProjectedBounds = L.bounds([b.west, b.south], [b.east, b.north]);
       floodLatLngBounds = L.latLngBounds(
         projectedPointToLatLng(b.west, b.south),
         projectedPointToLatLng(b.east, b.north)
       );
-
-      const placementText = document.getElementById("placementText");
-      if (placementText) {
-        placementText.textContent = auxWorld
-          ? "Overlay placement: per-file PNG aux.xml geotransform"
-          : "Overlay placement: shared 5 ft EPSG:3424 fallback geotransform";
-      }
     }
 
     function getPrimaryMunicipalBoundaryRing() {
