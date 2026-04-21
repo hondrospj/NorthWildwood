@@ -2902,7 +2902,7 @@
             <input id="downloadEndInput" type="datetime-local" step="3600" />
           </label>
         </div>
-        <p class="export-modal-copy">Export a range of times out to 84 hours.</p>
+        <p class="export-modal-copy">Export a range of times out to 84 hours. Exports render in the background and only capture the map and legend.</p>
             <div id="downloadRangeNote" class="download-note"></div>
         <input id="downloadScopeSelect" type="hidden" value="current" />
             <input id="downloadFormatSelect" type="hidden" value="png" />
@@ -2955,6 +2955,7 @@
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
     const STAGE_STEP = 0.2;
+    const STAGE_ADJUSTMENT_FT = -0.09;
     const MINOR_FLOOD_FT = 3.25;
     const MODERATE_FLOOD_FT = 4.25;
     const MAJOR_FLOOD_FT = 5.25;
@@ -3140,9 +3141,9 @@
     ];
 
     const DYNAMIC_LEGEND = [
-      { label: "Minor", color: "var(--minor)" },
-      { label: "Moderate", color: "var(--moderate)" },
-      { label: "Major", color: "var(--major)" },
+      { label: "Minor (3.25–4.24 ft NAVD88)", color: "var(--minor)" },
+      { label: "Moderate (4.25–5.24 ft NAVD88)", color: "var(--moderate)" },
+      { label: "Major (5.25+ ft NAVD88)", color: "var(--major)" },
       { label: "Areas Below Grade But Not Likely Flooded", color: "var(--below)" }
     ];
 
@@ -3323,6 +3324,12 @@
 
     function getDatumLongLabel() {
       return currentDatum === "mllw" ? "MLLW (+2.75 ft)" : "NAVD88";
+    }
+
+    function normalizeStageValue(value) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return null;
+      return n + STAGE_ADJUSTMENT_FT;
     }
 
     function convertStageForDisplay(value) {
@@ -4442,7 +4449,7 @@
         btn.classList.toggle("is-busy", isBusy);
       }
       if (btnLabel) {
-        btnLabel.textContent = isBusy ? "Preparing export..." : "Download";
+        btnLabel.textContent = isBusy ? "Exporting..." : "Download";
       }
       if (scope) scope.disabled = isBusy;
       if (format) format.disabled = isBusy;
@@ -5056,7 +5063,7 @@
     }
 
     function getStageValue(entry) {
-      return Number(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
+      return normalizeStageValue(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
     }
 
     function classifyFloodStage(stageValue) {
@@ -5082,12 +5089,12 @@
       const notes = [];
       if (!Number.isFinite(rawStage) || !Number.isFinite(matchedStage)) return "";
       if (Math.abs(rawStage - matchedStage) > 0.0001) {
-        notes.push(`Rendered from the nearest lower published overlay at ${matchedStage.toFixed(1)} ft NAVD88.`);
+        notes.push(`The displayed water level stays exact, but the called raster is rounded down to the nearest published overlay at ${matchedStage.toFixed(1)} ft NAVD88.`);
       }
       if (rawStage > MAX_STAGE) {
-        notes.push(`The selected stage was above the published range and was clamped to ${matchedStage.toFixed(1)} ft NAVD88.`);
+        notes.push(`The adjusted water level was above the published range and the raster call was clamped to ${matchedStage.toFixed(1)} ft NAVD88.`);
       } else if (rawStage < MIN_STAGE) {
-        notes.push(`The selected stage was below the published range and was clamped to ${matchedStage.toFixed(1)} ft NAVD88.`);
+        notes.push(`The adjusted water level was below the published range and the raster call was clamped to ${matchedStage.toFixed(1)} ft NAVD88.`);
       }
       return notes.join(" ");
     }
@@ -5133,7 +5140,7 @@
     function getLatestObservedDate() {
       const days = getObservedDays();
       if (!days.length) return null;
-      const floodDays = days.filter(d => (d.classification || "none") !== "none");
+      const floodDays = days.filter(d => classifyFloodEntries(Array.isArray(d.hours) ? d.hours : []) !== "none");
       return (floodDays.length ? floodDays[floodDays.length - 1] : days[days.length - 1]).date;
     }
 
@@ -5582,8 +5589,11 @@
       currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
       currentSelectedSubLabel = dayRecord.peakNAVD88 != null
-        ? `${formatStageForDisplay(dayRecord.peakNAVD88)} peak`
-        : (dayRecord.classification || "Observed");
+        ? `${formatStageForDisplay(normalizeStageValue(dayRecord.peakNAVD88))} peak`
+        : (() => {
+          const derived = classifyFloodEntries(Array.isArray(dayRecord.hours) ? dayRecord.hours : []);
+          return derived === "none" ? "Observed" : derived.charAt(0).toUpperCase() + derived.slice(1);
+        })();
       currentRangeLabel = `${dateStr}`;
 
       syncSliderBounds();
