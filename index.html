@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>PATCH V4 DEBUG - North Wildwood Flood Map</title>
+  <title>North Wildwood Flood Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -2632,32 +2632,9 @@
         font-size:13px;
       }
     }
-
-    #patchDebugBanner{
-      position:fixed;
-      top:8px;
-      right:8px;
-      z-index:99999;
-      background:#ffea00;
-      color:#111827;
-      border:3px solid #ef4444;
-      border-radius:14px;
-      padding:10px 14px;
-      font-size:16px;
-      font-weight:900;
-      line-height:1.15;
-      box-shadow:0 18px 34px rgba(0,0,0,.28);
-      max-width:420px;
-    }
-
   </style>
 </head>
 <body>
-  <div id="patchDebugBanner">
-    PATCH V4 DEBUG LOADED<br>
-    If you do not see this yellow box, you are still running the old HTML.
-  </div>
-
   <div id="topBanner">
     <div class="banner-text">
       <div class="banner-eyebrow">Flood alert</div>
@@ -2671,7 +2648,7 @@
     <aside id="leftPanel">
       <section class="panel-card brand">
         <div class="brand-top">
-          <h1>PATCH V4 DEBUG<br>North&nbsp;Wildwood Flood Map</h1>
+          <h1>North&nbsp;Wildwood <br> Flood Map</h1>
         </div>
       </section>
 
@@ -2977,7 +2954,7 @@
 
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
-    const STAGE_STEP = 0.1;
+    const STAGE_STEP = 0.2;
     const STAGE_ADJUSTMENT_FT = -0.09;
     const MINOR_FLOOD_FT = 3.25;
     const MODERATE_FLOOD_FT = 4.25;
@@ -3108,28 +3085,19 @@
       [39.025, -74.755]
     );
 
-    // Shared geotransform fallback from exported PNG aux.xml files
-    // EPSG:3424 | 5 ft cells | upper-left corner = 401465, 70425
-    
-    console.log("PATCH_V4_DEBUG_LOADED");
-    console.log("PATCH_V4_DEBUG_STAGE_STEP", typeof STAGE_STEP !== "undefined" ? STAGE_STEP : "missing");
-    console.log("PATCH_V4_DEBUG_SHARED_WORLD", typeof SHARED_WORLD !== "undefined" ? SHARED_WORLD : "missing");
-
     const SHARED_WORLD = {
-      A: 5.0,
+      A: 7.5,
       D: 0.0,
       B: 0.0,
-      E: -5.0,
-      C: 401465.0,
-      F: 70425.0
+      E: -7.5,
+      C: 401468.75,
+      F: 70421.25
     };
 
     const NJSP_PROJ4 =
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
 
-    const WGS84_PROJ4 = "+proj=longlat +datum=WGS84 +no_defs";
-
-    const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
+    const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
       resolutions: [
         2006.2172023914932, 1003.1086011953124, 501.55430059809026, 250.7771502986111,
@@ -3756,48 +3724,19 @@
     }
 
     function projectedPointToLatLng(x, y) {
-      const result = proj4(NJSP_PROJ4, WGS84_PROJ4, [x, y]);
+      const result = proj4(NJSP_PROJ4, "EPSG:4326", [x, y]);
       return L.latLng(result[1], result[0]);
     }
 
-    async function fetchOptionalText(url) {
-      try {
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) return null;
-        return await response.text();
-      } catch (err) {
-        return null;
-      }
-    }
-
-    function parseAuxXmlGeoTransform(xmlText) {
-      if (!xmlText) return null;
-
-      const geoMatch = xmlText.match(/<GeoTransform>\s*([^<]+)\s*<\/GeoTransform>/i);
-      if (!geoMatch) return null;
-
-      const nums = geoMatch[1]
-        .split(",")
-        .map(v => Number(String(v).trim()))
-        .filter(v => Number.isFinite(v));
-
-      if (nums.length < 6) return null;
-
-      const [C, A, B, F, D, E] = nums;
-      return { A, D, B, E, C, F };
-    }
-
-    function computeProjectedBounds(width, height, world = SHARED_WORLD) {
-      const { A, D, B, E, C, F } = world;
+    function computeProjectedBounds(width, height) {
+      const { A, D, B, E, C, F } = SHARED_WORLD;
       if (Math.abs(B) > 1e-12 || Math.abs(D) > 1e-12) {
-        throw new Error("Overlay geotransform contains rotation or skew.");
+        throw new Error("Shared world file contains rotation or skew.");
       }
-
-      const west = C;
-      const north = F;
-      const east = C + A * width;
-      const south = F + E * height;
-
+      const west = C - (A / 2);
+      const north = F - (E / 2);
+      const east = C + A * (width - 0.5);
+      const south = F + E * (height - 0.5);
       return { west, south, east, north };
     }
 
@@ -3875,14 +3814,8 @@
 
     async function ensureOverlayBounds(sampleOverlayUrl) {
       if (floodProjectedBounds && floodLatLngBounds) return;
-
       const meta = await loadImageMeta(sampleOverlayUrl);
-      const auxXmlUrl = `${sampleOverlayUrl}.aux.xml`;
-      const auxXmlText = await fetchOptionalText(auxXmlUrl);
-      const auxWorld = parseAuxXmlGeoTransform(auxXmlText);
-      const world = auxWorld || SHARED_WORLD;
-
-      const b = computeProjectedBounds(meta.width, meta.height, world);
+      const b = computeProjectedBounds(meta.width, meta.height);
       floodProjectedBounds = L.bounds([b.west, b.south], [b.east, b.north]);
       floodLatLngBounds = L.latLngBounds(
         projectedPointToLatLng(b.west, b.south),
@@ -3892,14 +3825,6 @@
 
     function getPrimaryMunicipalBoundaryRing() {
       return Array.isArray(municipalBoundaryRings) && municipalBoundaryRings.length ? municipalBoundaryRings[0] : FALLBACK_NORTH_WILDWOOD_MASK_RING;
-    }
-
-    function getTownFocusBounds() {
-      const ring = getPrimaryMunicipalBoundaryRing();
-      if (Array.isArray(ring) && ring.length >= 3) {
-        return L.latLngBounds(ring.map(([lat, lng]) => L.latLng(lat, lng)));
-      }
-      return FALLBACK_LATLNG_BOUNDS;
     }
 
     function approximateRingArea(ring) {
@@ -4775,8 +4700,8 @@
 
       if (map) {
         mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
-      } else {
-        mapInstance.fitBounds(getTownFocusBounds(), { padding: [16, 16] });
+      } else if (floodLatLngBounds) {
+        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16] });
       }
 
       updateExportRoadLayerAppearance();
@@ -5436,8 +5361,6 @@
       if (token !== lastRenderToken) return;
 
       if (!match) {
-        const attempted = getOverlayCandidates(mode, stageValue);
-        console.warn("PATCH_V4_DEBUG_OVERLAY_MISSING", { mode, stageValue, attempted });
         toast(`Overlay missing for ${stageValue.toFixed(1)} ft. Check your folder path or file naming.`);
         return;
       }
@@ -5489,8 +5412,8 @@
           map.removeLayer(previousLayer);
         }
 
-        if (!mapHasFit) {
-          map.fitBounds(getTownFocusBounds(), { padding: [16, 16] });
+        if (!mapHasFit && floodLatLngBounds) {
+          map.fitBounds(floodLatLngBounds, { padding: [16, 16] });
           mapHasFit = true;
         }
       });
