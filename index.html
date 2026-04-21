@@ -3765,7 +3765,7 @@
         throw new Error("Overlay geotransform contains rotation or skew.");
       }
 
-      // PNG aux.xml GeoTransform uses upper-left corner coordinates.
+      // PNG aux.xml GeoTransform uses upper-left CORNER coordinates.
       const west = C;
       const north = F;
       const east = C + A * width;
@@ -3865,6 +3865,14 @@
 
     function getPrimaryMunicipalBoundaryRing() {
       return Array.isArray(municipalBoundaryRings) && municipalBoundaryRings.length ? municipalBoundaryRings[0] : FALLBACK_NORTH_WILDWOOD_MASK_RING;
+    }
+
+    function getTownFocusBounds() {
+      const ring = getPrimaryMunicipalBoundaryRing();
+      if (Array.isArray(ring) && ring.length >= 3) {
+        return L.latLngBounds(ring.map(([lat, lng]) => L.latLng(lat, lng)));
+      }
+      return FALLBACK_LATLNG_BOUNDS;
     }
 
     function approximateRingArea(ring) {
@@ -4740,8 +4748,8 @@
 
       if (map) {
         mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
-      } else if (floodLatLngBounds) {
-        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16] });
+      } else {
+        mapInstance.fitBounds(getTownFocusBounds(), { padding: [16, 16] });
       }
 
       updateExportRoadLayerAppearance();
@@ -5452,8 +5460,8 @@
           map.removeLayer(previousLayer);
         }
 
-        if (!mapHasFit && floodLatLngBounds) {
-          map.fitBounds(floodLatLngBounds, { padding: [16, 16] });
+        if (!mapHasFit) {
+          map.fitBounds(getTownFocusBounds(), { padding: [16, 16] });
           mapHasFit = true;
         }
       });
