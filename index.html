@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>North Wildwood Flood Map</title>
+  <title>PATCH V4 DEBUG - North Wildwood Flood Map</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -2632,9 +2632,32 @@
         font-size:13px;
       }
     }
+
+    #patchDebugBanner{
+      position:fixed;
+      top:8px;
+      right:8px;
+      z-index:99999;
+      background:#ffea00;
+      color:#111827;
+      border:3px solid #ef4444;
+      border-radius:14px;
+      padding:10px 14px;
+      font-size:16px;
+      font-weight:900;
+      line-height:1.15;
+      box-shadow:0 18px 34px rgba(0,0,0,.28);
+      max-width:420px;
+    }
+
   </style>
 </head>
 <body>
+  <div id="patchDebugBanner">
+    PATCH V4 DEBUG LOADED<br>
+    If you do not see this yellow box, you are still running the old HTML.
+  </div>
+
   <div id="topBanner">
     <div class="banner-text">
       <div class="banner-eyebrow">Flood alert</div>
@@ -2648,7 +2671,7 @@
     <aside id="leftPanel">
       <section class="panel-card brand">
         <div class="brand-top">
-          <h1>North&nbsp;Wildwood <br> Flood Map</h1>
+          <h1>PATCH V4 DEBUG<br>North&nbsp;Wildwood Flood Map</h1>
         </div>
       </section>
 
@@ -3087,7 +3110,10 @@
 
     // Shared geotransform fallback from exported PNG aux.xml files
     // EPSG:3424 | 5 ft cells | upper-left corner = 401465, 70425
-    console.log("PATCHED_HTML_V3_LOADED");
+    
+    console.log("PATCH_V4_DEBUG_LOADED");
+    console.log("PATCH_V4_DEBUG_STAGE_STEP", typeof STAGE_STEP !== "undefined" ? STAGE_STEP : "missing");
+    console.log("PATCH_V4_DEBUG_SHARED_WORLD", typeof SHARED_WORLD !== "undefined" ? SHARED_WORLD : "missing");
 
     const SHARED_WORLD = {
       A: 5.0,
@@ -3767,7 +3793,6 @@
         throw new Error("Overlay geotransform contains rotation or skew.");
       }
 
-      // PNG aux.xml GeoTransform uses upper-left CORNER coordinates.
       const west = C;
       const north = F;
       const east = C + A * width;
@@ -5411,6 +5436,8 @@
       if (token !== lastRenderToken) return;
 
       if (!match) {
+        const attempted = getOverlayCandidates(mode, stageValue);
+        console.warn("PATCH_V4_DEBUG_OVERLAY_MISSING", { mode, stageValue, attempted });
         toast(`Overlay missing for ${stageValue.toFixed(1)} ft. Check your folder path or file naming.`);
         return;
       }
