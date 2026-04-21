@@ -1235,6 +1235,78 @@
       color:#fecaca;
     }
 
+    .download-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+    }
+
+    .download-btn-spinner{
+      width:16px;
+      height:16px;
+      border-radius:999px;
+      border:2px solid rgba(255,255,255,.28);
+      border-top-color:#ffffff;
+      display:none;
+      flex:0 0 auto;
+      animation:download-spin .8s linear infinite;
+    }
+
+    .download-btn.is-busy .download-btn-spinner{
+      display:inline-block;
+    }
+
+    @keyframes download-spin{
+      from{ transform:rotate(0deg); }
+      to{ transform:rotate(360deg); }
+    }
+
+    .export-stage{
+      position:fixed;
+      left:-20000px;
+      top:0;
+      width:100vw;
+      height:100vh;
+      pointer-events:none;
+      z-index:-1;
+    }
+
+    .export-stage-frame{
+      position:relative;
+      width:100%;
+      height:100%;
+      background:#050b16;
+      overflow:hidden;
+    }
+
+    .export-stage-map{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      background:#050b16;
+    }
+
+    .export-stage-legend{
+      position:absolute;
+      top:16px;
+      right:16px;
+      width:182px;
+      padding:12px;
+      z-index:1200;
+      background:rgba(11,18,32,.84);
+      border:1px solid rgba(255,255,255,.085);
+      box-shadow:0 22px 48px rgba(0,0,0,.34);
+      border-radius:24px;
+      backdrop-filter:blur(18px);
+      -webkit-backdrop-filter:blur(18px);
+    }
+
+    .export-stage .leaflet-control-container{
+      display:none !important;
+    }
+
     @media (max-width: 900px){
       .download-range-grid{
         grid-template-columns:1fr;
@@ -2752,7 +2824,7 @@
               <h3>Export as GIF, MOV, PNG</h3>
             </div>
           </div>
-          <div class="download-launch-meta">Export only the map and the legend. Use a single timestamp or a time range up to 4 days.</div>
+          <div class="download-launch-meta">Export a range of times out to 84 hours.</div>
           <button id="openDownloadModalBtn" class="download-launch-btn active" type="button" aria-expanded="false" aria-controls="downloadModal">Open export panel</button>
         </section>
       </aside>
@@ -2803,7 +2875,7 @@
         <h3 id="downloadModalTitle">Export map</h3>
         <button id="downloadModalCloseBtn" class="datum-modal-close" type="button" aria-label="Close export window">×</button>
       </div>
-      <p class="download-modal-sub">Export only the map and the legend. Choose a single timestamp or a time range up to 4 days in Eastern Time.</p>
+      <p class="download-modal-sub">Export a range of times out to 84 hours.</p>
       <div class="download-grid">
         <label class="download-field">
           Scope
@@ -2836,10 +2908,17 @@
             <input id="downloadFormatSelect" type="hidden" value="png" />
             <div id="downloadSummary" class="download-summary">Current map at the selected time.</div>
         <div class="download-actions">
-          <button id="downloadBtn" class="download-btn active" type="button">Download</button>
+          <button id="downloadBtn" class="download-btn active" type="button"><span class="download-btn-spinner" aria-hidden="true"></span><span id="downloadBtnLabel">Download</span></button>
         </div>
         <div id="downloadStatus" class="download-status" aria-live="polite"></div>
       </div>
+    </div>
+  </div>
+
+  <div id="exportStage" class="export-stage" aria-hidden="true">
+    <div id="exportStageFrame" class="export-stage-frame">
+      <div id="exportMap" class="export-stage-map"></div>
+      <section id="exportLegendDock" class="export-stage-legend"></section>
     </div>
   </div>
 
@@ -2876,8 +2955,9 @@
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
     const STAGE_STEP = 0.2;
-    const MIN_VISIBLE_STAGE = 1.5;
-    const FORCED_STAGE = 1.6;
+    const MINOR_FLOOD_FT = 3.25;
+    const MODERATE_FLOOD_FT = 4.25;
+    const MAJOR_FLOOD_FT = 5.25;
     const DEFAULT_OVERLAY_MODE = "depth";
     const DEFAULT_DATA_MODE = "forecast";
     const DEFAULT_OPACITY = 0.75;
@@ -3081,8 +3161,9 @@
     ];
 
     const TIMELINE_BELOW_COLOR = "rgba(121,221,90,.88)";
-    const IMPACT_MINOR_MAX_FT = 4.25;
-    const IMPACT_MODERATE_MAX_FT = 5.25;
+    const IMPACT_MINOR_MAX_FT = MINOR_FLOOD_FT;
+    const IMPACT_MODERATE_MAX_FT = MODERATE_FLOOD_FT;
+    const IMPACT_MAJOR_MAX_FT = MAJOR_FLOOD_FT;
 
     function cloneStyleObject(value) {
       return JSON.parse(JSON.stringify(value || {}));
@@ -3150,6 +3231,13 @@
     let cityBoundaryOutline = null;
     let cityBoundaryMask = null;
     let cityBoundaryGuide = null;
+
+    let exportMap = null;
+    let exportBasemapColorLayer = null;
+    let exportRoadsLayer = null;
+    let exportBoundaryOutline = null;
+    let exportBoundaryMask = null;
+    let exportFloodLayer = null;
     let municipalBoundaryFeature = null;
     let municipalBoundaryRings = [FALLBACK_NORTH_WILDWOOD_MASK_RING];
     let currentFloodLayer = null;
@@ -3454,7 +3542,7 @@
       if (isOpen) {
         syncDownloadRangeInputs(true);
         updateDownloadSummary();
-        document.getElementById("downloadScopeSelect")?.focus();
+        document.getElementById("exportScopeCurrentBtn")?.focus();
       }
     }
 
@@ -3544,25 +3632,24 @@
     function getOverlayStage(value) {
       const n = Number(value);
       if (!Number.isFinite(n)) return null;
-      if (n < MIN_VISIBLE_STAGE) return FORCED_STAGE;
       return clampStage(floorToCatalogStep(clampStage(n)));
     }
 
     function getDepthTimelineColor(stageValue) {
       const n = Number(stageValue);
       if (!Number.isFinite(n)) return "rgba(121,221,90,.92)";
-      if (n < MIN_VISIBLE_STAGE) return "rgba(121,221,90,.92)";
-      if (n < IMPACT_MINOR_MAX_FT) return "rgba(213,138,0,.92)";
-      if (n < IMPACT_MODERATE_MAX_FT) return "rgba(216,75,103,.92)";
+      if (n < MINOR_FLOOD_FT) return "rgba(121,221,90,.92)";
+      if (n < MODERATE_FLOOD_FT) return "rgba(213,138,0,.92)";
+      if (n < MAJOR_FLOOD_FT) return "rgba(216,75,103,.92)";
       return "rgba(124,92,224,.92)";
     }
 
     function getImpactTimelineColor(stageValue) {
       const n = Number(stageValue);
       if (!Number.isFinite(n)) return "rgba(121,221,90,.92)";
-      if (n < IMPACT_MINOR_MAX_FT) return "rgba(121,221,90,.92)";
-      if (n < IMPACT_MODERATE_MAX_FT) return "rgba(213,138,0,.92)";
-      if (n < 5.25) return "rgba(216,75,103,.92)";
+      if (n < MINOR_FLOOD_FT) return "rgba(121,221,90,.92)";
+      if (n < MODERATE_FLOOD_FT) return "rgba(213,138,0,.92)";
+      if (n < MAJOR_FLOOD_FT) return "rgba(216,75,103,.92)";
       return "rgba(124,92,224,.92)";
     }
 
@@ -4345,13 +4432,17 @@
     function setDownloadBusy(isBusy, message = "") {
       exportInProgress = isBusy;
       const btn = document.getElementById("downloadBtn");
+      const btnLabel = document.getElementById("downloadBtnLabel");
       const scope = document.getElementById("downloadScopeSelect");
       const format = document.getElementById("downloadFormatSelect");
       const start = document.getElementById("downloadStartInput");
       const end = document.getElementById("downloadEndInput");
       if (btn) {
         btn.disabled = isBusy;
-        btn.textContent = isBusy ? "Working..." : "Download";
+        btn.classList.toggle("is-busy", isBusy);
+      }
+      if (btnLabel) {
+        btnLabel.textContent = isBusy ? "Preparing export..." : "Download";
       }
       if (scope) scope.disabled = isBusy;
       if (format) format.disabled = isBusy;
@@ -4409,31 +4500,6 @@
       return gifWorkerUrlPromise;
     }
 
-    async function captureAppCanvas() {
-      if (typeof html2canvas !== "function") {
-        throw new Error("html2canvas did not load, so map export is unavailable.");
-      }
-      document.body.classList.add("exporting");
-      try {
-        await waitForStableRender();
-        return await html2canvas(document.getElementById("app"), {
-          backgroundColor: null,
-          useCORS: true,
-          allowTaint: false,
-          logging: false,
-          scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1))
-        });
-      } finally {
-        document.body.classList.remove("exporting");
-      }
-    }
-
-    function canvasToBlob(canvas, type = "image/png", quality) {
-      return new Promise((resolve, reject) => {
-        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Canvas export failed.")), type, quality);
-      });
-    }
-
     function downloadBlob(blob, filename) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -4443,6 +4509,220 @@
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    function makeExportBoundaryVector(style) {
+      const boundaryStyle = {
+        fill: false,
+        fillOpacity: 0,
+        stroke: true,
+        ...style
+      };
+
+      if (municipalBoundaryFeature) {
+        return L.geoJSON(municipalBoundaryFeature, {
+          pane: "boundaryPane",
+          interactive: false,
+          style: () => boundaryStyle
+        });
+      }
+
+      return L.polygon(getPrimaryMunicipalBoundaryRing(), {
+        pane: "boundaryPane",
+        interactive: false,
+        smoothFactor: 0,
+        ...boundaryStyle
+      });
+    }
+
+    function makeExportBoundaryMask() {
+      return L.polygon(createBoundaryMaskGeometry(), {
+        pane: "maskPane",
+        interactive: false,
+        smoothFactor: 0,
+        stroke: false,
+        fill: true,
+        fillColor: "#d7d7d7",
+        fillOpacity: 0.62,
+        bubblingMouseEvents: false
+      });
+    }
+
+    function ensureExportMap() {
+      if (exportMap) return exportMap;
+
+      exportMap = L.map("exportMap", {
+        zoomControl: false,
+        attributionControl: false,
+        minZoom: 11,
+        maxZoom: 19,
+        zoomSnap: 1,
+        zoomDelta: 1,
+        preferCanvas: true,
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false
+      });
+
+      exportMap.createPane("basemapColorPane");
+      exportMap.createPane("boundaryPane");
+      exportMap.createPane("floodPane");
+      exportMap.createPane("roadsPane");
+      exportMap.createPane("maskPane");
+      exportMap.getPane("basemapColorPane").style.zIndex = 190;
+      exportMap.getPane("boundaryPane").style.zIndex = 640;
+      exportMap.getPane("floodPane").style.zIndex = 500;
+      exportMap.getPane("roadsPane").style.zIndex = 620;
+      exportMap.getPane("maskPane").style.zIndex = 630;
+
+      exportBasemapColorLayer = makeEsriBuildingBasemapLayer();
+      if (exportBasemapColorLayer) {
+        exportBasemapColorLayer.addTo(exportMap);
+        exportBasemapColorLayer.on("error", () => {
+          if (exportBasemapColorLayer && exportMap.hasLayer(exportBasemapColorLayer)) {
+            exportMap.removeLayer(exportBasemapColorLayer);
+          }
+          exportBasemapColorLayer = L.tileLayer(FALLBACK_BASEMAP_URL, {
+            attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+            minZoom: 11,
+            maxZoom: 19,
+            subdomains: "abc",
+            crossOrigin: true,
+            updateWhenIdle: true,
+            keepBuffer: 3,
+            className: "basemap-color-layer",
+            pane: "basemapColorPane"
+          }).addTo(exportMap);
+        });
+      } else {
+        exportBasemapColorLayer = L.tileLayer(FALLBACK_BASEMAP_URL, {
+          attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+          minZoom: 11,
+          maxZoom: 19,
+          subdomains: "abc",
+          crossOrigin: true,
+          updateWhenIdle: true,
+          keepBuffer: 3,
+          className: "basemap-color-layer",
+          pane: "basemapColorPane"
+        }).addTo(exportMap);
+      }
+
+      exportRoadsLayer = L.tileLayer(ROAD_LABELS_URL, {
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
+        minZoom: 11,
+        maxZoom: 20,
+        subdomains: "abcd",
+        crossOrigin: true,
+        opacity: 0,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        className: "roads-layer",
+        pane: "roadsPane"
+      }).addTo(exportMap);
+
+      exportBoundaryMask = makeExportBoundaryMask().addTo(exportMap);
+      exportBoundaryOutline = makeExportBoundaryVector({
+        color: getComputedStyle(document.documentElement).getPropertyValue("--boundary-red").trim() || "#ef4444",
+        weight: 4.6,
+        opacity: 1,
+        lineCap: "round",
+        lineJoin: "round"
+      });
+
+      exportMap.fitBounds(FALLBACK_LATLNG_BOUNDS, { padding: [20, 20] });
+      return exportMap;
+    }
+
+    function updateExportLegend() {
+      const source = document.getElementById("legendDock");
+      const target = document.getElementById("exportLegendDock");
+      if (!source || !target) return;
+      target.innerHTML = source.innerHTML;
+    }
+
+    function updateExportRoadLayerAppearance() {
+      if (!exportMap || !exportRoadsLayer) return;
+      const roadsEnabled = document.getElementById("roadsToggle")?.classList.contains("on");
+      const zoom = exportMap.getZoom() || 0;
+      const showLabels = roadsEnabled && zoom >= ROAD_LABEL_ZOOM;
+      exportRoadsLayer.setOpacity(showLabels ? 0.98 : 0);
+      const pane = exportMap.getPane("roadsPane");
+      if (pane) pane.classList.toggle("roads-dark", showLabels);
+    }
+
+    function updateExportBoundaryVisibility() {
+      if (!exportMap || !exportBoundaryOutline || !exportBoundaryMask) return;
+      const showBoundary = isTownBoundaryEnabled();
+      if (showBoundary) {
+        if (!exportMap.hasLayer(exportBoundaryOutline)) exportBoundaryOutline.addTo(exportMap);
+      } else if (exportMap.hasLayer(exportBoundaryOutline)) {
+        exportMap.removeLayer(exportBoundaryOutline);
+      }
+      if (!exportMap.hasLayer(exportBoundaryMask)) exportBoundaryMask.addTo(exportMap);
+    }
+
+    async function setExportFloodLayer(mode, stageValue) {
+      ensureExportMap();
+      const match = await getOverlayRecord(mode, stageValue);
+      if (!match) {
+        throw new Error(`Overlay missing for ${stageValue.toFixed(1)} ft. Check your folder path or file naming.`);
+      }
+      await preloadImage(match.url);
+      await ensureOverlayBounds(match.url);
+      if (exportFloodLayer && exportMap.hasLayer(exportFloodLayer)) {
+        exportMap.removeLayer(exportFloodLayer);
+      }
+      exportFloodLayer = L.imageOverlay(match.url, floodLatLngBounds, {
+        opacity: overlayOpacity,
+        interactive: false,
+        crossOrigin: true,
+        zIndex: 500,
+        pane: "floodPane"
+      }).addTo(exportMap);
+      await new Promise(resolve => {
+        exportFloodLayer.once("load", resolve);
+        exportFloodLayer.once("error", resolve);
+      });
+    }
+
+    async function prepareExportFrame(item) {
+      const mapInstance = ensureExportMap();
+      updateExportLegend();
+      updateExportBoundaryVisibility();
+
+      if (map) {
+        mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
+      } else if (floodLatLngBounds) {
+        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16] });
+      }
+
+      updateExportRoadLayerAppearance();
+
+      const rawStage = getStageValue(item.entry);
+      const displayStage = getOverlayStage(rawStage);
+      if (displayStage == null) {
+        throw new Error("Stage is not numeric for the selected hour.");
+      }
+
+      await setExportFloodLayer(currentOverlayMode, displayStage);
+      mapInstance.invalidateSize();
+      await waitForStableRender();
+    }
+
+    async function captureExportCanvas() {
+      if (typeof html2canvas !== "function") {
+        throw new Error("html2canvas did not load, so map export is unavailable.");
+      }
+      const stage = document.getElementById("exportStageFrame");
+      if (!stage) throw new Error("Export stage is unavailable.");
+      return await html2canvas(stage, {
+        backgroundColor: null,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1))
+      });
     }
 
     function captureViewState() {
@@ -4456,72 +4736,15 @@
       };
     }
 
-    async function restoreViewState(state) {
-      if (!state) return;
-      if (state.dataMode === "forecast") {
-        currentDataMode = "forecast";
-        updateDataModeButtons();
-        await loadForecast();
-        const restoreIndex = state.currentEntry
-          ? findClosestEntryIndex(currentSeriesHours, state.currentEntry)
-          : Math.max(0, Math.min(state.hourIndex || 0, Math.max(0, currentSeriesHours.length - 1)));
-        await renderHour(restoreIndex);
-        return;
-      }
-
-      currentDataMode = "observed";
-      updateDataModeButtons();
-      await loadObserved();
-      if (state.viewType === "top-tide" && state.topTideIndex != null) {
-        await loadTopTideEvent(state.topTideIndex, state.currentEntry);
-        return;
-      }
-      const restoreDate = state.selectedObservedDate || getLatestObservedDate();
-      if (restoreDate) {
-        await loadObservedDay(restoreDate, state.hourIndex, state.currentEntry);
-      }
-    }
-
-    async function renderExportFrameItem(item) {
-      if (!item) return;
-      if (item.mode === "forecast") {
-        if (currentDataMode !== "forecast" || currentViewType !== "forecast") {
-          currentDataMode = "forecast";
-          updateDataModeButtons();
-          await loadForecast();
-        }
-        const index = item.index != null
-          ? Math.max(0, Math.min(item.index, Math.max(0, currentSeriesHours.length - 1)))
-          : findClosestEntryIndex(currentSeriesHours, item.entry);
-        await renderHour(index);
-        return;
-      }
-
-      if (!observedData) await loadObserved();
-      const dateStr = item.dateStr || item.entry?.observedDate || selectedObservedDate || getLatestObservedDate();
-      if (!dateStr) throw new Error("No observed date is available for export.");
-      if (currentViewType !== "observed-day" || selectedObservedDate !== dateStr) {
-        await loadObservedDay(dateStr, null, item.entry);
-        return;
-      }
-      const index = findClosestEntryIndex(currentSeriesHours, item.entry);
-      await renderHour(index);
-    }
-
     async function withExportFrames(frameItems, onFrame) {
-      const originalState = captureViewState();
-      try {
-        for (let i = 0; i < frameItems.length; i++) {
-          const item = frameItems[i];
-          setDownloadStatus(`Capturing frame ${i + 1} of ${frameItems.length}...`);
-          await renderExportFrameItem(item);
-          const canvas = await captureAppCanvas();
-          await onFrame({ sequence: i, item, entry: item.entry, canvas });
-          canvas.width = 1;
-          canvas.height = 1;
-        }
-      } finally {
-        await restoreViewState(originalState);
+      for (let i = 0; i < frameItems.length; i++) {
+        const item = frameItems[i];
+        setDownloadStatus(`Rendering frame ${i + 1} of ${frameItems.length}...`);
+        await prepareExportFrame(item);
+        const canvas = await captureExportCanvas();
+        await onFrame({ sequence: i, item, entry: item.entry, canvas });
+        canvas.width = 1;
+        canvas.height = 1;
       }
     }
 
@@ -4563,7 +4786,7 @@
       await withExportFrames(frameItems, async ({ canvas }) => {
         gif.addFrame(canvas, { delay: 700, copy: true });
       });
-      setDownloadStatus("Rendering GIF...");
+      setDownloadStatus("Encoding GIF...");
       const blob = await new Promise((resolve, reject) => {
         gif.on("finished", resolve);
         gif.on("abort", () => reject(new Error("GIF export was aborted.")));
@@ -4836,15 +5059,35 @@
       return Number(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
     }
 
+    function classifyFloodStage(stageValue) {
+      const n = Number(stageValue);
+      if (!Number.isFinite(n)) return "none";
+      if (n < MINOR_FLOOD_FT) return "none";
+      if (n < MODERATE_FLOOD_FT) return "minor";
+      if (n < MAJOR_FLOOD_FT) return "moderate";
+      return "major";
+    }
+
+    function classifyFloodEntries(entries = []) {
+      let severity = "none";
+      const rank = { none: 0, minor: 1, moderate: 2, major: 3 };
+      entries.forEach(entry => {
+        const next = classifyFloodStage(getStageValue(entry));
+        if ((rank[next] || 0) > (rank[severity] || 0)) severity = next;
+      });
+      return severity;
+    }
+
     function buildNotes(rawStage, matchedStage) {
       const notes = [];
-      if (rawStage < MIN_VISIBLE_STAGE) {
-        notes.push(`Any stage below ${MIN_VISIBLE_STAGE.toFixed(1)} ft is drawn with the ${FORCED_STAGE.toFixed(1)} ft overlay.`);
-      } else if (Math.abs(rawStage - matchedStage) > 0.0001) {
-        notes.push(`Rendered from the nearest lower published overlay at ${matchedStage.toFixed(1)} ft.`);
+      if (!Number.isFinite(rawStage) || !Number.isFinite(matchedStage)) return "";
+      if (Math.abs(rawStage - matchedStage) > 0.0001) {
+        notes.push(`Rendered from the nearest lower published overlay at ${matchedStage.toFixed(1)} ft NAVD88.`);
       }
       if (rawStage > MAX_STAGE) {
-        notes.push(`The selected stage was above the published range and was clamped to ${matchedStage.toFixed(1)} ft.`);
+        notes.push(`The selected stage was above the published range and was clamped to ${matchedStage.toFixed(1)} ft NAVD88.`);
+      } else if (rawStage < MIN_STAGE) {
+        notes.push(`The selected stage was below the published range and was clamped to ${matchedStage.toFixed(1)} ft NAVD88.`);
       }
       return notes.join(" ");
     }
@@ -5299,7 +5542,7 @@
           continue;
         }
 
-        const cls = meta.classification || "none";
+        const cls = classifyFloodEntries(Array.isArray(meta.hours) ? meta.hours : []);
         btn.classList.add(`day-${cls}`);
         if (selectedObservedDate === dateStr && currentViewType !== "top-tide") btn.classList.add("selected");
         btn.title = `${formatSelectedObservedDate(dateStr)} • ${cls}`;
