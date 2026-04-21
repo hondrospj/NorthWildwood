@@ -2954,7 +2954,7 @@
 
     const MIN_STAGE = -4.0;
     const MAX_STAGE = 14.0;
-    const STAGE_STEP = 0.2;
+    const STAGE_STEP = 0.1;
     const STAGE_ADJUSTMENT_FT = -0.09;
     const MINOR_FLOOD_FT = 3.25;
     const MODERATE_FLOOD_FT = 4.25;
@@ -3085,19 +3085,21 @@
       [39.025, -74.755]
     );
 
+    // Shared world file values updated to match the exported PNG aux.xml metadata
+    // EPSG:3424, 5 ft pixels, origin 401465 / 70425
     const SHARED_WORLD = {
-      A: 7.5,
+      A: 5.0,
       D: 0.0,
       B: 0.0,
-      E: -7.5,
-      C: 401468.75,
-      F: 70421.25
+      E: -5.0,
+      C: 401465.0,
+      F: 70425.0
     };
 
     const NJSP_PROJ4 =
-      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=150000 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
+      "+proj=tmerc +lat_0=38.8333333333333 +lon_0=-74.5 +k=0.9999 +x_0=492125 +y_0=0 +ellps=GRS80 +units=us-ft +no_defs";
 
-    const NJSP_CRS = new L.Proj.CRS("EPSG:6527", NJSP_PROJ4, {
+    const NJSP_CRS = new L.Proj.CRS("EPSG:3424", NJSP_PROJ4, {
       origin: [-17954600, 18705699.999999993],
       resolutions: [
         2006.2172023914932, 1003.1086011953124, 501.55430059809026, 250.7771502986111,
