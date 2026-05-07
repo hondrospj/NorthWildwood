@@ -3183,6 +3183,328 @@
       }
     }
 
+
+    /* Critical mobile UI fix: no blur layer, fully clickable controls, better landscape layout */
+    @media (max-width: 860px), (max-height: 560px) and (pointer: coarse){
+      html, body, #app, #mapWrap, #map{
+        width:100vw;
+        height:100dvh;
+        min-height:100dvh;
+        overflow:hidden;
+      }
+
+      body{
+        touch-action:manipulation;
+        -webkit-tap-highlight-color:transparent;
+      }
+
+      #mobileDrawerBackdrop{
+        position:fixed;
+        inset:0;
+        z-index:4090;
+        display:block;
+        opacity:0;
+        pointer-events:none !important;
+        background:rgba(5,11,22,.18);
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+        transition:opacity .16s ease;
+      }
+
+      body.mobile-controls-open #mobileDrawerBackdrop{
+        opacity:1;
+        pointer-events:none !important;
+      }
+
+      #mobileControlsToggle{
+        position:fixed;
+        right:calc(12px + env(safe-area-inset-right));
+        bottom:calc(92px + env(safe-area-inset-bottom));
+        z-index:4700;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        min-height:48px;
+        min-width:124px;
+        padding:0 16px;
+        border-radius:999px;
+        border:1px solid rgba(191,219,254,.42);
+        background:rgba(11,18,32,.96);
+        color:#ffffff;
+        box-shadow:0 18px 38px rgba(0,0,0,.38);
+        font-size:13px;
+        font-weight:900;
+        letter-spacing:-.01em;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+      }
+
+      #mobileControlsToggle::before{
+        content:"☰";
+        font-size:16px;
+        line-height:1;
+      }
+
+      body.mobile-controls-open #mobileControlsToggle::before{
+        content:"×";
+        font-size:20px;
+      }
+
+      #leftPanel{
+        position:fixed;
+        left:calc(8px + env(safe-area-inset-left));
+        right:calc(8px + env(safe-area-inset-right));
+        top:auto;
+        bottom:calc(76px + env(safe-area-inset-bottom));
+        width:auto !important;
+        max-width:none !important;
+        max-height:min(78dvh, calc(100dvh - 112px - env(safe-area-inset-top)));
+        display:flex !important;
+        flex-direction:column;
+        gap:8px;
+        overflow-y:auto;
+        overflow-x:hidden;
+        padding:42px 10px 12px;
+        border:1px solid rgba(191,219,254,.20);
+        border-radius:24px;
+        background:rgba(11,18,32,.98);
+        box-shadow:0 24px 70px rgba(0,0,0,.50);
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+        z-index:4550;
+        pointer-events:auto !important;
+        opacity:0;
+        visibility:hidden;
+        transform:translateY(calc(100% + 110px));
+        transition:transform .20s ease, opacity .16s ease, visibility .16s ease;
+        scrollbar-gutter:auto;
+        -webkit-overflow-scrolling:touch;
+      }
+
+      body.mobile-controls-open #leftPanel{
+        opacity:1;
+        visibility:visible;
+        transform:translateY(0);
+        pointer-events:auto !important;
+      }
+
+      #leftPanel::before{
+        content:"Controls";
+        position:sticky;
+        top:-42px;
+        z-index:5;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        min-height:34px;
+        margin:-42px -10px 8px;
+        border-radius:24px 24px 0 0;
+        border-bottom:1px solid rgba(255,255,255,.08);
+        background:rgba(11,18,32,.99);
+        color:#ffffff;
+        font-size:13px;
+        font-weight:900;
+        letter-spacing:.02em;
+        text-transform:uppercase;
+        pointer-events:none;
+      }
+
+      #leftPanel .panel-card,
+      #leftPanel .rail-card,
+      #leftPanel #legendDock{
+        width:100%;
+        min-height:0;
+        flex:0 0 auto;
+        padding:10px 11px;
+        border-radius:18px;
+        background:rgba(255,255,255,.045);
+        border:1px solid rgba(255,255,255,.085);
+        box-shadow:none;
+      }
+
+      #leftPanel button,
+      #leftPanel select,
+      #leftPanel input[type="datetime-local"]{
+        min-height:44px;
+        font-size:13px;
+        border-radius:13px;
+        touch-action:manipulation;
+      }
+
+      #leftPanel .brand{
+        min-height:52px;
+        padding:8px 10px;
+      }
+
+      #leftPanel .brand br{ display:none; }
+
+      #leftPanel h1{
+        font-size:clamp(17px, 5.4vw, 22px);
+        line-height:1;
+      }
+
+      #leftPanel #legendDock{
+        position:static !important;
+        left:auto !important;
+        right:auto !important;
+        top:auto !important;
+        bottom:auto !important;
+        display:block !important;
+        margin:0;
+        backdrop-filter:none !important;
+        -webkit-backdrop-filter:none !important;
+      }
+
+      #leftPanel #legendDock .legend-list{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:6px 8px;
+      }
+
+      #rightRail{ display:none !important; }
+
+      #timelineDock{
+        left:calc(8px + env(safe-area-inset-left));
+        right:calc(8px + env(safe-area-inset-right));
+        bottom:calc(8px + env(safe-area-inset-bottom));
+        padding:22px 9px 8px;
+        border-radius:16px;
+        z-index:1300;
+      }
+
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-top:calc(10px + env(safe-area-inset-top));
+        margin-right:10px;
+      }
+
+      .leaflet-control-zoom a{
+        width:38px !important;
+        height:38px !important;
+        line-height:38px !important;
+      }
+
+      .download-modal{
+        z-index:7200;
+        align-items:flex-end;
+        padding:8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+      }
+
+      .datum-modal{ z-index:7100; }
+
+      .download-modal-card,
+      .datum-modal-card{
+        width:100%;
+        max-height:min(84dvh, calc(100dvh - 24px - env(safe-area-inset-top)));
+        border-radius:24px;
+        padding:15px;
+      }
+    }
+
+    @media (max-width: 860px) and (orientation: landscape), (max-height: 560px) and (pointer: coarse){
+      #mobileControlsToggle{
+        top:calc(10px + env(safe-area-inset-top));
+        bottom:auto;
+        right:calc(10px + env(safe-area-inset-right));
+        min-width:112px;
+        min-height:42px;
+      }
+
+      #leftPanel{
+        top:calc(8px + env(safe-area-inset-top));
+        bottom:calc(8px + env(safe-area-inset-bottom));
+        left:calc(8px + env(safe-area-inset-left));
+        right:auto;
+        width:min(430px, 46vw) !important;
+        max-height:none;
+        border-radius:22px;
+        transform:translateX(calc(-100% - 28px));
+        padding:38px 9px 10px;
+      }
+
+      body.mobile-controls-open #leftPanel{
+        transform:translateX(0);
+      }
+
+      #leftPanel::before{
+        top:-38px;
+        min-height:30px;
+        margin:-38px -9px 7px;
+        border-radius:22px 22px 0 0;
+      }
+
+      #leftPanel .brand{
+        min-height:42px;
+        padding:6px 8px;
+      }
+
+      #leftPanel h1{
+        font-size:16px;
+      }
+
+      #leftPanel .panel-card,
+      #leftPanel .rail-card,
+      #leftPanel #legendDock{
+        padding:8px 9px;
+        border-radius:15px;
+      }
+
+      #leftPanel button,
+      #leftPanel select,
+      #leftPanel input[type="datetime-local"]{
+        min-height:36px;
+        font-size:12px;
+      }
+
+      #leftPanel .button-grid-2,
+      #leftPanel .segmented-control{
+        gap:5px;
+      }
+
+      #leftPanel .snapshot-card .stat-box{
+        min-height:54px;
+        padding:8px 10px;
+      }
+
+      #leftPanel #timeText{ font-size:12px; }
+      #leftPanel #stageText{ font-size:17px; }
+
+      #leftPanel .calendar-day{
+        min-height:26px;
+        font-size:11px;
+        border-radius:9px;
+      }
+
+      #leftPanel .calendar-head div{ font-size:9px; }
+
+      #leftPanel .calendar-key,
+      #leftPanel #legendDock .legend-list{
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+      }
+
+      #timelineDock{
+        left:calc(8px + env(safe-area-inset-left));
+        right:calc(8px + env(safe-area-inset-right));
+        bottom:calc(6px + env(safe-area-inset-bottom));
+        padding:18px 8px 7px;
+      }
+
+      .timeline-day{
+        min-height:24px;
+        padding:5px 3px;
+        font-size:9px;
+      }
+
+      .timeline-top{ margin-bottom:4px; }
+      .playFab{ width:36px; min-width:36px; height:36px; min-height:36px; }
+      .miniAction{ min-height:28px; padding:0 7px; font-size:8.5px; }
+      #timelineBubble{ font-size:9px; padding:4px 8px; }
+
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-top:calc(58px + env(safe-area-inset-top));
+        margin-right:10px;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -6782,7 +7104,7 @@
     }
 
     function syncMobileControlsLayout() {
-      const isMobile = window.matchMedia("(max-width: 760px)").matches;
+      const isMobile = window.matchMedia("(max-width: 860px), (max-height: 560px) and (pointer: coarse)").matches;
       const leftPanel = document.getElementById("leftPanel");
       const rightRail = document.getElementById("rightRail");
       const legendDock = document.getElementById("legendDock");
@@ -6815,15 +7137,15 @@
       document.addEventListener("keydown", e => {
         if (e.key === "Escape") setMobileControlsOpen(false);
       });
+      // Keep the drawer open while the user works inside it. Closing is handled by the Close button,
+      // Escape key, or the non-interactive backdrop. Avoid capture-phase auto-close on mobile because
+      // some mobile browsers treat transformed panels/backdrop-filter layers as the click target.
       document.addEventListener("click", e => {
         if (!document.body.classList.contains("mobile-controls-open")) return;
         const target = e.target;
-        const leftPanel = document.getElementById("leftPanel");
         const toggleBtn = document.getElementById("mobileControlsToggle");
-        if (leftPanel?.contains(target) || toggleBtn?.contains(target)) return;
-        if (target?.closest?.(".download-modal, .datum-modal, .export-progress-overlay")) return;
-        setMobileControlsOpen(false);
-      }, true);
+        if (toggleBtn?.contains(target)) return;
+      }, false);
       syncMobileControlsLayout();
     }
 
