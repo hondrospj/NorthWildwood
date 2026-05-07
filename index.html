@@ -4449,6 +4449,10 @@
         if (!entries.length) {
           startEl.value = "";
           endEl.value = "";
+          startEl.removeAttribute("min");
+          startEl.removeAttribute("max");
+          endEl.removeAttribute("min");
+          endEl.removeAttribute("max");
           if (note) note.textContent = "";
           return;
         }
@@ -4459,16 +4463,28 @@
       if (!firstDate || !lastDate) {
         startEl.value = "";
         endEl.value = "";
+        startEl.removeAttribute("min");
+        startEl.removeAttribute("max");
+        endEl.removeAttribute("min");
+        endEl.removeAttribute("max");
         if (note) note.textContent = "";
         return;
       }
 
       const minValue = formatNyLocalIso(firstDate);
       const maxValue = formatNyLocalIso(lastDate);
-      startEl.min = minValue;
-      startEl.max = maxValue;
-      endEl.min = minValue;
-      endEl.max = maxValue;
+
+      // Keep the archive bounds available for validation, but do not use native min/max.
+      // Native datetime-local min/max can clamp while the user is still typing a year,
+      // which made older years jump back to the first archive year.
+      startEl.dataset.archiveMin = minValue;
+      startEl.dataset.archiveMax = maxValue;
+      endEl.dataset.archiveMin = minValue;
+      endEl.dataset.archiveMax = maxValue;
+      startEl.removeAttribute("min");
+      startEl.removeAttribute("max");
+      endEl.removeAttribute("min");
+      endEl.removeAttribute("max");
 
       const currentDate = getEntryESTDate(getDownloadCurrentEntry());
       const defaultStart = currentDate
@@ -4476,27 +4492,75 @@
         : firstDate;
       const defaultEnd = new Date(Math.min(lastDate.getTime(), defaultStart.getTime() + 24 * 60 * 60 * 1000));
 
-      let startDate = (!force && startEl.value) ? (parseStoredLocalNyToDate(startEl.value) || defaultStart) : defaultStart;
-      let endDate = (!force && endEl.value) ? (parseStoredLocalNyToDate(endEl.value) || defaultEnd) : defaultEnd;
-
-      startDate = new Date(Math.min(Math.max(startDate.getTime(), firstDate.getTime()), lastDate.getTime()));
-      endDate = new Date(Math.min(Math.max(endDate.getTime(), firstDate.getTime()), lastDate.getTime()));
-
-      if (endDate.getTime() < startDate.getTime()) {
-        endDate = new Date(startDate.getTime());
-      }
-
-      const maxEndMs = Math.min(lastDate.getTime(), startDate.getTime() + EXPORT_RANGE_MAX_MS);
-      if (endDate.getTime() > maxEndMs) {
-        endDate = new Date(maxEndMs);
-      }
-
-      setRangeInputDate("downloadStartInput", startDate);
-      setRangeInputDate("downloadEndInput", endDate);
+      const shouldSeedStart = force || !startEl.value;
+      const shouldSeedEnd = force || !endEl.value;
+      if (shouldSeedStart) setRangeInputDate("downloadStartInput", defaultStart);
+      if (shouldSeedEnd) setRangeInputDate("downloadEndInput", defaultEnd);
 
       if (note) {
         note.textContent = "";
       }
+    }
+
+    function getDownloadRangeRequest() {
+      const currentEntry = getDownloadCurrentEntry();
+      const startDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(currentEntry);
+      const endDate = getRangeInputDate("downloadEndInput") || getEntryESTDate(currentEntry);
+      if (!startDate || !endDate) return null;
+      let startMs = startDate.getTime();
+      let endMs = endDate.getTime();
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+      if (endMs < startMs) [startMs, endMs] = [endMs, startMs];
+      return {
+        startDate: new Date(startMs),
+        endDate: new Date(endMs),
+        startMs,
+        endMs,
+        durationMs: endMs - startMs
+      };
+    }
+
+    function getDownloadArchiveBounds() {
+      const observedBounds = getObservedArchiveDateBounds();
+      const forecastEntries = getForecastExportEntries();
+      const forecastFirst = forecastEntries.length ? getEntryESTDate(forecastEntries[0]) : null;
+      const forecastLast = forecastEntries.length ? getEntryESTDate(forecastEntries[forecastEntries.length - 1]) : null;
+      let firstDate = observedBounds?.firstDate || forecastFirst || getEntryESTDate(getDownloadCurrentEntry());
+      let lastDate = observedBounds?.lastDate || forecastLast || getEntryESTDate(getDownloadCurrentEntry());
+      if (forecastFirst && (!firstDate || forecastFirst.getTime() < firstDate.getTime())) firstDate = forecastFirst;
+      if (forecastLast && (!lastDate || forecastLast.getTime() > lastDate.getTime())) lastDate = forecastLast;
+      return firstDate && lastDate ? { firstDate, lastDate } : null;
+    }
+
+    function validateDownloadRangeForExport() {
+      const scope = document.getElementById("downloadScopeSelect")?.value || "current";
+      if (scope !== "range") return { ok: true };
+
+      const range = getDownloadRangeRequest();
+      if (!range) {
+        return { ok: false, message: "Please enter a valid export start and end time." };
+      }
+
+      if (range.durationMs > EXPORT_RANGE_MAX_MS) {
+        return {
+          ok: false,
+          message: `This export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours. Please choose a shorter range, then download again.`
+        };
+      }
+
+      const bounds = getDownloadArchiveBounds();
+      if (bounds) {
+        const firstMs = bounds.firstDate.getTime();
+        const lastMs = bounds.lastDate.getTime();
+        if (range.startMs < firstMs || range.endMs > lastMs) {
+          return {
+            ok: false,
+            message: `That export range is outside the available historical record. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
+          };
+        }
+      }
+
+      return { ok: true, range };
     }
 
     function getDownloadFrameItems(scope = null) {
@@ -4509,22 +4573,14 @@
         return item ? [item] : [];
       }
 
-      const startDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(currentEntry);
-      const endDate = getRangeInputDate("downloadEndInput") || getEntryESTDate(currentEntry);
-      if (!startDate || !endDate) return [];
+      const range = getDownloadRangeRequest();
+      if (!range) return [];
 
-      let startMs = startDate.getTime();
-      let endMs = endDate.getTime();
-      if (endMs < startMs) [startMs, endMs] = [endMs, startMs];
-      endMs = Math.min(endMs, startMs + EXPORT_RANGE_MAX_MS);
-
-      const boundedStart = new Date(startMs);
-      const boundedEnd = new Date(endMs);
-      const entries = getDownloadSourceEntries(true, boundedStart, boundedEnd);
+      const entries = getDownloadSourceEntries(true, range.startDate, range.endDate);
       if (!entries.length) return [];
 
-      const startIndex = findStartIndexForTime(entries, startMs);
-      const endIndex = findEndIndexForTime(entries, endMs);
+      const startIndex = findStartIndexForTime(entries, range.startMs);
+      const endIndex = findEndIndexForTime(entries, range.endMs);
       if (endIndex < startIndex) {
         const item = getDownloadFrameItemFromEntry(entries[startIndex], currentHourIndex);
         return item ? [item] : [];
@@ -4542,6 +4598,24 @@
       syncDownloadRangeInputs(false);
       const scope = document.getElementById("downloadScopeSelect")?.value || "current";
       const format = String(document.getElementById("downloadFormatSelect")?.value || "png").toUpperCase();
+
+      if (scope === "range") {
+        const range = getDownloadRangeRequest();
+        if (!range) {
+          summary.textContent = "No frames are available for export.";
+          return;
+        }
+        if (range.durationMs > EXPORT_RANGE_MAX_MS) {
+          summary.textContent = `${format} export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
+          return;
+        }
+        const bounds = getDownloadArchiveBounds();
+        if (bounds && (range.startMs < bounds.firstDate.getTime() || range.endMs > bounds.lastDate.getTime())) {
+          summary.textContent = "No frames are available for export.";
+          return;
+        }
+      }
+
       const items = getDownloadFrameItems(scope);
       if (!items.length) {
         summary.textContent = "No frames are available for export.";
@@ -4991,11 +5065,20 @@
       if (exportInProgress) return;
       syncDownloadRangeInputs(false);
       const format = document.getElementById("downloadFormatSelect")?.value || "png";
+      const validation = validateDownloadRangeForExport();
+      if (!validation.ok) {
+        toast(validation.message);
+        setDownloadStatus(validation.message, true);
+        updateDownloadSummary();
+        return;
+      }
       const frameItems = getDownloadFrameItems();
       if (!frameItems.length) {
         toast("No frames are available for export.");
+        setDownloadStatus("No frames are available for export.", true);
         return;
       }
+      setDownloadModalOpen(false);
       setDownloadBusy(true, "Preparing export...");
       try {
         if (format === "gif") {
@@ -6124,14 +6207,18 @@
         updateDownloadSummary();
       });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
-        document.getElementById(id).addEventListener("change", () => {
+        const input = document.getElementById(id);
+        input.addEventListener("input", () => {
+          if (!exportInProgress) setDownloadStatus("", false);
+          updateDownloadSummary();
+        });
+        input.addEventListener("change", () => {
           if (!exportInProgress) setDownloadStatus("", false);
           syncDownloadRangeInputs(false);
           updateDownloadSummary();
         });
       });
       document.getElementById("downloadBtn").addEventListener("click", () => {
-        setDownloadModalOpen(false);
         downloadCurrentSelection().catch(err => {
           const format = document.getElementById("downloadFormatSelect")?.value || "png";
           const friendlyMessage = getFriendlyExportError(err, format);
