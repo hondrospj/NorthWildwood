@@ -3093,11 +3093,12 @@
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 220;
-    const EXPORT_MOV_FPS = 3;
+    const EXPORT_MOV_FPS = 10;
     const EXPORT_VIDEO_BITRATE = 36000000;
     const EXPORT_VIDEO_MAX_WIDTH = 1920;
     const EXPORT_VIDEO_MAX_HEIGHT = 1080;
-    const EXPORT_MOV_FRAME_HOLD_MS = 450;
+    const EXPORT_MOV_FRAME_HOLD_MS = 1000;
+    const EXPORT_GIF_FRAME_DELAY_MS = 1000;
     const EXPORT_CAPTURE_SCALE_DEFAULT = 2;
     const EXPORT_CAPTURE_SCALE_VIDEO = 2;
     const EXPORT_GIF_QUALITY = 4;
@@ -5310,7 +5311,7 @@
         workerScript
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
-        gif.addFrame(canvas, { delay: 700, copy: true });
+        gif.addFrame(canvas, { delay: EXPORT_GIF_FRAME_DELAY_MS, copy: true });
       }, 4, 78);
       setDownloadStatus("Encoding GIF...");
       setExportProgress("Encoding GIF...", 80, false);
@@ -5370,6 +5371,94 @@
       return { width, height };
     }
 
+    function createVideoOutputCanvas(width, height) {
+      const outputCanvas = document.createElement("canvas");
+      outputCanvas.width = width;
+      outputCanvas.height = height;
+      const outputCtx = outputCanvas.getContext("2d", { alpha: false, desynchronized: true });
+      if (outputCtx) {
+        outputCtx.imageSmoothingEnabled = true;
+        outputCtx.imageSmoothingQuality = "high";
+      }
+      return { outputCanvas, outputCtx };
+    }
+
+    function drawVideoFrameToCanvas(ctx, source, width, height) {
+      ctx.fillStyle = "#050b16";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(source, 0, 0, width, height);
+    }
+
+    async function canvasToVideoStillImage(canvas, width, height) {
+      const frameCanvas = document.createElement("canvas");
+      frameCanvas.width = width;
+      frameCanvas.height = height;
+      const frameCtx = frameCanvas.getContext("2d", { alpha: false });
+      if (!frameCtx) throw new Error("Video export could not prepare a still frame.");
+      frameCtx.imageSmoothingEnabled = true;
+      frameCtx.imageSmoothingQuality = "high";
+      drawVideoFrameToCanvas(frameCtx, canvas, width, height);
+
+      const blob = await canvasToBlob(frameCanvas, "image/png");
+      frameCanvas.width = 1;
+      frameCanvas.height = 1;
+
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+      image.decoding = "sync";
+      image.src = url;
+      try {
+        if (typeof image.decode === "function") {
+          await image.decode();
+        } else {
+          await new Promise((resolve, reject) => {
+            image.onload = resolve;
+            image.onerror = reject;
+          });
+        }
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        throw err;
+      }
+      return { image, url };
+    }
+
+    async function renderVideoStillFrames(frameItems) {
+      const total = Math.max(1, frameItems.length);
+      const stills = [];
+      let videoSize = null;
+
+      try {
+        for (let i = 0; i < frameItems.length; i++) {
+          const item = frameItems[i];
+          const pct = 4 + ((i / total) * 68);
+          const message = `Rendering video pane ${i + 1} of ${frameItems.length}...`;
+          setDownloadStatus(message);
+          setExportProgress(message, pct, false);
+
+          await prepareExportFrame(item);
+          const captured = await captureExportCanvas();
+          if (!videoSize) {
+            videoSize = getPreferredVideoCanvasSize(captured.width, captured.height) || { width: captured.width, height: captured.height };
+          }
+          const still = await canvasToVideoStillImage(captured, videoSize.width, videoSize.height);
+          stills.push(still);
+          captured.width = 1;
+          captured.height = 1;
+
+          const donePct = 4 + (((i + 1) / total) * 68);
+          setExportProgress(`Prepared video pane ${i + 1} of ${frameItems.length}...`, donePct, false);
+        }
+      } catch (err) {
+        stills.forEach(still => {
+          try { URL.revokeObjectURL(still.url); } catch (e) {}
+        });
+        throw err;
+      }
+
+      return { stills, videoSize };
+    }
+
     async function exportMov(frameItems) {
       if (typeof MediaRecorder === "undefined") {
         throw new Error("MOV export is unavailable because this browser does not support native video recording.");
@@ -5382,53 +5471,17 @@
         throw new Error("No frames are available for MOV export.");
       }
 
-      const outputCanvas = document.createElement("canvas");
-      const outputCtx = outputCanvas.getContext("2d", { alpha: false, desynchronized: true });
-      if (outputCtx) {
-        outputCtx.imageSmoothingEnabled = true;
-        outputCtx.imageSmoothingQuality = "high";
-      }
+      setDownloadStatus("Preparing video frames...");
+      setExportProgress("Preparing video frames...", 3, false);
+      const { stills, videoSize } = await renderVideoStillFrames(frameItems);
+
+      const { outputCanvas, outputCtx } = createVideoOutputCanvas(videoSize.width, videoSize.height);
       if (!outputCtx || typeof outputCanvas.captureStream !== "function") {
+        stills.forEach(still => {
+          try { URL.revokeObjectURL(still.url); } catch (e) {}
+        });
         throw new Error("MOV export is unavailable because this browser cannot record canvas video.");
       }
-
-      const total = Math.max(1, frameItems.length);
-      const perVideoFrameMs = Math.max(1, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
-      const holdFrameCount = Math.max(1, Math.round(EXPORT_MOV_FRAME_HOLD_MS / perVideoFrameMs));
-
-      const drawCapturedToOutput = (captured) => {
-        outputCtx.fillStyle = "#050b16";
-        outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-        outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
-      };
-
-      async function renderCapturedFrame(i) {
-        const item = frameItems[i];
-        const renderPct = 4 + ((i / total) * 84);
-        const message = `Rendering video frame ${i + 1} of ${frameItems.length}...`;
-        setDownloadStatus(message);
-        setExportProgress(message, renderPct, false);
-        await prepareExportFrame(item);
-        return await captureExportCanvas();
-      }
-
-      const holdOutputFrame = async (requestVideoFrame) => {
-        for (let hold = 0; hold < holdFrameCount; hold++) {
-          requestVideoFrame();
-          await wait(perVideoFrameMs);
-        }
-      };
-
-      setDownloadStatus("Starting MOV export...");
-      setExportProgress("Starting MOV export...", 3, false);
-
-      // Critical quality fix: size the recording canvas BEFORE calling captureStream().
-      // captureStream() can otherwise lock the video track to the default 300x150 canvas,
-      // which makes the MOV look blurry no matter how high the bitrate is.
-      const firstCaptured = await renderCapturedFrame(0);
-      const preferredSize = getPreferredVideoCanvasSize(firstCaptured.width, firstCaptured.height);
-      outputCanvas.width = preferredSize?.width || firstCaptured.width;
-      outputCanvas.height = preferredSize?.height || firstCaptured.height;
 
       const stream = outputCanvas.captureStream(EXPORT_MOV_FPS);
       const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
@@ -5458,29 +5511,38 @@
         recorder.onstop = resolve;
       });
 
+      const perVideoFrameMs = Math.max(1, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
+      const holdFrameCount = Math.max(1, Math.round(EXPORT_MOV_FRAME_HOLD_MS / perVideoFrameMs));
+      const total = Math.max(1, stills.length);
+
       try {
+        setDownloadStatus("Recording video...");
+        setExportProgress("Recording video...", 74, false);
         recorder.start(1000);
 
-        drawCapturedToOutput(firstCaptured);
-        await holdOutputFrame(requestVideoFrame);
-        firstCaptured.width = 1;
-        firstCaptured.height = 1;
-        setExportProgress(`Added video frame 1 of ${frameItems.length}...`, 4 + (1 / total) * 84, false);
+        for (let i = 0; i < stills.length; i++) {
+          const still = stills[i];
+          const startTime = performance.now();
+          drawVideoFrameToCanvas(outputCtx, still.image, outputCanvas.width, outputCanvas.height);
 
-        for (let i = 1; i < frameItems.length; i++) {
-          const captured = await renderCapturedFrame(i);
-          drawCapturedToOutput(captured);
-          await holdOutputFrame(requestVideoFrame);
-          captured.width = 1;
-          captured.height = 1;
+          for (let hold = 0; hold < holdFrameCount; hold++) {
+            requestVideoFrame();
+            const targetTime = startTime + ((hold + 1) * perVideoFrameMs);
+            await wait(Math.max(0, targetTime - performance.now()));
+          }
 
-          const donePct = 4 + (((i + 1) / total) * 84);
-          setExportProgress(`Added video frame ${i + 1} of ${frameItems.length}...`, donePct, false);
+          const elapsed = performance.now() - startTime;
+          if (elapsed < EXPORT_MOV_FRAME_HOLD_MS) {
+            await wait(EXPORT_MOV_FRAME_HOLD_MS - elapsed);
+          }
+
+          const pct = 74 + (((i + 1) / total) * 20);
+          setExportProgress(`Recorded video pane ${i + 1} of ${stills.length}...`, pct, false);
         }
 
         setDownloadStatus(`Encoding ${videoType.label} video...`);
-        setExportProgress(`Encoding ${videoType.label} video...`, 92, false);
-        await wait(350);
+        setExportProgress(`Encoding ${videoType.label} video...`, 96, false);
+        await wait(250);
         if (recorder.state !== "inactive") recorder.stop();
         await stopped;
       } finally {
@@ -5490,6 +5552,9 @@
         if (recorder && recorder.state !== "inactive") {
           try { recorder.stop(); } catch (err) {}
         }
+        stills.forEach(still => {
+          try { URL.revokeObjectURL(still.url); } catch (e) {}
+        });
       }
 
       if (!chunks.length) {
