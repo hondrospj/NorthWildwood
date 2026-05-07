@@ -4248,11 +4248,47 @@
       return raw.replace(/[:\s]/g, "-").replace(/[^a-z0-9\-_]+/gi, "").toLowerCase();
     }
 
+    function getObservedExportSourceEntries() {
+      const source = observedFlatHours.length ? observedFlatHours : currentSeriesHours;
+      return getObservedDisplaySeries(source).map(entry => ({
+        ...entry,
+        exportSourceMode: "observed"
+      }));
+    }
+
+    function getForecastExportSourceEntries() {
+      const source = Array.isArray(forecastData?.hours) && forecastData.hours.length
+        ? forecastData.hours
+        : currentDataMode === "forecast"
+          ? currentSeriesHours
+          : [];
+      return source.map(entry => ({
+        ...entry,
+        exportSourceMode: "forecast"
+      }));
+    }
+
     function getDownloadSourceEntries() {
-      if (currentDataMode === "observed") {
-        return observedFlatHours.length ? observedFlatHours.slice() : currentSeriesHours.slice();
-      }
-      return currentSeriesHours.slice();
+      const combined = [
+        ...getObservedExportSourceEntries(),
+        ...getForecastExportSourceEntries()
+      ]
+        .filter(entry => entryTimeMs(entry) != null)
+        .sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+
+      if (!combined.length) return currentSeriesHours.slice();
+
+      const byHour = new Map();
+      combined.forEach(entry => {
+        const d = getEntryESTDate(entry);
+        const key = d ? formatNyLocalIso(d) : String(entryTimeMs(entry));
+        const existing = byHour.get(key);
+        if (!existing || entry.exportSourceMode === "forecast") {
+          byHour.set(key, entry);
+        }
+      });
+
+      return Array.from(byHour.values()).sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
     }
 
     function getDownloadCurrentEntry() {
@@ -4261,7 +4297,7 @@
 
     function getDownloadFrameItemFromEntry(entry, fallbackIndex = 0) {
       if (!entry) return null;
-      if (currentDataMode === "observed") {
+      if (entry.exportSourceMode === "observed" || currentDataMode === "observed") {
         return {
           mode: "observed",
           dateStr: entry.observedDate || selectedObservedDate || "",
@@ -4332,6 +4368,13 @@
       const lastDate = getEntryESTDate(entries[entries.length - 1]);
       if (!firstDate || !lastDate) return;
 
+      const minValue = formatNyLocalIso(firstDate);
+      const maxValue = formatNyLocalIso(lastDate);
+      startEl.min = minValue;
+      startEl.max = maxValue;
+      endEl.min = minValue;
+      endEl.max = maxValue;
+
       const defaultStart = getEntryESTDate(getDownloadCurrentEntry()) || firstDate;
       const defaultEnd = new Date(Math.min(lastDate.getTime(), defaultStart.getTime() + 24 * 60 * 60 * 1000));
 
@@ -4361,9 +4404,9 @@
     function getDownloadFrameItems(scope = null) {
       const mode = scope || document.getElementById("downloadScopeSelect")?.value || "current";
       const currentEntry = getDownloadCurrentEntry();
-      if (!currentEntry) return [];
 
       if (mode === "current") {
+        if (!currentEntry) return [];
         const item = getDownloadFrameItemFromEntry(currentEntry, currentHourIndex);
         return item ? [item] : [];
       }
@@ -4395,7 +4438,7 @@
       }
 
       return entries.slice(startIndex, endIndex + 1).map(entry => {
-        const fallbackIndex = currentDataMode === "forecast" ? findClosestEntryIndex(currentSeriesHours, entry) : 0;
+        const fallbackIndex = entry.exportSourceMode === "forecast" ? findClosestEntryIndex(currentSeriesHours, entry) : 0;
         return getDownloadFrameItemFromEntry(entry, fallbackIndex);
       }).filter(Boolean);
     }
