@@ -1295,6 +1295,22 @@
       padding-right:2px;
     }
 
+    .export-calendar-nav{display:grid;grid-template-columns:34px minmax(0,1fr) 34px;gap:6px;align-items:center;}
+    .export-calendar-nav button{min-height:32px;padding:0;border-radius:12px;font-size:18px;font-weight:900;}
+    .export-calendar-title{min-height:32px;display:grid;place-items:center;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.04);color:#eaf0ff;font-size:12px;font-weight:900;text-align:center;}
+    .export-calendar-weekdays,.export-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+    .export-calendar-weekdays div{text-align:center;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;}
+    .export-calendar-day{min-height:30px;border-radius:10px;border:1px solid transparent;background:transparent;color:transparent;padding:0;font-size:11px;font-weight:900;box-shadow:none;pointer-events:none;}
+    .export-calendar-day.available{color:#dbe8ff;background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.34);pointer-events:auto;}
+    .export-calendar-day.forecast-day{background:rgba(45,212,191,.13);border-color:rgba(45,212,191,.30);}
+    .export-calendar-day.selected{color:#fff;background:linear-gradient(180deg,rgba(96,165,250,.32),rgba(96,165,250,.18));border-color:#bfdbfe;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
+    .export-range-status{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;line-height:1.3;color:var(--muted);}
+    .export-range-status span{min-width:0;padding:7px 8px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .export-range-status strong{color:#eaf0ff;}
+    .export-picker-hours-title{margin-top:2px;font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+    .export-hour-btn.range-start,.export-hour-btn.range-end{border-color:#fef3c7;background:rgba(213,138,0,.30);color:#fff;}
+    .export-hour-btn.in-range{border-color:rgba(191,219,254,.36);background:rgba(96,165,250,.20);color:#fff;}
+
     .export-picker-day{
       display:grid;
       gap:6px;
@@ -5558,15 +5574,29 @@
         </div>
         <p class="export-modal-copy">Export a range of times out to 84 hours.</p>
             <div id="downloadRangeNote" class="download-note"></div>
-        <section id="exportTimePicker" class="export-picker" aria-label="Available export times">
+        <section id="exportTimePicker" class="export-picker" aria-label="Available export dates and times">
           <div class="export-picker-head">
-            <span id="exportPickerTitle">Available times</span>
+            <span id="exportPickerTitle">Available export dates</span>
             <div class="export-picker-tools">
               <span id="exportSelectionCount">0 selected</span>
               <button id="clearPngSelectionsBtn" type="button">Clear</button>
             </div>
           </div>
-          <div id="exportTimePickerGrid" class="export-picker-grid"></div>
+          <div class="export-calendar-nav" aria-label="Export calendar month navigation">
+            <button id="exportCalendarPrevBtn" type="button" aria-label="Previous export month">‹</button>
+            <div id="exportCalendarTitle" class="export-calendar-title">--</div>
+            <button id="exportCalendarNextBtn" type="button" aria-label="Next export month">›</button>
+          </div>
+          <div class="export-calendar-weekdays" aria-hidden="true">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+          </div>
+          <div id="exportCalendarGrid" class="export-calendar-grid"></div>
+          <div id="exportRangeStatus" class="export-range-status" aria-live="polite">
+            <span>Start: <strong id="exportRangeStartText">--</strong></span>
+            <span>End: <strong id="exportRangeEndText">--</strong></span>
+          </div>
+          <div id="exportHourTitle" class="export-picker-hours-title">Select a date</div>
+          <div id="exportTimePickerGrid" class="export-picker-hours"></div>
         </section>
         <input id="downloadScopeSelect" type="hidden" value="current" />
             <input id="downloadFormatSelect" type="hidden" value="gif" />
@@ -5976,6 +6006,10 @@
     let ffmpegClientPromise = null;
     let gifWorkerUrlPromise = null;
     let exportPngSelections = new Map();
+    let exportCalendarCursorDate = null;
+    let exportCalendarSelectedDayKey = "";
+    let exportRangePickMode = "start";
+    let exportAvailabilityCache = null;
 
     function pad2(n) {
       return String(n).padStart(2, "0");
@@ -7415,12 +7449,10 @@
       let lastDate = null;
 
       if (scopeValue === "range") {
-        // IMPORTANT: Do not scan historical observed archives just because the user
-        // clicks Time range. That made the button feel unclickable/slow online.
-        // Historical bounds are checked later, only when Download is pressed.
-        const currentDate = getEntryESTDate(getDownloadCurrentEntry()) || new Date();
-        firstDate = currentDate;
-        lastDate = new Date(currentDate.getTime() + EXPORT_RANGE_MAX_MS);
+        const bounds = getExportAvailabilityBounds();
+        const currentDate = getEntryESTDate(getDownloadCurrentEntry()) || bounds?.firstDate || new Date();
+        firstDate = bounds?.firstDate || currentDate;
+        lastDate = bounds?.lastDate || new Date(currentDate.getTime() + EXPORT_RANGE_MAX_MS);
       } else {
         const entries = getDownloadSourceEntries(false);
         if (!entries.length) {
@@ -7472,7 +7504,7 @@
       const defaultStart = currentDate
         ? new Date(Math.min(Math.max(currentDate.getTime(), firstDate.getTime()), lastDate.getTime()))
         : firstDate;
-      const defaultEnd = new Date(Math.min(lastDate.getTime(), defaultStart.getTime() + 24 * 60 * 60 * 1000));
+      const defaultEnd = new Date(Math.min(lastDate.getTime(), defaultStart.getTime() + EXPORT_RANGE_MAX_MS));
 
       // Do not reseed while the user is typing/clicking inside the native datetime control.
       // Some browsers temporarily expose an empty value while a datetime-local field is being edited;
@@ -7587,41 +7619,129 @@
       return String(entry?.displayTimeEST || entry?.timeEST || entry?.timeUtc || Math.random());
     }
 
+    function getExportDayKeyFromDate(date) {
+      const parts = getNyParts(date);
+      if (!parts) return "";
+      return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
+    }
+
+    function getExportMonthKey(date) {
+      const parts = getNyParts(date);
+      if (!parts) return "";
+      return `${parts.year}-${String(parts.month).padStart(2, "0")}`;
+    }
+
+    function getExportMonthStart(date) {
+      const parts = getNyParts(date || new Date());
+      if (!parts) return new Date();
+      return parseStoredLocalNyToDate(`${parts.year}-${String(parts.month).padStart(2, "0")}-01T00:00`) || new Date();
+    }
+
+    function shiftExportMonth(date, delta) {
+      const parts = getNyParts(date || new Date());
+      const shifted = new Date(Date.UTC(parts.year, parts.month - 1 + delta, 1, 12, 0, 0));
+      const y = shifted.getUTCFullYear();
+      const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+      return parseStoredLocalNyToDate(`${y}-${m}-01T00:00`) || shifted;
+    }
+
+    function getAllExportAvailabilityEntries() {
+      if (exportAvailabilityCache) return exportAvailabilityCache;
+      const combined = [];
+      getObservedDays().forEach(day => {
+        const hours = Array.isArray(day?.hours) ? day.hours : [];
+        hours.forEach((hour, idx) => {
+          const t = entryTimeMs(hour);
+          if (t == null) return;
+          const rawStage = getStageValue(hour);
+          if (rawStage == null || !Number.isFinite(Number(rawStage))) return;
+          combined.push({ ...hour, observedDate: day.date, classification: day.classification || "none", peakNAVD88: day.peakNAVD88, sourceHourIndex: idx, exportSourceMode: "observed" });
+        });
+      });
+      const forecastEntries = getForecastExportEntries().filter(entry => entryTimeMs(entry) != null).sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+      if (forecastEntries.length) {
+        const firstForecastMs = entryTimeMs(forecastEntries[0]);
+        const maxForecastMs = firstForecastMs + (72 * 60 * 60 * 1000);
+        forecastEntries.forEach(entry => {
+          const t = entryTimeMs(entry);
+          if (t != null && t <= maxForecastMs) combined.push({ ...entry, exportSourceMode: "forecast" });
+        });
+      }
+      const byHour = new Map();
+      combined.forEach(entry => {
+        const d = getEntryESTDate(entry);
+        const key = d ? formatNyLocalIso(d) : String(entryTimeMs(entry));
+        const existing = byHour.get(key);
+        if (!existing || entry.exportSourceMode === "forecast") byHour.set(key, entry);
+      });
+      exportAvailabilityCache = Array.from(byHour.values()).sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+      return exportAvailabilityCache;
+    }
+
+    function clearExportAvailabilityCache() { exportAvailabilityCache = null; }
+
+    function getExportAvailabilityDayMap() {
+      const map = new Map();
+      getAllExportAvailabilityEntries().forEach((entry, idx) => {
+        const key = getExportDayKeyFromDate(getEntryESTDate(entry));
+        if (!key) return;
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push({ entry, idx });
+      });
+      map.forEach(items => items.sort((a, b) => entryTimeMs(a.entry) - entryTimeMs(b.entry)));
+      return map;
+    }
+
+    function getExportAvailabilityBounds() {
+      const entries = getAllExportAvailabilityEntries();
+      if (!entries.length) return null;
+      return { firstDate: getEntryESTDate(entries[0]), lastDate: getEntryESTDate(entries[entries.length - 1]) };
+    }
+
+    function ensureExportCalendarCursor() {
+      const dayMap = getExportAvailabilityDayMap();
+      const bounds = getExportAvailabilityBounds();
+      if (!bounds) return;
+      const currentDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(getDownloadCurrentEntry()) || bounds.lastDate || bounds.firstDate;
+      let selectedKey = getExportDayKeyFromDate(currentDate);
+      if (!dayMap.has(selectedKey)) {
+        const currentMs = currentDate ? currentDate.getTime() : null;
+        let best = null;
+        let bestDiff = Infinity;
+        dayMap.forEach((items, key) => {
+          const t = entryTimeMs(items[0].entry);
+          const diff = currentMs == null ? 0 : Math.abs(t - currentMs);
+          if (diff < bestDiff) { best = key; bestDiff = diff; }
+        });
+        selectedKey = best || getExportDayKeyFromDate(bounds.firstDate);
+      }
+      if (!exportCalendarSelectedDayKey || !dayMap.has(exportCalendarSelectedDayKey)) exportCalendarSelectedDayKey = selectedKey;
+      if (!exportCalendarCursorDate) {
+        const cursorSource = parseStoredLocalNyToDate(`${exportCalendarSelectedDayKey}T00:00`) || bounds.firstDate;
+        exportCalendarCursorDate = getExportMonthStart(cursorSource);
+      }
+    }
+
     function getExportPickerEntries() {
       const scope = getDownloadScopeValue();
       const range = scope === "range" ? getDownloadRangeRequest() : null;
-      let entries = [];
+      let entries = getAllExportAvailabilityEntries();
       if (scope === "range" && range) {
-        entries = getDownloadSourceEntries(true, range.startDate, range.endDate)
-          .filter(entry => entryTimeMs(entry) != null)
-          .filter(entry => {
-            const t = entryTimeMs(entry);
-            return t >= range.startMs - 1000 && t <= range.endMs + 1000;
-          });
-      } else {
-        entries = getDownloadSourceEntries(false).filter(entry => entryTimeMs(entry) != null);
-      }
-
-      entries = entries.sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
-      if (currentDataMode === "forecast" || entries.some(e => e.exportSourceMode === "forecast")) {
-        const firstForecast = entries.find(e => e.exportSourceMode === "forecast") || entries[0];
-        const startMs = entryTimeMs(firstForecast);
-        const maxMs = startMs == null ? Infinity : startMs + 72 * 60 * 60 * 1000;
-        entries = entries.filter(e => e.exportSourceMode !== "forecast" || entryTimeMs(e) <= maxMs);
+        entries = entries.filter(entry => {
+          const t = entryTimeMs(entry);
+          return t != null && t >= range.startMs - 1000 && t <= range.endMs + 1000;
+        });
       }
       return entries;
     }
 
     function getSelectedPngFrameItems() {
-      return Array.from(exportPngSelections.values())
-        .sort((a, b) => entryTimeMs(a.entry) - entryTimeMs(b.entry));
+      return Array.from(exportPngSelections.values()).sort((a, b) => entryTimeMs(a.entry) - entryTimeMs(b.entry));
     }
 
     function prunePngSelectionsToAvailable(entries) {
-      const available = new Set(entries.map(getEntryExportKey));
-      Array.from(exportPngSelections.keys()).forEach(key => {
-        if (!available.has(key)) exportPngSelections.delete(key);
-      });
+      const available = new Set(entries.map(item => getEntryExportKey(item.entry || item)));
+      Array.from(exportPngSelections.keys()).forEach(key => { if (!available.has(key)) exportPngSelections.delete(key); });
     }
 
     function togglePngExportSelection(entry, fallbackIndex = 0) {
@@ -7629,10 +7749,7 @@
       if (exportPngSelections.has(key)) {
         exportPngSelections.delete(key);
       } else {
-        if (exportPngSelections.size >= EXPORT_PNG_SELECTION_LIMIT) {
-          toast(`You can select up to ${EXPORT_PNG_SELECTION_LIMIT} PNG times.`);
-          return;
-        }
+        if (exportPngSelections.size >= EXPORT_PNG_SELECTION_LIMIT) { toast(`You can select up to ${EXPORT_PNG_SELECTION_LIMIT} PNG times.`); return; }
         const item = getDownloadFrameItemFromEntry(entry, fallbackIndex);
         if (item) exportPngSelections.set(key, item);
       }
@@ -7640,72 +7757,145 @@
       updateDownloadSummary();
     }
 
+    function setExportRangeBoundaryFromEntry(entry) {
+      const d = getEntryESTDate(entry);
+      if (!d) return;
+      const startEl = document.getElementById("downloadStartInput");
+      const endEl = document.getElementById("downloadEndInput");
+      const existingStart = getRangeInputDate("downloadStartInput");
+      const existingEnd = getRangeInputDate("downloadEndInput");
+      if (exportRangePickMode === "start" || (existingStart && existingEnd)) {
+        setRangeInputDate("downloadStartInput", d);
+        if (!existingEnd || existingEnd.getTime() < d.getTime()) setRangeInputDate("downloadEndInput", d);
+        exportRangePickMode = "end";
+      } else {
+        setRangeInputDate("downloadEndInput", d);
+        const newStart = getRangeInputDate("downloadStartInput");
+        const newEnd = getRangeInputDate("downloadEndInput");
+        if (newStart && newEnd && newEnd.getTime() < newStart.getTime()) { setRangeInputDate("downloadStartInput", newEnd); setRangeInputDate("downloadEndInput", newStart); }
+        exportRangePickMode = "start";
+      }
+      if (startEl) startEl.dataset.userEdited = "1";
+      if (endEl) endEl.dataset.userEdited = "1";
+      renderExportTimePicker();
+      updateDownloadSummary();
+    }
+
+    function formatExportShortTime(entry) {
+      const d = getEntryESTDate(entry);
+      const parts = d ? getNyParts(d) : null;
+      if (!parts) return "--";
+      const hour12 = (parts.hour % 12) || 12;
+      return `${hour12} ${parts.hour >= 12 ? "PM" : "AM"}`;
+    }
+
     function renderExportTimePicker() {
       const wrap = document.getElementById("exportTimePicker");
-      const grid = document.getElementById("exportTimePickerGrid");
+      const calendarGrid = document.getElementById("exportCalendarGrid");
+      const hourGrid = document.getElementById("exportTimePickerGrid");
       const title = document.getElementById("exportPickerTitle");
       const count = document.getElementById("exportSelectionCount");
       const clearBtn = document.getElementById("clearPngSelectionsBtn");
-      if (!wrap || !grid) return;
-
+      const monthTitle = document.getElementById("exportCalendarTitle");
+      const hourTitle = document.getElementById("exportHourTitle");
+      const prevBtn = document.getElementById("exportCalendarPrevBtn");
+      const nextBtn = document.getElementById("exportCalendarNextBtn");
+      const startText = document.getElementById("exportRangeStartText");
+      const endText = document.getElementById("exportRangeEndText");
+      if (!wrap || !calendarGrid || !hourGrid) return;
       const format = getDownloadFormatValue();
-      const entries = getExportPickerEntries();
-      prunePngSelectionsToAvailable(entries);
+      const scope = getDownloadScopeValue();
+      const dayMap = getExportAvailabilityDayMap();
+      const bounds = getExportAvailabilityBounds();
       wrap.hidden = false;
-      if (title) title.textContent = format === "png" ? "PNG times" : "Available GIF hours";
-      if (count) count.textContent = format === "png" ? `${exportPngSelections.size}/${EXPORT_PNG_SELECTION_LIMIT} selected` : `${entries.length} hours`;
-      if (clearBtn) clearBtn.hidden = format !== "png" || exportPngSelections.size === 0;
-      grid.innerHTML = "";
-
-      if (!entries.length) {
-        grid.innerHTML = `<div class="export-picker-empty">No exportable hours are available for this selection.</div>`;
+      calendarGrid.innerHTML = "";
+      hourGrid.innerHTML = "";
+      if (!bounds || !dayMap.size) {
+        calendarGrid.innerHTML = `<div class="export-picker-empty" style="grid-column:1/-1">No exportable dates are available.</div>`;
+        if (title) title.textContent = "Available export dates";
+        if (count) count.textContent = "0 hours";
         return;
       }
-
-      const byDay = new Map();
-      entries.forEach((entry, idx) => {
-        const d = getEntryESTDate(entry);
-        if (!d) return;
-        const p = getNyParts(d);
-        const dayKey = `${p.year}-${p.month}-${p.day}`;
-        if (!byDay.has(dayKey)) byDay.set(dayKey, []);
-        byDay.get(dayKey).push({ entry, idx });
-      });
-
-      byDay.forEach((items, dayKey) => {
-        const day = document.createElement("div");
-        day.className = "export-picker-day";
-        const firstDate = getEntryESTDate(items[0].entry);
-        const heading = document.createElement("div");
-        heading.className = "export-picker-day-title";
-        heading.textContent = firstDate ? formatFixedESTFromUtc(firstDate.toISOString()).replace(/,?\s*\d{1,2}:00\s*[AP]M\s*E[DS]T/i, "") : dayKey;
-        const hours = document.createElement("div");
-        hours.className = "export-picker-hours";
-
-        items.forEach(({ entry, idx }) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "export-hour-btn has-data";
-          const d = getEntryESTDate(entry);
-          const parts = d ? getNyParts(d) : null;
-          const hour = parts ? parts.hour : null;
-          const hour12 = hour == null ? "--" : ((hour % 12) || 12);
-          const ampm = hour == null ? "" : (hour >= 12 ? "PM" : "AM");
-          button.textContent = `${hour12} ${ampm}`.trim();
-          button.title = formatHourEntryTime(entry);
-          const key = getEntryExportKey(entry);
-          button.classList.toggle("selected", exportPngSelections.has(key));
-          if (format !== "png") {
-            button.disabled = true;
-          } else {
-            button.addEventListener("click", () => togglePngExportSelection(entry, idx));
-          }
-          hours.appendChild(button);
-        });
-
-        day.appendChild(heading);
-        day.appendChild(hours);
-        grid.appendChild(day);
+      ensureExportCalendarCursor();
+      prunePngSelectionsToAvailable(getAllExportAvailabilityEntries());
+      if (title) title.textContent = scope === "range" ? "Choose export range" : (format === "png" ? "Choose PNG times" : "Available export dates");
+      if (count) count.textContent = format === "png" ? `${exportPngSelections.size}/${EXPORT_PNG_SELECTION_LIMIT} selected` : `${getExportPickerEntries().length} hours`;
+      if (clearBtn) clearBtn.hidden = format !== "png" || exportPngSelections.size === 0;
+      const start = getRangeInputDate("downloadStartInput");
+      const end = getRangeInputDate("downloadEndInput");
+      if (startText) startText.textContent = start ? formatFixedESTFromUtc(start.toISOString()).replace(/^[A-Za-z]+\s+/, "") : "--";
+      if (endText) endText.textContent = end ? formatFixedESTFromUtc(end.toISOString()).replace(/^[A-Za-z]+\s+/, "") : "--";
+      const cursorParts = getNyParts(exportCalendarCursorDate || bounds.firstDate);
+      const monthName = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/New_York" }).format(exportCalendarCursorDate || bounds.firstDate);
+      if (monthTitle) monthTitle.textContent = monthName;
+      const firstMonth = getExportMonthKey(bounds.firstDate);
+      const lastMonth = getExportMonthKey(bounds.lastDate);
+      const currentMonth = getExportMonthKey(exportCalendarCursorDate);
+      if (prevBtn) prevBtn.disabled = currentMonth <= firstMonth;
+      if (nextBtn) nextBtn.disabled = currentMonth >= lastMonth;
+      const year = cursorParts.year;
+      const month = cursorParts.month;
+      const firstOfMonth = parseStoredLocalNyToDate(`${year}-${String(month).padStart(2, "0")}-01T00:00`);
+      const firstParts = getNyParts(firstOfMonth);
+      const startPad = firstParts ? firstParts.weekday : 0;
+      const daysInMonth = new Date(year, month, 0).getDate();
+      for (let i = 0; i < startPad; i++) {
+        const blank = document.createElement("div");
+        blank.className = "export-calendar-day";
+        calendarGrid.appendChild(blank);
+      }
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        const items = dayMap.get(dayKey) || [];
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "export-calendar-day";
+        if (items.length) {
+          btn.classList.add("available");
+          if (items.some(item => item.entry.exportSourceMode === "forecast")) btn.classList.add("forecast-day");
+          btn.textContent = String(day);
+          btn.title = `${items.length} exportable hour${items.length === 1 ? "" : "s"}`;
+          btn.addEventListener("click", () => { exportCalendarSelectedDayKey = dayKey; renderExportTimePicker(); });
+        } else {
+          btn.textContent = "";
+          btn.disabled = true;
+        }
+        btn.classList.toggle("selected", dayKey === exportCalendarSelectedDayKey);
+        calendarGrid.appendChild(btn);
+      }
+      const selectedItems = (dayMap.get(exportCalendarSelectedDayKey) || []);
+      if (hourTitle) {
+        const sourceLabel = selectedItems.some(item => item.entry.exportSourceMode === "forecast") ? "forecast + historical" : "historical";
+        hourTitle.textContent = selectedItems.length ? `${exportCalendarSelectedDayKey} available hours (${sourceLabel})` : "Select an available date";
+      }
+      if (!selectedItems.length) {
+        hourGrid.innerHTML = `<div class="export-picker-empty" style="grid-column:1/-1">Select a highlighted date to choose export hours.</div>`;
+        return;
+      }
+      const startMs = start ? start.getTime() : null;
+      const endMs = end ? end.getTime() : null;
+      const minMs = startMs != null && endMs != null ? Math.min(startMs, endMs) : null;
+      const maxMs = startMs != null && endMs != null ? Math.max(startMs, endMs) : null;
+      selectedItems.forEach(({ entry, idx }) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "export-hour-btn has-data";
+        button.textContent = formatExportShortTime(entry);
+        button.title = formatHourEntryTime(entry);
+        const key = getEntryExportKey(entry);
+        const t = entryTimeMs(entry);
+        button.classList.toggle("selected", exportPngSelections.has(key));
+        if (t != null && startMs != null && Math.abs(t - startMs) < 1000) button.classList.add("range-start");
+        if (t != null && endMs != null && Math.abs(t - endMs) < 1000) button.classList.add("range-end");
+        if (t != null && minMs != null && maxMs != null && t > minMs && t < maxMs) button.classList.add("in-range");
+        if (format === "png") {
+          button.addEventListener("click", () => togglePngExportSelection(entry, idx));
+        } else if (scope === "range") {
+          button.addEventListener("click", () => setExportRangeBoundaryFromEntry(entry));
+        } else {
+          button.addEventListener("click", () => { setRangeInputDate("downloadStartInput", getEntryESTDate(entry)); setRangeInputDate("downloadEndInput", getEntryESTDate(entry)); renderExportTimePicker(); updateDownloadSummary(); });
+        }
+        hourGrid.appendChild(button);
       });
     }
     function updateDownloadSummary() {
@@ -9906,6 +10096,14 @@
         updateDownloadSummary();
       });
 
+      document.getElementById("exportCalendarPrevBtn")?.addEventListener("click", () => {
+        exportCalendarCursorDate = shiftExportMonth(exportCalendarCursorDate || new Date(), -1);
+        renderExportTimePicker();
+      });
+      document.getElementById("exportCalendarNextBtn")?.addEventListener("click", () => {
+        exportCalendarCursorDate = shiftExportMonth(exportCalendarCursorDate || new Date(), 1);
+        renderExportTimePicker();
+      });
       document.getElementById("clearPngSelectionsBtn")?.addEventListener("click", () => {
         exportPngSelections.clear();
         renderExportTimePicker();
