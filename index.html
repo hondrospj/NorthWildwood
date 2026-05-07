@@ -1192,6 +1192,48 @@
       display:none;
     }
 
+    .export-segmented{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:6px;
+      padding:4px;
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:15px;
+      background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .export-segmented button{
+      min-height:38px;
+      border-radius:11px;
+      border:1px solid rgba(255,255,255,.02);
+      background:transparent;
+      box-shadow:none;
+      font-size:12.5px;
+      font-weight:850;
+      letter-spacing:-.02em;
+      color:#dbe8ff;
+      padding:8px 10px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      line-height:1.04;
+      cursor:pointer;
+    }
+
+    .export-segmented button:hover:not(:disabled){
+      transform:none;
+      box-shadow:none;
+      background:rgba(255,255,255,.04);
+    }
+
+    .export-segmented button.active{
+      background:linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.12));
+      border-color:rgba(191,219,254,.55);
+      color:#eef6ff;
+      box-shadow:0 8px 18px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
     .download-note{
       margin-top:2px;
       font-size:11px;
@@ -5117,6 +5159,13 @@
                 <button id="exportScopeRangeBtn" type="button" data-scope="range" aria-pressed="false">Time range</button>
               </div>
         </label>
+        <label class="download-field">
+          Aspect ratio
+          <div id="downloadAspectControl" class="export-segmented" role="tablist" aria-label="GIF aspect ratio">
+            <button id="exportAspectLandscapeBtn" type="button" class="active" data-aspect="16:9" aria-pressed="true">16:9</button>
+            <button id="exportAspectPortraitBtn" type="button" data-aspect="9:16" aria-pressed="false">9:16</button>
+          </div>
+        </label>
         <div id="downloadRangeFields" class="download-range-grid" hidden>
           <label class="download-field">
             Start (ET)
@@ -5131,7 +5180,8 @@
             <div id="downloadRangeNote" class="download-note"></div>
         <input id="downloadScopeSelect" type="hidden" value="current" />
             <input id="downloadFormatSelect" type="hidden" value="gif" />
-            <div id="downloadSummary" class="download-summary">Current map at the selected time.</div>
+            <input id="downloadAspectSelect" type="hidden" value="16:9" />
+            <div id="downloadSummary" class="download-summary">GIF (16:9) export at the selected time.</div>
         <div class="download-actions">
           <button id="downloadBtn" class="download-btn active" type="button"><span class="download-btn-spinner" aria-hidden="true"></span><span id="downloadBtnLabel">Download</span></button>
         </div>
@@ -5217,6 +5267,10 @@
     const EXPORT_GIF_QUALITY = 9;
     const EXPORT_GIF_MAX_WORKERS = 6;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
+    const EXPORT_GIF_ASPECTS = {
+      "16:9": { value: "16:9", width: 1280, height: 720, label: "16:9" },
+      "9:16": { value: "9:16", width: 720, height: 1280, label: "9:16" }
+    };
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
@@ -5957,6 +6011,8 @@
       modal.classList.toggle("open", isOpen);
       btn.setAttribute("aria-expanded", String(isOpen));
       if (isOpen) {
+        updateExportSegmentedUI();
+        applyExportStageAspect(getDownloadAspectValue());
         syncDownloadRangeInputs(true);
         updateDownloadSummary();
         document.getElementById("exportScopeCurrentBtn")?.focus();
@@ -6695,7 +6751,8 @@
         : currentViewType === "observed-day"
           ? (selectedObservedDate || "observed")
           : "historic-crest";
-      return `north-wildwood-${view}-${mode}`.replace(/[^a-z0-9\-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+      const aspect = getDownloadAspectValue().replace(":", "x");
+      return `north-wildwood-${view}-${mode}-${aspect}`.replace(/[^a-z0-9\-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
     }
 
     function getSafeFrameStamp(entry, sequence) {
@@ -6890,6 +6947,44 @@
       return "gif";
     }
 
+    function getDownloadAspectValue() {
+      const hiddenAspect = document.getElementById("downloadAspectSelect");
+      const activeAspectButton = document.querySelector("#downloadAspectControl button[data-aspect].active");
+      const raw = hiddenAspect?.value || activeAspectButton?.dataset?.aspect || "16:9";
+      const normalized = EXPORT_GIF_ASPECTS[raw] ? raw : "16:9";
+      if (hiddenAspect && hiddenAspect.value !== normalized) hiddenAspect.value = normalized;
+      return normalized;
+    }
+
+    function getExportAspectConfig(aspect = null) {
+      return EXPORT_GIF_ASPECTS[aspect || getDownloadAspectValue()] || EXPORT_GIF_ASPECTS["16:9"];
+    }
+
+    function applyExportStageAspect(aspect = null) {
+      const config = getExportAspectConfig(aspect);
+      const stageHost = document.getElementById("exportStage");
+      const stageFrame = document.getElementById("exportStageFrame");
+      const legendDock = document.getElementById("exportLegendDock");
+      const timestamp = document.getElementById("exportTimestampLabel");
+      if (stageHost) {
+        stageHost.style.width = `${config.width}px`;
+        stageHost.style.height = `${config.height}px`;
+      }
+      if (stageFrame) {
+        stageFrame.style.width = `${config.width}px`;
+        stageFrame.style.height = `${config.height}px`;
+        stageFrame.dataset.exportAspect = config.value;
+      }
+      if (legendDock) {
+        legendDock.style.width = `${config.value === "9:16" ? 176 : 192}px`;
+      }
+      if (timestamp) {
+        timestamp.style.maxWidth = `calc(${config.width}px - 48px)`;
+      }
+      if (exportMap) exportMap.invalidateSize(false);
+      return config;
+    }
+
     function syncDownloadRangeInputs(force = false) {
       const wrap = document.getElementById("downloadRangeFields");
       const note = document.getElementById("downloadRangeNote");
@@ -7080,6 +7175,7 @@
       syncDownloadRangeInputs(false);
       const scope = getDownloadScopeValue();
       const format = getDownloadFormatValue().toUpperCase();
+      const aspectLabel = getExportAspectConfig().label;
 
       if (scope === "range") {
         const range = getDownloadRangeRequest();
@@ -7088,13 +7184,13 @@
           return;
         }
         if (range.durationMs > EXPORT_RANGE_MAX_MS) {
-          summary.textContent = `${format} export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
+          summary.textContent = `${format} (${aspectLabel}) export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
           return;
         }
         // Do not check historical archive bounds here. That check can require
         // archive inspection and should only happen after Download is pressed.
         const frameCount = getDownloadRangeSummaryFrameCount(range);
-        summary.textContent = `${format} export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
+        summary.textContent = `${format} (${aspectLabel}) export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
         return;
       }
 
@@ -7103,13 +7199,19 @@
         summary.textContent = "No frames are available for export.";
         return;
       }
-      summary.textContent = `${format} export at ${formatHourEntryTime(item.entry)}.`;
+      summary.textContent = `${format} (${aspectLabel}) export at ${formatHourEntryTime(item.entry)}.`;
     }
 
     function updateExportSegmentedUI() {
       const scopeValue = getDownloadScopeValue();
+      const aspectValue = getDownloadAspectValue();
       document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
         const active = btn.dataset.scope === scopeValue;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+      document.querySelectorAll("#downloadAspectControl button[data-aspect]").forEach(btn => {
+        const active = btn.dataset.aspect === aspectValue;
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", String(active));
       });
@@ -7383,6 +7485,7 @@
     }
 
     async function prepareExportFrame(item) {
+      applyExportStageAspect(getDownloadAspectValue());
       const mapInstance = ensureExportMap();
       updateExportLegend();
       updateExportBoundaryVisibility();
@@ -7413,7 +7516,7 @@
       }
       const stage = document.getElementById("exportStageFrame");
       if (!stage) throw new Error("Export stage is unavailable.");
-      const captureScale = Math.min(3, Math.max(EXPORT_CAPTURE_SCALE_DEFAULT, window.devicePixelRatio || 1));
+      const captureScale = 1;
       return await html2canvas(stage, {
         backgroundColor: null,
         useCORS: true,
@@ -7569,14 +7672,17 @@
       if (typeof GIF === "undefined") {
         throw new Error("GIF export library did not load.");
       }
-      setDownloadStatus("Preloading GIF frames...");
-      setExportProgress("Preloading GIF frames...", 2, false);
+      const aspectConfig = applyExportStageAspect(getDownloadAspectValue());
+      setDownloadStatus(`Preloading ${aspectConfig.label} GIF frames...`);
+      setExportProgress(`Preloading ${aspectConfig.label} GIF frames...`, 2, false);
       await preloadExportFrameAssets(frameItems);
       const workerScript = await getGifWorkerUrl();
       const gif = new GIF({
         workers: getGifWorkerCount(),
         quality: EXPORT_GIF_QUALITY,
-        workerScript
+        workerScript,
+        width: aspectConfig.width,
+        height: aspectConfig.height
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
         gif.addFrame(canvas, { delay: EXPORT_GIF_FRAME_DELAY_MS, copy: true });
@@ -7619,7 +7725,7 @@
       }
       setDownloadModalOpen(false);
       setDownloadBusy(true, "Preparing export...");
-      setExportProgress(`Preparing GIF export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
+      setExportProgress(`Preparing ${getDownloadAspectValue()} GIF export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
       try {
         await exportGif(frameItems);
         const doneMessage = "Downloaded GIF export.";
@@ -9071,6 +9177,26 @@
         if (!exportInProgress) setDownloadStatus("", false);
         updateExportSegmentedUI();
         syncDownloadRangeInputs(true);
+        updateDownloadSummary();
+      });
+
+      document.querySelectorAll("#downloadAspectControl button[data-aspect]").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
+          const input = document.getElementById("downloadAspectSelect");
+          if (!input) return;
+          input.value = btn.dataset.aspect || "16:9";
+          if (!exportInProgress) setDownloadStatus("", false);
+          applyExportStageAspect(input.value);
+          updateExportSegmentedUI();
+          updateDownloadSummary();
+        });
+      });
+
+      document.getElementById("downloadAspectSelect")?.addEventListener("change", () => {
+        if (!exportInProgress) setDownloadStatus("", false);
+        applyExportStageAspect(getDownloadAspectValue());
+        updateExportSegmentedUI();
         updateDownloadSummary();
       });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
