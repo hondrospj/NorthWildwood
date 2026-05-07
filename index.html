@@ -5763,36 +5763,69 @@
       return Number.isInteger(fallback) && fallback >= 0 && fallback <= 23 ? fallback : null;
     }
 
+    function normalizeObservedDayHourEntry(source, dateStr, hourIndex, sourceIndex, sourceResolutionMinutes) {
+      const safeHour = Math.max(0, Math.min(23, Number(hourIndex) || 0));
+      const stage = source?.navd88StageFt ?? source?.stageFt ?? source?.value ?? source?.waterLevel ?? source?.waterLevelNAVD88;
+      return {
+        ...source,
+        navd88StageFt: Number.isFinite(Number(stage)) ? Number(stage) : source?.navd88StageFt,
+        displayTimeEST: source?.displayTimeEST || source?.timeEST || source?.timeEst || `${dateStr}T${pad2(safeHour)}:00`,
+        observedDate: source?.observedDate || dateStr,
+        hourIndex: safeHour,
+        sourceHourIndex: source?.sourceHourIndex ?? sourceIndex,
+        observationInterval: "1hour",
+        isMissingObservedHour: false,
+        sourceResolutionMinutes
+      };
+    }
+
     function buildObservedDayDisplaySeries(dayRecord, dateStr) {
       const hours = Array.isArray(dayRecord?.hours) ? dayRecord.hours : [];
       const sourceResolutionMinutes = detectSeriesResolutionMinutes(hours);
       const byHour = new Map();
 
       hours.forEach((entry, idx) => {
-        const hourIndex = getStoredEntryHourIndex(entry);
+        let hourIndex = getStoredEntryHourIndex(entry);
+        if (hourIndex == null && idx >= 0 && idx <= 23) hourIndex = idx;
         if (hourIndex == null) return;
-        if (!byHour.has(hourIndex)) byHour.set(hourIndex, { entry, idx });
+        if (!byHour.has(hourIndex)) {
+          byHour.set(hourIndex, { entry, idx });
+        } else {
+          const existing = byHour.get(hourIndex);
+          const existingStage = getStageValue(existing.entry);
+          const nextStage = getStageValue(entry);
+          if (!Number.isFinite(existingStage) && Number.isFinite(nextStage)) byHour.set(hourIndex, { entry, idx });
+        }
       });
 
       const out = [];
       for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
-        const item = byHour.get(hourIndex);
+        let item = byHour.get(hourIndex);
+
+        // The archive is an hourly-max full-history file. If it has a 24-row day,
+        // trust the array position as the hour fallback instead of marking valid
+        // early-day records as missing because of timezone/date parsing drift.
+        if (!item && hours.length >= 20 && hours[hourIndex]) {
+          item = { entry: hours[hourIndex], idx: hourIndex };
+        }
+
         if (item) {
-          const source = item.entry;
-          out.push({
-            ...source,
-            displayTimeEST: source.displayTimeEST || source.timeEST || source.timeEst || `${dateStr}T${pad2(hourIndex)}:00`,
-            observedDate: source.observedDate || dateStr,
-            hourIndex,
-            sourceHourIndex: source.sourceHourIndex ?? item.idx,
-            observationInterval: "1hour",
-            isMissingObservedHour: false,
-            sourceResolutionMinutes
-          });
+          out.push(normalizeObservedDayHourEntry(item.entry, dateStr, hourIndex, item.idx, sourceResolutionMinutes));
         } else {
           out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
         }
       }
+
+      // Final safety: for a complete archive day, never show fabricated "No data"
+      // panes when source rows exist for those hour positions.
+      if (hours.length >= 24) {
+        for (let i = 0; i < 24; i++) {
+          if (out[i]?.isMissingObservedHour && hours[i]) {
+            out[i] = normalizeObservedDayHourEntry(hours[i], dateStr, i, i, sourceResolutionMinutes);
+          }
+        }
+      }
+
       return out;
     }
 
