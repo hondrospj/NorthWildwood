@@ -4664,6 +4664,191 @@
       }
     }
 
+
+    /* Final mobile layout request: Controls below Legend + full visible Legend content */
+    @media (max-width: 860px), (max-height: 560px) and (pointer: coarse){
+      body.mobile-optimized #legendDock{
+        top:calc(8px + env(safe-area-inset-top)) !important;
+        left:calc(9px + env(safe-area-inset-left)) !important;
+        width:auto !important;
+        min-width:176px !important;
+        max-width:calc(100vw - 104px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
+        height:44px !important;
+        max-height:44px !important;
+        padding:7px 13px !important;
+        border-radius:999px !important;
+        overflow:hidden !important;
+        display:flex !important;
+        align-items:center !important;
+        gap:10px !important;
+        z-index:4300 !important;
+      }
+
+      body.mobile-optimized #legendDock::before{
+        width:46px !important;
+        height:13px !important;
+        flex:0 0 46px !important;
+      }
+
+      body.mobile-optimized #legendDock::after{
+        content:attr(data-preview-text) !important;
+        white-space:pre-line !important;
+        font-size:11px !important;
+        line-height:1.04 !important;
+        font-weight:950 !important;
+        letter-spacing:.01em !important;
+      }
+
+      #mobileControlsToggle,
+      body.mobile-controls-open #mobileControlsToggle,
+      body.mobile-legend-open #mobileControlsToggle{
+        top:calc(60px + env(safe-area-inset-top)) !important;
+        bottom:auto !important;
+        left:calc(9px + env(safe-area-inset-left)) !important;
+        min-height:38px !important;
+        height:38px !important;
+        padding:0 16px !important;
+        border-radius:999px !important;
+        z-index:4200 !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock{
+        top:calc(8px + env(safe-area-inset-top)) !important;
+        left:calc(9px + env(safe-area-inset-left)) !important;
+        display:block !important;
+        width:min(330px, calc(100vw - 18px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+        min-width:0 !important;
+        height:auto !important;
+        max-height:none !important;
+        padding:9px 10px 10px !important;
+        border-radius:17px !important;
+        overflow:visible !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock::before{
+        display:none !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock::after{
+        content:"Tap to close" !important;
+        position:absolute !important;
+        right:10px !important;
+        top:10px !important;
+        font-size:8px !important;
+        line-height:1 !important;
+        letter-spacing:.08em !important;
+        white-space:nowrap !important;
+        color:#bfdbfe !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-title{
+        display:block !important;
+        margin:0 78px 7px 0 !important;
+        font-size:13px !important;
+        line-height:1.05 !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-list{
+        display:grid !important;
+        grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+        column-gap:10px !important;
+        row-gap:4px !important;
+        max-height:none !important;
+        overflow:visible !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row,
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row:nth-child(n+9){
+        display:grid !important;
+        grid-template-columns:10px minmax(0, 1fr) !important;
+        gap:6px !important;
+        align-items:center !important;
+        font-size:9.5px !important;
+        line-height:1.02 !important;
+        font-weight:850 !important;
+        min-width:0 !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-swatch{
+        width:10px !important;
+        height:10px !important;
+        border-radius:4px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-swatch.legend-line{
+        width:12px !important;
+        height:0 !important;
+        border-top-width:3px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row.legend-row-boundary{
+        grid-column:1 / -1 !important;
+        margin-top:3px !important;
+        padding-top:5px !important;
+        border-top:1px solid rgba(255,255,255,.12) !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #mobileControlsToggle,
+      body.mobile-optimized.mobile-legend-open.mobile-controls-open #mobileControlsToggle{
+        top:calc(230px + env(safe-area-inset-top)) !important;
+        bottom:auto !important;
+      }
+    }
+
+    @media (max-width: 430px) and (orientation: portrait){
+      body.mobile-optimized #legendDock{
+        min-width:172px !important;
+        height:43px !important;
+        max-height:43px !important;
+        padding:7px 12px !important;
+      }
+
+      #mobileControlsToggle,
+      body.mobile-controls-open #mobileControlsToggle,
+      body.mobile-legend-open #mobileControlsToggle{
+        top:calc(58px + env(safe-area-inset-top)) !important;
+        bottom:auto !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock{
+        width:min(324px, calc(100vw - 18px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row,
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row:nth-child(n+9){
+        font-size:9px !important;
+        column-gap:5px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #mobileControlsToggle,
+      body.mobile-optimized.mobile-legend-open.mobile-controls-open #mobileControlsToggle{
+        top:calc(222px + env(safe-area-inset-top)) !important;
+      }
+    }
+
+    @media (max-width: 860px) and (orientation: landscape), (max-height: 560px) and (pointer: coarse){
+      body.mobile-optimized #legendDock{
+        top:calc(7px + env(safe-area-inset-top)) !important;
+        left:calc(8px + env(safe-area-inset-left)) !important;
+        height:38px !important;
+        max-height:38px !important;
+        min-width:164px !important;
+      }
+
+      #mobileControlsToggle,
+      body.mobile-controls-open #mobileControlsToggle,
+      body.mobile-legend-open #mobileControlsToggle{
+        top:calc(51px + env(safe-area-inset-top)) !important;
+        left:calc(8px + env(safe-area-inset-left)) !important;
+        bottom:auto !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #mobileControlsToggle,
+      body.mobile-optimized.mobile-legend-open.mobile-controls-open #mobileControlsToggle{
+        top:calc(202px + env(safe-area-inset-top)) !important;
+      }
+    }
+
   </style>
 </head>
 <body>
