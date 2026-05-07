@@ -5726,9 +5726,9 @@
         displayTimeUtc: new Date(slotMs).toISOString(),
         timeUtc: new Date(slotMs).toISOString(),
         observedDate,
-        navd88StageFt: MIN_STAGE,
-        stageFt: MIN_STAGE,
-        value: MIN_STAGE,
+        navd88StageFt: null,
+        stageFt: null,
+        value: null,
         observationInterval: "1hour",
         isMissingObservedHour: true,
         sourceResolutionMinutes: null
@@ -5743,9 +5743,9 @@
         displayTimeEST,
         observedDate: dateStr,
         hourIndex: safeHour,
-        navd88StageFt: MIN_STAGE,
-        stageFt: MIN_STAGE,
-        value: MIN_STAGE,
+        navd88StageFt: null,
+        stageFt: null,
+        value: null,
         observationInterval: "1hour",
         isMissingObservedHour: true,
         sourceResolutionMinutes: options.sourceResolutionMinutes ?? null
@@ -5788,52 +5788,115 @@
       };
     }
 
+    function parseEntryDateHourFields(entry) {
+      const directDate = String(entry?.observedDate || entry?.date || "").slice(0, 10);
+      const directHour = Number(entry?.hourIndex ?? entry?.sourceHourIndex);
+      const times = [entry?.displayTimeEST, entry?.timeEST, entry?.timeEst, entry?.displayTimeEst];
+      for (const value of times) {
+        const match = String(value || "").match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/);
+        if (match) return { dateStr: match[1], hourIndex: Number(match[2]) };
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(directDate) && Number.isInteger(directHour) && directHour >= 0 && directHour <= 23) {
+        return { dateStr: directDate, hourIndex: directHour };
+      }
+      return null;
+    }
+
+    function addDaysToDateString(dateStr, deltaDays) {
+      const match = String(dateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return dateStr;
+      const d = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + deltaDays));
+      return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+    }
+
+    function isRealObservedStageEntry(entry) {
+      return Number.isFinite(getStageValue(entry));
+    }
+
+    function forceObservedDayDisplayEntry(source, dateStr, hourIndex, sourceIndex = hourIndex, sourceResolutionMinutes = null) {
+      return normalizeObservedDayHourEntry(source, dateStr, hourIndex, sourceIndex, sourceResolutionMinutes, {
+        forceArchiveHourTime: true
+      });
+    }
+
+    function findObservedArchiveEntryForHour(dayRecord, dateStr, hourIndex, sourceResolutionMinutes = null) {
+      const safeHour = Math.max(0, Math.min(23, Number(hourIndex) || 0));
+      const sameDayHours = Array.isArray(dayRecord?.hours) ? dayRecord.hours : [];
+
+      // 1) Best case: the archive row has an explicit hourIndex.
+      for (let i = 0; i < sameDayHours.length; i++) {
+        const entry = sameDayHours[i];
+        if (!isRealObservedStageEntry(entry)) continue;
+        const direct = Number(entry?.hourIndex);
+        if (Number.isInteger(direct) && direct === safeHour) {
+          return forceObservedDayDisplayEntry(entry, dateStr, safeHour, i, sourceResolutionMinutes);
+        }
+      }
+
+      // 2) Next best: the stored local/EST timestamp says this exact date/hour.
+      for (let i = 0; i < sameDayHours.length; i++) {
+        const entry = sameDayHours[i];
+        if (!isRealObservedStageEntry(entry)) continue;
+        const parsed = parseEntryDateHourFields(entry);
+        if (parsed && parsed.dateStr === dateStr && parsed.hourIndex === safeHour) {
+          return forceObservedDayDisplayEntry(entry, dateStr, safeHour, i, sourceResolutionMinutes);
+        }
+      }
+
+      // 3) Full historical archive fallback: row position 0-23 is the hour.
+      if (sameDayHours.length >= 20 && sameDayHours[safeHour] && isRealObservedStageEntry(sameDayHours[safeHour])) {
+        return forceObservedDayDisplayEntry(sameDayHours[safeHour], dateStr, safeHour, safeHour, sourceResolutionMinutes);
+      }
+
+      // 4) Search the flattened all-history archive. This catches cases where the
+      // day was grouped differently, but each hour still carries a usable timestamp
+      // or observedDate/hourIndex combination.
+      if (Array.isArray(observedFlatHours) && observedFlatHours.length) {
+        for (let i = 0; i < observedFlatHours.length; i++) {
+          const entry = observedFlatHours[i];
+          if (!isRealObservedStageEntry(entry)) continue;
+          const parsed = parseEntryDateHourFields(entry);
+          if (parsed && parsed.dateStr === dateStr && parsed.hourIndex === safeHour) {
+            return forceObservedDayDisplayEntry(entry, dateStr, safeHour, entry.sourceHourIndex ?? i, sourceResolutionMinutes);
+          }
+        }
+      }
+
+      // 5) Last resort: check adjacent stored day buckets by row position. This is
+      // intentionally narrow and only used when an entry's own display date/hour
+      // matches after normal Date parsing. It prevents UTC/EST day-boundary drift.
+      const neighborDates = [addDaysToDateString(dateStr, -1), dateStr, addDaysToDateString(dateStr, 1)];
+      for (const neighborDate of neighborDates) {
+        const neighbor = getObservedDayRecord(neighborDate);
+        const hours = Array.isArray(neighbor?.hours) ? neighbor.hours : [];
+        for (let i = 0; i < hours.length; i++) {
+          const entry = hours[i];
+          if (!isRealObservedStageEntry(entry)) continue;
+          const d = getEntryESTDate(entry);
+          const parts = d ? getNyParts(d) : null;
+          if (!parts) continue;
+          const localDate = `${parts.year}-${parts.month}-${parts.day}`;
+          const localHour = Number(parts.hour24);
+          if (localDate === dateStr && localHour === safeHour) {
+            return forceObservedDayDisplayEntry(entry, dateStr, safeHour, i, sourceResolutionMinutes);
+          }
+        }
+      }
+
+      return null;
+    }
+
     function buildObservedDayDisplaySeries(dayRecord, dateStr) {
       const hours = Array.isArray(dayRecord?.hours) ? dayRecord.hours : [];
       const sourceResolutionMinutes = detectSeriesResolutionMinutes(hours);
-
-      // observed.json is an hourly-max full-history archive. For complete archive
-      // days, the safest key is the row position/hourIndex, not reparsed timestamps.
-      // This avoids the bug where valid 12 AM–6 PM values were displayed as "No data"
-      // or shifted into the evening because of EST/EDT timestamp parsing/caching drift.
-      if (hours.length >= 20) {
-        const out = [];
-        for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
-          const source = hours[hourIndex];
-          const stage = source ? getStageValue(source) : null;
-          if (source && Number.isFinite(stage)) {
-            out.push(normalizeObservedDayHourEntry(source, dateStr, hourIndex, hourIndex, sourceResolutionMinutes, {
-              forceArchiveHourTime: true
-            }));
-          } else {
-            out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
-          }
-        }
-        return out;
-      }
-
-      const byHour = new Map();
-      hours.forEach((entry, idx) => {
-        let hourIndex = getStoredEntryHourIndex(entry);
-        if (hourIndex == null && idx >= 0 && idx <= 23) hourIndex = idx;
-        if (hourIndex == null) return;
-        if (!byHour.has(hourIndex)) {
-          byHour.set(hourIndex, { entry, idx });
-        } else {
-          const existing = byHour.get(hourIndex);
-          const existingStage = getStageValue(existing.entry);
-          const nextStage = getStageValue(entry);
-          if (!Number.isFinite(existingStage) && Number.isFinite(nextStage)) byHour.set(hourIndex, { entry, idx });
-        }
-      });
-
       const out = [];
+
+      // Do not fabricate water levels. Build 24 labeled hours, but each hour must
+      // come from a real archive record. Missing slots remain true No data, not -4 ft.
       for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
-        const item = byHour.get(hourIndex);
-        if (item) {
-          out.push(normalizeObservedDayHourEntry(item.entry, dateStr, hourIndex, item.idx, sourceResolutionMinutes, {
-            forceArchiveHourTime: true
-          }));
+        const realEntry = findObservedArchiveEntryForHour(dayRecord, dateStr, hourIndex, sourceResolutionMinutes);
+        if (realEntry) {
+          out.push(realEntry);
         } else {
           out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
         }
@@ -7819,7 +7882,28 @@
     }
 
     function getStageValue(entry) {
-      return normalizeStageValue(entry?.navd88StageFt ?? entry?.stageFt ?? entry?.value);
+      if (!entry) return null;
+      const candidates = [
+        entry.navd88StageFt,
+        entry.navd88_stage_ft,
+        entry.navd88Stage,
+        entry.navd88,
+        entry.stageFt,
+        entry.stage_ft,
+        entry.waterLevelNAVD88,
+        entry.water_level_navd88,
+        entry.waterLevelNavd88,
+        entry.waterLevelFt,
+        entry.water_level_ft,
+        entry.waterLevel,
+        entry.value,
+        entry.v
+      ];
+      for (const value of candidates) {
+        const normalized = normalizeStageValue(value);
+        if (Number.isFinite(normalized)) return normalized;
+      }
+      return null;
     }
 
     function classifyFloodStage(stageValue) {
@@ -8106,9 +8190,9 @@
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").textContent = formatSnapshotTime(entry);
-      if (entry?.isMissingObservedHour && !Number.isFinite(Number(rawStage))) {
+      if (entry?.isMissingObservedHour || !Number.isFinite(Number(rawStage))) {
         document.getElementById("stageText").textContent = "No data";
-        document.getElementById("stageSubText").textContent = "No observed record for this hour";
+        document.getElementById("stageSubText").textContent = currentDataMode === "observed" ? "No observed record for this hour" : "Stage is not numeric";
       } else {
         document.getElementById("stageText").textContent = formatStageForDisplay(rawStage);
         document.getElementById("stageSubText").textContent = getDatumLongLabel();
@@ -8207,16 +8291,19 @@
 
       const rawStage = getStageValue(entry);
       const displayStage = getOverlayStage(rawStage);
-      if (displayStage == null) {
-        toast("Stage is not numeric for the selected hour.");
-        return;
-      }
 
       renderSelectionMeta(entry, rawStage, displayStage);
       renderTimelineMeta(entry);
 
       const slider = document.getElementById("hourSlider");
       slider.value = String(index);
+
+      if (entry?.isMissingObservedHour || displayStage == null || !Number.isFinite(rawStage)) {
+        toast(currentDataMode === "observed" ? "No observed record for this hour." : "Stage is not numeric for the selected hour.");
+        const token = ++lastRenderToken;
+        clearFloodLayer();
+        return;
+      }
 
       const note = buildNotes(rawStage, displayStage);
       toast(note);
