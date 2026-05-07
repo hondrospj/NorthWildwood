@@ -4064,6 +4064,372 @@
       .timeline-trackRow{ grid-template-columns:1fr !important; }
     }
 
+
+
+    /* Ultra mobile space optimization: compact legend, thumb-friendly controls, thinner timeline */
+    @media (max-width: 860px), (max-height: 560px) and (pointer: coarse){
+      body.mobile-optimized #legendDock{
+        top:calc(7px + env(safe-area-inset-top)) !important;
+        left:calc(8px + env(safe-area-inset-left)) !important;
+        width:auto !important;
+        min-width:128px !important;
+        max-width:calc(100vw - 96px - env(safe-area-inset-left) - env(safe-area-inset-right)) !important;
+        height:38px !important;
+        max-height:38px !important;
+        padding:7px 10px !important;
+        border-radius:999px !important;
+        overflow:hidden !important;
+        display:flex !important;
+        align-items:center !important;
+        gap:8px !important;
+        background:rgba(11,18,32,.95) !important;
+        box-shadow:0 10px 22px rgba(0,0,0,.26) !important;
+        z-index:4200 !important;
+      }
+
+      body.mobile-optimized #legendDock::before{
+        content:"";
+        display:inline-block;
+        width:38px;
+        height:12px;
+        flex:0 0 auto;
+        border-radius:999px;
+        background:linear-gradient(90deg, var(--depth-0) 0 14%, var(--depth-1) 14% 28%, var(--depth-3) 28% 42%, var(--depth-5) 42% 56%, var(--depth-7) 56% 70%, var(--depth-8) 70% 84%, var(--depth-10) 84% 100%);
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+      }
+
+      body.mobile-optimized #legendDock::after{
+        content:"Legend" !important;
+        position:static !important;
+        display:inline-block !important;
+        font-size:11px !important;
+        line-height:1 !important;
+        font-weight:900 !important;
+        letter-spacing:.01em !important;
+        color:#eaf0ff !important;
+        text-transform:none !important;
+        opacity:1 !important;
+        pointer-events:none !important;
+        white-space:nowrap !important;
+      }
+
+      body.mobile-optimized #legendDock .legend-title,
+      body.mobile-optimized #legendDock .legend-list,
+      body.mobile-optimized #legendDock .legend-note{
+        display:none !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock{
+        display:block !important;
+        width:min(286px, calc(100vw - 18px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+        height:auto !important;
+        max-height:min(42dvh, 250px) !important;
+        padding:8px 10px 9px !important;
+        border-radius:16px !important;
+        overflow-y:auto !important;
+        -webkit-overflow-scrolling:touch !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock::before{
+        display:none !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock::after{
+        content:"Tap to close" !important;
+        position:absolute !important;
+        right:10px !important;
+        top:10px !important;
+        font-size:8px !important;
+        letter-spacing:.08em !important;
+        text-transform:uppercase !important;
+        color:#bfdbfe !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-title{
+        display:block !important;
+        margin:0 86px 6px 0 !important;
+        font-size:13px !important;
+        line-height:1.05 !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-list{
+        display:grid !important;
+        grid-template-columns:repeat(2, minmax(0, 1fr)) !important;
+        gap:4px 8px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row{
+        display:grid !important;
+        grid-template-columns:9px minmax(0, 1fr) !important;
+        gap:5px !important;
+        font-size:8px !important;
+        line-height:1.05 !important;
+        font-weight:850 !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row:nth-child(n+9){
+        display:grid !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-swatch{
+        width:8px !important;
+        height:8px !important;
+        border-radius:3px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-swatch.legend-line{
+        width:9px !important;
+        border-top-width:2px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock .legend-row.legend-row-boundary{
+        margin-top:0 !important;
+        padding-top:0 !important;
+        border-top:0 !important;
+      }
+
+      #mobileControlsToggle{
+        left:calc(8px + env(safe-area-inset-left)) !important;
+        right:auto !important;
+        top:auto !important;
+        bottom:calc(86px + env(safe-area-inset-bottom)) !important;
+        width:auto !important;
+        min-width:108px !important;
+        min-height:34px !important;
+        padding:0 12px !important;
+        border-radius:999px !important;
+        font-size:13px !important;
+        font-weight:900 !important;
+        letter-spacing:-.01em !important;
+        z-index:4700 !important;
+        background:rgba(11,18,32,.94) !important;
+        box-shadow:0 10px 22px rgba(0,0,0,.24) !important;
+      }
+
+      body.mobile-controls-open #mobileControlsToggle{
+        bottom:calc(min(72dvh, 520px) + 10px + env(safe-area-inset-bottom)) !important;
+      }
+
+      body.mobile-legend-open #mobileControlsToggle{
+        top:auto !important;
+        bottom:calc(86px + env(safe-area-inset-bottom)) !important;
+      }
+
+      #leftPanel{
+        top:auto !important;
+        left:calc(8px + env(safe-area-inset-left)) !important;
+        right:calc(8px + env(safe-area-inset-right)) !important;
+        bottom:calc(64px + env(safe-area-inset-bottom)) !important;
+        width:auto !important;
+        max-height:min(72dvh, 520px) !important;
+        padding:28px 9px 10px !important;
+        border-radius:18px !important;
+        transform:translateY(calc(100% + 24px)) !important;
+        transition:transform .18s ease !important;
+      }
+
+      body.mobile-controls-open #leftPanel{
+        transform:translateY(0) !important;
+      }
+
+      body.mobile-legend-open #leftPanel{
+        top:auto !important;
+        bottom:calc(64px + env(safe-area-inset-bottom)) !important;
+      }
+
+      #timelineDock{
+        left:calc(8px + env(safe-area-inset-left)) !important;
+        right:calc(8px + env(safe-area-inset-right)) !important;
+        bottom:calc(4px + env(safe-area-inset-bottom)) !important;
+        padding:9px 7px 4px !important;
+        border-radius:14px !important;
+        max-height:78px !important;
+        overflow:hidden !important;
+      }
+
+      #timelineBubble{
+        top:-9px !important;
+        padding:3px 8px !important;
+        border-radius:999px !important;
+        font-size:9px !important;
+        line-height:1 !important;
+      }
+
+      .timeline-top{
+        margin-bottom:2px !important;
+        gap:5px !important;
+        min-height:28px !important;
+      }
+
+      .playFab{
+        width:30px !important;
+        min-width:30px !important;
+        height:30px !important;
+        min-height:30px !important;
+        font-size:14px !important;
+      }
+
+      .miniAction{
+        min-height:24px !important;
+        padding:0 8px !important;
+        font-size:8px !important;
+        letter-spacing:.12em !important;
+      }
+
+      .timeline-days{
+        margin-bottom:1px !important;
+        border-radius:9px !important;
+      }
+
+      .timeline-day{
+        min-height:18px !important;
+        padding:3px 3px !important;
+        font-size:8px !important;
+        line-height:1 !important;
+      }
+
+      .timeline-trackRow{
+        display:grid !important;
+        grid-template-columns:42px minmax(0, 1fr) 42px !important;
+        gap:4px !important;
+        align-items:center !important;
+      }
+
+      .timeline-end,
+      .timeline-scale{
+        font-size:7.5px !important;
+        line-height:1 !important;
+      }
+
+      #hourSlider{ height:3px !important; }
+      #hourSlider::-webkit-slider-thumb{ width:12px !important; height:12px !important; }
+      #hourSlider::-moz-range-thumb{ width:12px !important; height:12px !important; }
+
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-top:calc(7px + env(safe-area-inset-top)) !important;
+        margin-right:calc(7px + env(safe-area-inset-right)) !important;
+      }
+
+      .leaflet-control-zoom a{
+        width:38px !important;
+        height:38px !important;
+        line-height:38px !important;
+      }
+    }
+
+    @media (max-width: 430px) and (orientation: portrait){
+      body.mobile-optimized #legendDock{
+        min-width:120px !important;
+        height:36px !important;
+        max-height:36px !important;
+        padding:6px 9px !important;
+      }
+
+      body.mobile-optimized #legendDock::before{
+        width:34px !important;
+        height:11px !important;
+      }
+
+      body.mobile-optimized #legendDock::after{
+        font-size:10px !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock{
+        width:min(276px, calc(100vw - 16px - env(safe-area-inset-left) - env(safe-area-inset-right))) !important;
+        height:auto !important;
+        max-height:min(40dvh, 235px) !important;
+      }
+
+      #mobileControlsToggle{
+        min-width:102px !important;
+        min-height:32px !important;
+        bottom:calc(82px + env(safe-area-inset-bottom)) !important;
+        font-size:12px !important;
+      }
+
+      #timelineDock{
+        max-height:74px !important;
+        padding-top:8px !important;
+      }
+    }
+
+    @media (max-width: 860px) and (orientation: landscape), (max-height: 560px) and (pointer: coarse){
+      body.mobile-optimized #legendDock{
+        min-width:116px !important;
+        height:34px !important;
+        max-height:34px !important;
+        top:calc(6px + env(safe-area-inset-top)) !important;
+        left:calc(7px + env(safe-area-inset-left)) !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock{
+        width:min(260px, 38vw) !important;
+        height:auto !important;
+        max-height:calc(100dvh - 86px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+      }
+
+      #mobileControlsToggle{
+        top:calc(46px + env(safe-area-inset-top)) !important;
+        bottom:auto !important;
+        left:calc(7px + env(safe-area-inset-left)) !important;
+        min-width:98px !important;
+        min-height:30px !important;
+        font-size:11px !important;
+      }
+
+      body.mobile-controls-open #mobileControlsToggle{
+        top:calc(46px + env(safe-area-inset-top)) !important;
+        bottom:auto !important;
+      }
+
+      #leftPanel{
+        top:calc(82px + env(safe-area-inset-top)) !important;
+        bottom:calc(38px + env(safe-area-inset-bottom)) !important;
+        left:calc(7px + env(safe-area-inset-left)) !important;
+        right:auto !important;
+        width:min(360px, 46vw) !important;
+        max-height:none !important;
+        transform:translateX(calc(-100% - 18px)) !important;
+      }
+
+      body.mobile-controls-open #leftPanel{
+        transform:translateX(0) !important;
+      }
+
+      #timelineDock{
+        max-height:52px !important;
+        padding:7px 6px 3px !important;
+      }
+
+      #timelineBubble{
+        top:-8px !important;
+        font-size:8px !important;
+      }
+
+      .timeline-top{
+        display:none !important;
+      }
+
+      .timeline-days{
+        margin-bottom:2px !important;
+      }
+
+      .timeline-day{
+        min-height:15px !important;
+        padding:2px !important;
+        font-size:7px !important;
+      }
+
+      .timeline-trackRow{
+        grid-template-columns:1fr !important;
+      }
+
+      .timeline-end,
+      .timeline-scale{
+        display:none !important;
+      }
+    }
+
   </style>
 </head>
 <body>
