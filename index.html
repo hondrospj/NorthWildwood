@@ -5729,6 +5729,73 @@
       };
     }
 
+
+    function makeObservedMissingDayHourEntry(dateStr, hourIndex, options = {}) {
+      const safeHour = Math.max(0, Math.min(23, Number(hourIndex) || 0));
+      const displayTimeEST = `${dateStr}T${pad2(safeHour)}:00`;
+      return {
+        displayTimeEST,
+        observedDate: dateStr,
+        hourIndex: safeHour,
+        navd88StageFt: MIN_STAGE,
+        stageFt: MIN_STAGE,
+        value: MIN_STAGE,
+        observationInterval: "1hour",
+        isMissingObservedHour: true,
+        sourceResolutionMinutes: options.sourceResolutionMinutes ?? null
+      };
+    }
+
+    function getStoredEntryHourIndex(entry) {
+      const direct = Number(entry?.hourIndex);
+      if (Number.isInteger(direct) && direct >= 0 && direct <= 23) return direct;
+
+      const raw = String(entry?.displayTimeEST || entry?.timeEST || entry?.timeEst || "");
+      const match = raw.match(/^\d{4}-\d{2}-\d{2}T(\d{2}):/);
+      if (match) {
+        const hour = Number(match[1]);
+        if (Number.isInteger(hour) && hour >= 0 && hour <= 23) return hour;
+      }
+
+      const d = getEntryESTDate(entry);
+      const parts = d ? getNyParts(d) : null;
+      const fallback = Number(parts?.hour24);
+      return Number.isInteger(fallback) && fallback >= 0 && fallback <= 23 ? fallback : null;
+    }
+
+    function buildObservedDayDisplaySeries(dayRecord, dateStr) {
+      const hours = Array.isArray(dayRecord?.hours) ? dayRecord.hours : [];
+      const sourceResolutionMinutes = detectSeriesResolutionMinutes(hours);
+      const byHour = new Map();
+
+      hours.forEach((entry, idx) => {
+        const hourIndex = getStoredEntryHourIndex(entry);
+        if (hourIndex == null) return;
+        if (!byHour.has(hourIndex)) byHour.set(hourIndex, { entry, idx });
+      });
+
+      const out = [];
+      for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
+        const item = byHour.get(hourIndex);
+        if (item) {
+          const source = item.entry;
+          out.push({
+            ...source,
+            displayTimeEST: source.displayTimeEST || source.timeEST || source.timeEst || `${dateStr}T${pad2(hourIndex)}:00`,
+            observedDate: source.observedDate || dateStr,
+            hourIndex,
+            sourceHourIndex: source.sourceHourIndex ?? item.idx,
+            observationInterval: "1hour",
+            isMissingObservedHour: false,
+            sourceResolutionMinutes
+          });
+        } else {
+          out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
+        }
+      }
+      return out;
+    }
+
     function getObservedDisplaySeries(entries = [], options = {}) {
       if (!Array.isArray(entries)) return [];
 
@@ -8228,14 +8295,7 @@
       selectedObservedDate = dateStr;
       currentMonthKey = dateStr.slice(0, 7);
       currentRawSeriesHours = Array.isArray(dayRecord.hours) ? dayRecord.hours : [];
-      const dayStart = parseStoredLocalNyToDate(`${dateStr}T00:00`);
-      const dayEnd = parseStoredLocalNyToDate(`${dateStr}T23:45`);
-      currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours, {
-        rangeStartMs: dayStart ? dayStart.getTime() : null,
-        rangeEndMs: dayEnd ? dayEnd.getTime() : null,
-        fillMissingSlots: true,
-        observedDate: dateStr
-      });
+      currentSeriesHours = buildObservedDayDisplaySeries(dayRecord, dateStr);
       currentViewType = "observed-day";
       currentTopTideIndex = null;
       currentSelectedLabel = dateStr;
