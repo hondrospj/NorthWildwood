@@ -5908,21 +5908,21 @@
     const EXPORT_FRAME_LIMIT = 72;
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
-    const EXPORT_CAPTURE_DELAY_MS = 2;
+    const EXPORT_CAPTURE_DELAY_MS = 1;
     const EXPORT_GIF_SPEEDS = {
       slow: { value: "slow", label: "Slow", delayMs: 2000 },
       normal: { value: "normal", label: "Normal", delayMs: 1000 },
       fast: { value: "fast", label: "Fast", delayMs: 500 }
     };
     const EXPORT_CAPTURE_SCALE_DEFAULT = 1;
-    const EXPORT_GIF_QUALITY = 48;
-    const EXPORT_GIF_MAX_WORKERS = 8;
+    const EXPORT_GIF_QUALITY = 72;
+    const EXPORT_GIF_MAX_WORKERS = 6;
     const EXPORT_PNG_SELECTION_LIMIT = 10;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
     const EXPORT_GIF_ASPECTS = {
-      "16:9": { value: "16:9", width: 960, height: 540, label: "16:9" },
-      "9:16": { value: "9:16", width: 540, height: 960, label: "9:16" },
-      "1:1": { value: "1:1", width: 720, height: 720, label: "1:1" }
+      "16:9": { value: "16:9", width: 854, height: 480, label: "16:9" },
+      "9:16": { value: "9:16", width: 480, height: 854, label: "9:16" },
+      "1:1": { value: "1:1", width: 640, height: 640, label: "1:1" }
     };
     const FAST_GIF_EXPORT = true;
 
@@ -6237,6 +6237,7 @@
     let exportCalendarSelectedDayKey = "";
     let exportRangePickMode = "start";
     let exportCalendarViewMode = "month";
+    let exportImageElementCache = new Map();
     let exportAvailabilityCache = null;
     let exportAvailabilityDayMapCache = null;
     let exportAvailabilityMonthMapCache = null;
@@ -6920,6 +6921,21 @@
       });
 
       preloadPromiseCache.set(url, promise);
+      return promise;
+    }
+
+    function getExportImageElement(url) {
+      if (!url) return Promise.resolve(null);
+      if (exportImageElementCache.has(url)) return exportImageElementCache.get(url);
+      const promise = new Promise(resolve => {
+        const img = new Image();
+        img.decoding = "async";
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+      });
+      exportImageElementCache.set(url, promise);
       return promise;
     }
 
@@ -7761,26 +7777,7 @@
       }
     }
 
-    function syncManualExportInputsToHiddenRange() {
-      const startManual = getExportWheelSelect("start", "manual");
-      const endManual = getExportWheelSelect("end", "manual");
-      const startDate = parseExportManualDate(startManual?.value, "start");
-      const endDate = parseExportManualDate(endManual?.value, "end");
-      if (startDate) {
-        setRangeInputDate("downloadStartInput", startDate);
-        const startHidden = document.getElementById("downloadStartInput");
-        if (startHidden) startHidden.dataset.userEdited = "1";
-      }
-      if (endDate) {
-        setRangeInputDate("downloadEndInput", endDate);
-        const endHidden = document.getElementById("downloadEndInput");
-        if (endHidden) endHidden.dataset.userEdited = "1";
-      }
-      return { startDate, endDate };
-    }
-
     function getDownloadRangeRequest() {
-      syncManualExportInputsToHiddenRange();
       const currentEntry = getDownloadCurrentEntry();
       const startDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(currentEntry);
       const endDate = getRangeInputDate("downloadEndInput") || getEntryESTDate(currentEntry);
@@ -7811,7 +7808,6 @@
     }
 
     function validateDownloadRangeForExport() {
-      syncManualExportInputsToHiddenRange();
       const scope = document.getElementById("downloadScopeSelect")?.value || "current";
       if (scope !== "range") return { ok: true };
 
@@ -7835,7 +7831,7 @@
         if (range.startMs < firstMs || range.endMs > lastMs) {
           return {
             ok: false,
-            message: `That export range is outside the available data range. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
+            message: `That export range is outside the available historical record. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
           };
         }
       }
@@ -8439,9 +8435,7 @@
 
     function handleExportAmPmToggle(prefix, ampm) {
       setExportAmPmValue(prefix, ampm);
-      const manual = getExportWheelSelect(prefix, "manual");
-      const manualDate = parseExportManualDate(manual?.value, prefix);
-      const date = manualDate || getExportDateFromWheels(prefix);
+      const date = getExportDateFromWheels(prefix);
       if (!date) return;
       setHiddenExportDate(prefix, date);
       exportCalendarSelectedDayKey = getExportDayKeyFromDate(date);
@@ -8758,7 +8752,6 @@
       }
     }
     function updateDownloadSummary() {
-      syncManualExportInputsToHiddenRange();
       const summary = document.getElementById("downloadSummary");
       if (!summary || !isDownloadModalOpen()) return;
 
@@ -9352,13 +9345,135 @@
       });
     }
 
+    function drawExportTimestampOnCanvas(ctx, canvas, entry) {
+      const label = getExportFrameTimestampText(entry);
+      if (!label) return;
+      const w = canvas.width;
+      const h = canvas.height;
+      const fontSize = Math.max(18, Math.round(Math.min(w, h) * 0.032));
+      const padX = Math.round(fontSize * 0.95);
+      const padY = Math.round(fontSize * 0.62);
+      ctx.save();
+      ctx.font = `900 ${fontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const textWidth = Math.min(ctx.measureText(label).width, w - 56);
+      const boxWidth = Math.min(w - 48, Math.max(Math.round(w * 0.42), Math.ceil(textWidth + padX * 2)));
+      const boxHeight = Math.ceil(fontSize + padY * 2);
+      const x = Math.round((w - boxWidth) / 2);
+      const y = h - boxHeight - Math.round(Math.max(12, h * 0.025));
+      const radius = Math.round(boxHeight / 2);
+      ctx.fillStyle = "rgba(11,18,32,0.92)";
+      ctx.strokeStyle = "rgba(191,219,254,0.42)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + boxWidth - radius, y);
+      ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + radius);
+      ctx.lineTo(x + boxWidth, y + boxHeight - radius);
+      ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - radius, y + boxHeight);
+      ctx.lineTo(x + radius, y + boxHeight);
+      ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, x + boxWidth / 2, y + boxHeight / 2 + 1, boxWidth - padX * 2);
+      ctx.restore();
+    }
+
+    function getExportOverlayRect(mapInstance) {
+      if (!mapInstance || !floodLatLngBounds) return null;
+      const nw = mapInstance.latLngToContainerPoint(floodLatLngBounds.getNorthWest());
+      const se = mapInstance.latLngToContainerPoint(floodLatLngBounds.getSouthEast());
+      return {
+        x: Math.round(nw.x),
+        y: Math.round(nw.y),
+        width: Math.round(se.x - nw.x),
+        height: Math.round(se.y - nw.y)
+      };
+    }
+
+    async function captureFastGifBaseCanvas(firstItem) {
+      const mapInstance = ensureExportMap();
+      applyExportStageAspect(getDownloadAspectValue());
+      mapInstance.invalidateSize(false);
+      updateExportLegend();
+      updateExportBoundaryVisibility();
+      updateExportRoadLayerAppearance();
+      if (map) {
+        mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
+      } else if (floodLatLngBounds) {
+        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16], animate: false });
+      }
+      if (exportFloodLayer && mapInstance.hasLayer(exportFloodLayer)) {
+        mapInstance.removeLayer(exportFloodLayer);
+      }
+      const timestamp = document.getElementById("exportTimestampLabel");
+      const previousVisibility = timestamp?.style.visibility || "";
+      if (timestamp) timestamp.style.visibility = "hidden";
+      await waitForExportMapReady(80);
+      await waitForStableRender();
+      const baseCanvas = await captureExportCanvas();
+      if (timestamp) timestamp.style.visibility = previousVisibility;
+      updateExportTimestampLabel(firstItem?.entry || null);
+      return { baseCanvas, overlayRect: getExportOverlayRect(mapInstance) };
+    }
+
+    async function addFastCompositeGifFrames(gif, frameItems, progressStart = 4, progressEnd = 68) {
+      const total = Math.max(1, frameItems.length);
+      const { baseCanvas, overlayRect } = await captureFastGifBaseCanvas(frameItems[0]);
+      const frameCanvas = document.createElement("canvas");
+      frameCanvas.width = baseCanvas.width;
+      frameCanvas.height = baseCanvas.height;
+      const ctx = frameCanvas.getContext("2d", { alpha: false, willReadFrequently: false });
+      if (!ctx || !overlayRect) {
+        await withExportFrames(frameItems, async ({ canvas }) => {
+          gif.addFrame(canvas, { delay: getGifFrameDelayMs(), copy: true });
+        }, progressStart, progressEnd);
+        return;
+      }
+      for (let i = 0; i < frameItems.length; i++) {
+        const item = frameItems[i];
+        const pct = progressStart + ((i / total) * (progressEnd - progressStart));
+        const message = `Compositing frame ${i + 1} of ${frameItems.length}...`;
+        setDownloadStatus(message);
+        setExportProgress(message, pct, false);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+        ctx.drawImage(baseCanvas, 0, 0);
+        const rawStage = getStageValue(item.entry);
+        const displayStage = getOverlayStage(rawStage);
+        if (displayStage != null) {
+          const record = await getOverlayRecord(currentOverlayMode, displayStage);
+          const overlayImg = record?.url ? await getExportImageElement(record.url) : null;
+          if (overlayImg) {
+            ctx.globalAlpha = Math.max(0, Math.min(1, overlayOpacity));
+            ctx.drawImage(overlayImg, overlayRect.x, overlayRect.y, overlayRect.width, overlayRect.height);
+            ctx.globalAlpha = 1;
+          }
+        }
+        drawExportTimestampOnCanvas(ctx, frameCanvas, item.entry);
+        gif.addFrame(frameCanvas, { delay: getGifFrameDelayMs(), copy: true });
+        const donePct = progressStart + (((i + 1) / total) * (progressEnd - progressStart));
+        setExportProgress(`Composited frame ${i + 1} of ${frameItems.length}...`, donePct, false);
+        if (i % 6 === 5) await wait(0);
+      }
+      baseCanvas.width = 1;
+      baseCanvas.height = 1;
+      frameCanvas.width = 1;
+      frameCanvas.height = 1;
+    }
+
     async function exportGif(frameItems) {
       if (typeof GIF === "undefined") {
         throw new Error("GIF export library did not load.");
       }
       const aspectConfig = applyExportStageAspect(getDownloadAspectValue());
-      setDownloadStatus(`Preloading ${aspectConfig.label} GIF frames...`);
-      setExportProgress(`Preloading ${aspectConfig.label} GIF frames...`, 2, false);
+      setDownloadStatus(`Fast-preloading ${aspectConfig.label} GIF frames...`);
+      setExportProgress(`Fast-preloading ${aspectConfig.label} GIF frames...`, 2, false);
       await preloadExportFrameAssets(frameItems);
       const workerScript = await getGifWorkerUrl();
       const gif = new GIF({
@@ -9371,14 +9486,12 @@
         repeat: 0,
         background: "#0b1220"
       });
-      await withExportFrames(frameItems, async ({ canvas }) => {
-        gif.addFrame(canvas, { delay: getGifFrameDelayMs(), copy: true });
-      }, 4, 68);
+      await addFastCompositeGifFrames(gif, frameItems, 4, 58);
       setDownloadStatus("Encoding GIF...");
-      setExportProgress("Encoding GIF...", 70, false);
+      setExportProgress("Encoding GIF...", 60, false);
       const blob = await new Promise((resolve, reject) => {
         gif.on("progress", value => {
-          const pct = 70 + ((Number(value) || 0) * 28);
+          const pct = 60 + ((Number(value) || 0) * 38);
           setExportProgress(`Encoding GIF... ${Math.round((Number(value) || 0) * 100)}%`, pct, false);
         });
         gif.on("finished", resolve);
