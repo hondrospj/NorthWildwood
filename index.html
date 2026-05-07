@@ -7761,7 +7761,26 @@
       }
     }
 
+    function syncManualExportInputsToHiddenRange() {
+      const startManual = getExportWheelSelect("start", "manual");
+      const endManual = getExportWheelSelect("end", "manual");
+      const startDate = parseExportManualDate(startManual?.value, "start");
+      const endDate = parseExportManualDate(endManual?.value, "end");
+      if (startDate) {
+        setRangeInputDate("downloadStartInput", startDate);
+        const startHidden = document.getElementById("downloadStartInput");
+        if (startHidden) startHidden.dataset.userEdited = "1";
+      }
+      if (endDate) {
+        setRangeInputDate("downloadEndInput", endDate);
+        const endHidden = document.getElementById("downloadEndInput");
+        if (endHidden) endHidden.dataset.userEdited = "1";
+      }
+      return { startDate, endDate };
+    }
+
     function getDownloadRangeRequest() {
+      syncManualExportInputsToHiddenRange();
       const currentEntry = getDownloadCurrentEntry();
       const startDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(currentEntry);
       const endDate = getRangeInputDate("downloadEndInput") || getEntryESTDate(currentEntry);
@@ -7792,6 +7811,7 @@
     }
 
     function validateDownloadRangeForExport() {
+      syncManualExportInputsToHiddenRange();
       const scope = document.getElementById("downloadScopeSelect")?.value || "current";
       if (scope !== "range") return { ok: true };
 
@@ -7815,7 +7835,7 @@
         if (range.startMs < firstMs || range.endMs > lastMs) {
           return {
             ok: false,
-            message: `That export range is outside the available historical record. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
+            message: `That export range is outside the available data range. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
           };
         }
       }
@@ -8419,7 +8439,9 @@
 
     function handleExportAmPmToggle(prefix, ampm) {
       setExportAmPmValue(prefix, ampm);
-      const date = getExportDateFromWheels(prefix);
+      const manual = getExportWheelSelect(prefix, "manual");
+      const manualDate = parseExportManualDate(manual?.value, prefix);
+      const date = manualDate || getExportDateFromWheels(prefix);
       if (!date) return;
       setHiddenExportDate(prefix, date);
       exportCalendarSelectedDayKey = getExportDayKeyFromDate(date);
@@ -8736,6 +8758,7 @@
       }
     }
     function updateDownloadSummary() {
+      syncManualExportInputsToHiddenRange();
       const summary = document.getElementById("downloadSummary");
       if (!summary || !isDownloadModalOpen()) return;
 
