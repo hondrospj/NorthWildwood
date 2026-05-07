@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <title>North Wildwood Flood Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
      :root{
@@ -2743,6 +2743,446 @@
         font-size:13px;
       }
     }
+
+
+    /* Mobile control-drawer optimization for iPhone, Samsung Galaxy/Fold, Razr, and Google Pixel */
+    #mobileControlsToggle,
+    #mobileDrawerBackdrop{
+      display:none;
+    }
+
+    #mobileRailMount{
+      display:contents;
+    }
+
+    @media (max-width: 760px){
+      html,
+      body,
+      #app,
+      #mapWrap,
+      #map{
+        width:100vw;
+        height:100dvh;
+        min-height:100dvh;
+        overflow:hidden;
+      }
+
+      body{
+        touch-action:manipulation;
+        -webkit-tap-highlight-color:transparent;
+      }
+
+      #map{
+        min-height:100dvh;
+      }
+
+      #topBanner{
+        top:calc(8px + env(safe-area-inset-top));
+        min-width:calc(100vw - 20px);
+        max-width:calc(100vw - 20px);
+        padding:8px 10px;
+        border-radius:18px;
+      }
+
+      #topBanner .banner-meta{
+        display:none;
+      }
+
+      #topBanner .banner-title{
+        font-size:12px;
+      }
+
+      #mobileDrawerBackdrop{
+        position:fixed;
+        inset:0;
+        z-index:4090;
+        display:block;
+        opacity:0;
+        pointer-events:none;
+        background:rgba(5,11,22,.28);
+        backdrop-filter:blur(2px);
+        -webkit-backdrop-filter:blur(2px);
+        transition:opacity .18s ease;
+      }
+
+      body.mobile-controls-open #mobileDrawerBackdrop{
+        opacity:1;
+        pointer-events:auto;
+      }
+
+      #mobileControlsToggle{
+        position:fixed;
+        right:calc(12px + env(safe-area-inset-right));
+        bottom:calc(92px + env(safe-area-inset-bottom));
+        z-index:4300;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:8px;
+        min-height:46px;
+        min-width:122px;
+        padding:0 16px;
+        border-radius:999px;
+        border:1px solid rgba(191,219,254,.36);
+        background:rgba(11,18,32,.94);
+        color:#ffffff;
+        box-shadow:0 18px 38px rgba(0,0,0,.36);
+        font-size:13px;
+        font-weight:900;
+        letter-spacing:-.01em;
+        backdrop-filter:blur(16px);
+        -webkit-backdrop-filter:blur(16px);
+      }
+
+      #mobileControlsToggle::before{
+        content:"☰";
+        font-size:16px;
+        line-height:1;
+      }
+
+      body.mobile-controls-open #mobileControlsToggle::before{
+        content:"×";
+        font-size:20px;
+      }
+
+      #leftPanel{
+        position:fixed;
+        left:calc(8px + env(safe-area-inset-left));
+        right:calc(8px + env(safe-area-inset-right));
+        top:auto;
+        bottom:calc(76px + env(safe-area-inset-bottom));
+        width:auto !important;
+        max-width:none;
+        max-height:min(78dvh, calc(100dvh - 112px - env(safe-area-inset-top)));
+        display:flex !important;
+        flex-direction:column;
+        gap:8px;
+        overflow-y:auto;
+        overflow-x:hidden;
+        padding:42px 10px 10px;
+        border:1px solid rgba(191,219,254,.18);
+        border-radius:24px;
+        background:rgba(11,18,32,.96);
+        box-shadow:0 24px 70px rgba(0,0,0,.48);
+        backdrop-filter:blur(18px);
+        -webkit-backdrop-filter:blur(18px);
+        z-index:4200;
+        pointer-events:none;
+        opacity:0;
+        transform:translateY(calc(100% + 110px));
+        transition:transform .22s ease, opacity .18s ease;
+        scrollbar-gutter:auto;
+        -webkit-overflow-scrolling:touch;
+      }
+
+      body.mobile-controls-open #leftPanel{
+        opacity:1;
+        transform:translateY(0);
+        pointer-events:auto;
+      }
+
+      #leftPanel::before{
+        content:"Controls";
+        position:sticky;
+        top:-42px;
+        z-index:3;
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        min-height:34px;
+        margin:-42px -10px 8px;
+        border-radius:24px 24px 0 0;
+        border-bottom:1px solid rgba(255,255,255,.08);
+        background:linear-gradient(180deg, rgba(11,18,32,.98), rgba(11,18,32,.92));
+        color:#ffffff;
+        font-size:13px;
+        font-weight:900;
+        letter-spacing:.02em;
+        text-transform:uppercase;
+      }
+
+      #leftPanel .panel-card,
+      #leftPanel .rail-card,
+      #leftPanel #legendDock{
+        width:100%;
+        min-height:0;
+        flex:0 0 auto;
+        padding:10px 11px;
+        border-radius:18px;
+        background:rgba(255,255,255,.045);
+        border:1px solid rgba(255,255,255,.085);
+        box-shadow:none;
+      }
+
+      #leftPanel .brand{
+        min-height:52px;
+        padding:8px 10px;
+      }
+
+      #leftPanel .brand br{
+        display:none;
+      }
+
+      #leftPanel h1{
+        font-size:clamp(17px, 5.4vw, 22px);
+        line-height:1;
+      }
+
+      #leftPanel .section-title,
+      #leftPanel .rail-head{
+        margin-bottom:7px;
+      }
+
+      #leftPanel .section-title h2,
+      #leftPanel .rail-head h3{
+        font-size:13px;
+      }
+
+      #leftPanel .button-grid-2,
+      #leftPanel .segmented-control{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:6px;
+      }
+
+      #leftPanel button,
+      #leftPanel select,
+      #leftPanel input[type="datetime-local"]{
+        min-height:42px;
+        font-size:13px;
+        border-radius:13px;
+      }
+
+      #leftPanel .segmented-control button{
+        min-height:38px;
+        padding:7px 8px;
+      }
+
+      #leftPanel .snapshot-card .stat-grid{
+        grid-template-columns:1fr;
+        gap:6px;
+      }
+
+      #leftPanel .snapshot-card .stat-box{
+        min-height:64px;
+        padding:10px 12px;
+        border-radius:14px;
+      }
+
+      #leftPanel #timeText{
+        font-size:14px;
+        white-space:normal;
+      }
+
+      #leftPanel #stageText{
+        font-size:20px;
+      }
+
+      #leftPanel .calendar-card{
+        gap:7px;
+      }
+
+      #leftPanel .calendar-toolbar{
+        grid-template-columns:36px 1fr 36px;
+        gap:5px;
+      }
+
+      #leftPanel .calendar-day{
+        min-height:34px;
+        border-radius:11px;
+        font-size:13px;
+      }
+
+      #leftPanel .calendar-head div{
+        font-size:10px;
+      }
+
+      #leftPanel .calendar-key{
+        grid-template-columns:repeat(3, minmax(0, 1fr));
+        gap:5px;
+      }
+
+      #leftPanel .calendar-key-item{
+        min-height:28px;
+        padding:0 6px;
+        font-size:10px;
+      }
+
+      #leftPanel .day-nav{
+        grid-template-columns:40px 1fr 40px;
+        gap:6px;
+      }
+
+      #leftPanel .day-nav button,
+      #leftPanel .day-nav-center{
+        min-height:38px;
+      }
+
+      #leftPanel .top-tide-list,
+      #leftPanel .top-tide-list-mobile,
+      #leftPanel .layer-list{
+        gap:6px;
+      }
+
+      #leftPanel .top-tide-item,
+      #leftPanel .layer-item{
+        padding:9px 10px;
+        border-radius:14px;
+      }
+
+      #leftPanel .download-launch-card{
+        display:grid;
+        gap:8px;
+      }
+
+      #leftPanel .download-launch-meta{
+        display:none;
+      }
+
+      #leftPanel #legendDock{
+        position:static !important;
+        left:auto !important;
+        right:auto !important;
+        top:auto !important;
+        bottom:auto !important;
+        display:block !important;
+        margin:0;
+        backdrop-filter:none;
+        -webkit-backdrop-filter:none;
+      }
+
+      #leftPanel #legendDock .legend-list{
+        grid-template-columns:repeat(2, minmax(0, 1fr));
+        gap:6px 8px;
+      }
+
+      #leftPanel #legendDock .legend-row{
+        font-size:10px;
+        gap:6px;
+      }
+
+      #rightRail{
+        display:none !important;
+      }
+
+      #timelineDock{
+        left:calc(8px + env(safe-area-inset-left));
+        right:calc(8px + env(safe-area-inset-right));
+        bottom:calc(8px + env(safe-area-inset-bottom));
+        padding:22px 9px 8px;
+        border-radius:16px;
+      }
+
+      .timeline-day{
+        min-height:31px;
+        padding:7px 3px;
+        font-size:10px;
+      }
+
+      .timeline-controls{
+        gap:5px;
+      }
+
+      .playFab{
+        width:42px;
+        min-width:42px;
+        height:42px;
+        min-height:42px;
+      }
+
+      .miniAction{
+        min-height:30px;
+        padding:0 8px;
+        font-size:9px;
+      }
+
+      .timeline-trackRow{
+        gap:5px;
+      }
+
+      .timeline-end,
+      .timeline-scale{
+        font-size:9px;
+      }
+
+      #timelineBubble{
+        max-width:calc(100vw - 24px);
+        overflow:hidden;
+        text-overflow:ellipsis;
+        font-size:10px;
+        padding:5px 9px;
+      }
+
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-top:calc(10px + env(safe-area-inset-top));
+        margin-right:10px;
+      }
+
+      .leaflet-control-zoom a{
+        width:38px !important;
+        height:38px !important;
+        line-height:38px !important;
+      }
+
+      .download-modal{
+        align-items:flex-end;
+        padding:8px calc(8px + env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+      }
+
+      .download-modal-card,
+      .datum-modal-card{
+        width:100%;
+        max-height:min(84dvh, calc(100dvh - 24px - env(safe-area-inset-top)));
+        border-radius:24px;
+        padding:15px;
+      }
+
+      .download-range-grid{
+        grid-template-columns:1fr;
+      }
+
+      .export-progress-card{
+        width:min(360px, calc(100vw - 32px));
+      }
+    }
+
+    @media (max-width: 390px){
+      #leftPanel{
+        left:calc(6px + env(safe-area-inset-left));
+        right:calc(6px + env(safe-area-inset-right));
+        max-height:min(80dvh, calc(100dvh - 100px - env(safe-area-inset-top)));
+        padding-left:8px;
+        padding-right:8px;
+      }
+
+      #leftPanel .button-grid-2,
+      #leftPanel .segmented-control,
+      #leftPanel #legendDock .legend-list{
+        grid-template-columns:1fr;
+      }
+
+      #leftPanel .calendar-day{
+        min-height:30px;
+        font-size:12px;
+      }
+
+      #leftPanel .calendar-key{
+        grid-template-columns:1fr;
+      }
+
+      #mobileControlsToggle{
+        right:calc(10px + env(safe-area-inset-right));
+        min-width:108px;
+        min-height:44px;
+        font-size:12px;
+      }
+    }
+
+    @media (min-width: 761px){
+      body.mobile-controls-open #mobileDrawerBackdrop{
+        display:none;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -6293,6 +6733,100 @@
       });
     }
 
+
+    function ensureMobileControlShell() {
+      let toggle = document.getElementById("mobileControlsToggle");
+      if (!toggle) {
+        toggle = document.createElement("button");
+        toggle.id = "mobileControlsToggle";
+        toggle.type = "button";
+        toggle.textContent = "Controls";
+        toggle.setAttribute("aria-controls", "leftPanel");
+        toggle.setAttribute("aria-expanded", "false");
+        document.body.appendChild(toggle);
+      }
+
+      let backdrop = document.getElementById("mobileDrawerBackdrop");
+      if (!backdrop) {
+        backdrop = document.createElement("div");
+        backdrop.id = "mobileDrawerBackdrop";
+        backdrop.setAttribute("aria-hidden", "true");
+        document.body.appendChild(backdrop);
+      }
+
+      let mobileRailMount = document.getElementById("mobileRailMount");
+      if (!mobileRailMount) {
+        mobileRailMount = document.createElement("div");
+        mobileRailMount.id = "mobileRailMount";
+      }
+
+      return { toggle, backdrop, mobileRailMount };
+    }
+
+    function setMobileControlsOpen(isOpen) {
+      const open = Boolean(isOpen);
+      document.body.classList.toggle("mobile-controls-open", open);
+      const toggle = document.getElementById("mobileControlsToggle");
+      if (toggle) {
+        toggle.setAttribute("aria-expanded", String(open));
+        toggle.textContent = open ? "Close" : "Controls";
+      }
+      setTimeout(() => {
+        if (map) {
+          map.invalidateSize();
+          updateColorBasemapClip();
+        }
+        positionTimelineBubble();
+        fitSnapshotTimeText();
+      }, 80);
+    }
+
+    function syncMobileControlsLayout() {
+      const isMobile = window.matchMedia("(max-width: 760px)").matches;
+      const leftPanel = document.getElementById("leftPanel");
+      const rightRail = document.getElementById("rightRail");
+      const legendDock = document.getElementById("legendDock");
+      const app = document.getElementById("app");
+      if (!leftPanel || !rightRail || !app) return;
+
+      const { mobileRailMount } = ensureMobileControlShell();
+      if (isMobile) {
+        document.body.classList.add("mobile-optimized");
+        if (!mobileRailMount.parentNode) leftPanel.appendChild(mobileRailMount);
+        Array.from(rightRail.children).forEach(node => mobileRailMount.appendChild(node));
+        if (legendDock && legendDock.parentNode !== mobileRailMount) mobileRailMount.appendChild(legendDock);
+      } else {
+        document.body.classList.remove("mobile-optimized");
+        setMobileControlsOpen(false);
+        if (legendDock && legendDock.parentNode !== app) app.appendChild(legendDock);
+        Array.from(mobileRailMount.children).forEach(node => {
+          if (node.id !== "legendDock") rightRail.appendChild(node);
+        });
+        if (mobileRailMount.parentNode) mobileRailMount.parentNode.removeChild(mobileRailMount);
+      }
+    }
+
+    function wireMobileControlShell() {
+      const { toggle, backdrop } = ensureMobileControlShell();
+      toggle.addEventListener("click", () => {
+        setMobileControlsOpen(!document.body.classList.contains("mobile-controls-open"));
+      });
+      backdrop.addEventListener("click", () => setMobileControlsOpen(false));
+      document.addEventListener("keydown", e => {
+        if (e.key === "Escape") setMobileControlsOpen(false);
+      });
+      document.addEventListener("click", e => {
+        if (!document.body.classList.contains("mobile-controls-open")) return;
+        const target = e.target;
+        const leftPanel = document.getElementById("leftPanel");
+        const toggleBtn = document.getElementById("mobileControlsToggle");
+        if (leftPanel?.contains(target) || toggleBtn?.contains(target)) return;
+        if (target?.closest?.(".download-modal, .datum-modal, .export-progress-overlay")) return;
+        setMobileControlsOpen(false);
+      }, true);
+      syncMobileControlsLayout();
+    }
+
     function wireEvents() {
       document.getElementById("hourSlider").addEventListener("input", async e => {
         stopPlayback();
@@ -6492,6 +7026,7 @@
       setDatumHelpOpen(false);
       setDownloadModalOpen(false);
       wireEvents();
+      wireMobileControlShell();
       updateRoadLayerAppearance();
       updateExportSegmentedUI();
       syncDownloadRangeInputs(true);
@@ -6501,6 +7036,7 @@
           map.invalidateSize();
           updateColorBasemapClip();
         }
+        syncMobileControlsLayout();
         syncLeftPanelLayout();
         positionTimelineBubble();
         fitSnapshotTimeText();
@@ -6510,6 +7046,7 @@
           map.invalidateSize();
           updateColorBasemapClip();
         }
+        syncMobileControlsLayout();
         syncLeftPanelLayout();
         positionTimelineBubble();
         fitSnapshotTimeText();
