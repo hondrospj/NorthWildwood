@@ -4252,18 +4252,20 @@
       return document.getElementById("downloadModal")?.classList.contains("open") || false;
     }
 
-    function getObservedExportEntriesCached() {
-      const source = observedFlatHours.length ? observedFlatHours : currentSeriesHours;
-      const cacheKey = `${source.length}|${source[0]?.timeEST || source[0]?.displayTimeEST || source[0]?.timeUtc || ""}|${source[source.length - 1]?.timeEST || source[source.length - 1]?.displayTimeEST || source[source.length - 1]?.timeUtc || ""}`;
-      if (getObservedExportEntriesCached.cacheKey === cacheKey && Array.isArray(getObservedExportEntriesCached.cache)) {
-        return getObservedExportEntriesCached.cache.slice();
-      }
-      getObservedExportEntriesCached.cacheKey = cacheKey;
-      getObservedExportEntriesCached.cache = getObservedDisplaySeries(source).map(entry => ({
-        ...entry,
-        exportSourceMode: "observed"
-      }));
-      return getObservedExportEntriesCached.cache.slice();
+    function getObservedArchiveDateBounds() {
+      const days = getObservedDays();
+      if (!days.length) return null;
+
+      const firstDay = days[0];
+      const lastDay = days[days.length - 1];
+      const firstHours = Array.isArray(firstDay?.hours) ? firstDay.hours : [];
+      const lastHours = Array.isArray(lastDay?.hours) ? lastDay.hours : [];
+
+      const firstDate = firstHours.length ? getEntryESTDate(firstHours[0]) : parseStoredLocalNyToDate(`${firstDay.date}T00:00`);
+      const lastDate = lastHours.length ? getEntryESTDate(lastHours[lastHours.length - 1]) : parseStoredLocalNyToDate(`${lastDay.date}T23:00`);
+
+      if (!firstDate || !lastDate) return null;
+      return { firstDate, lastDate };
     }
 
     function getForecastExportEntries() {
@@ -4278,7 +4280,46 @@
       }));
     }
 
-    function getDownloadSourceEntries(includeHistorical = false) {
+    function getObservedRangeExportEntries(startDate, endDate) {
+      if (!startDate || !endDate) return [];
+
+      const minMs = Math.min(startDate.getTime(), endDate.getTime()) - 2 * 60 * 60 * 1000;
+      const maxMs = Math.max(startDate.getTime(), endDate.getTime()) + 2 * 60 * 60 * 1000;
+
+      const startParts = getNyParts(new Date(minMs));
+      const endParts = getNyParts(new Date(maxMs));
+      if (!startParts || !endParts) return [];
+
+      const startKey = `${startParts.year}-${startParts.month}-${startParts.day}`;
+      const endKey = `${endParts.year}-${endParts.month}-${endParts.day}`;
+      const candidates = [];
+
+      getObservedDays().forEach(day => {
+        const dateKey = String(day?.date || "");
+        if (!dateKey || dateKey < startKey || dateKey > endKey) return;
+
+        const hours = Array.isArray(day.hours) ? day.hours : [];
+        hours.forEach((hour, idx) => {
+          const t = entryTimeMs(hour);
+          if (t == null || t < minMs || t > maxMs) return;
+          candidates.push({
+            ...hour,
+            observedDate: day.date,
+            classification: day.classification || "none",
+            peakNAVD88: day.peakNAVD88,
+            sourceHourIndex: idx,
+            exportSourceMode: "observed"
+          });
+        });
+      });
+
+      return getObservedDisplaySeries(candidates).map(entry => ({
+        ...entry,
+        exportSourceMode: "observed"
+      }));
+    }
+
+    function getDownloadSourceEntries(includeHistorical = false, startDate = null, endDate = null) {
       if (!includeHistorical) {
         if (currentDataMode === "observed") {
           return currentSeriesHours.map(entry => ({ ...entry, exportSourceMode: "observed" }));
@@ -4286,32 +4327,37 @@
         return currentSeriesHours.map(entry => ({ ...entry, exportSourceMode: "forecast" }));
       }
 
-      if (currentDataMode === "observed") {
-        return getObservedExportEntriesCached();
+      if (startDate && endDate) {
+        const combined = [
+          ...getObservedRangeExportEntries(startDate, endDate),
+          ...getForecastExportEntries().filter(entry => {
+            const t = entryTimeMs(entry);
+            if (t == null) return false;
+            const minMs = Math.min(startDate.getTime(), endDate.getTime()) - 2 * 60 * 60 * 1000;
+            const maxMs = Math.max(startDate.getTime(), endDate.getTime()) + 2 * 60 * 60 * 1000;
+            return t >= minMs && t <= maxMs;
+          })
+        ].filter(entry => entryTimeMs(entry) != null);
+
+        if (!combined.length) return [];
+
+        const byHour = new Map();
+        combined.forEach(entry => {
+          const d = getEntryESTDate(entry);
+          const key = d ? formatNyLocalIso(d) : String(entryTimeMs(entry));
+          const existing = byHour.get(key);
+          if (!existing || entry.exportSourceMode === "forecast") {
+            byHour.set(key, entry);
+          }
+        });
+
+        return Array.from(byHour.values()).sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
       }
 
-      const combined = [
-        ...getObservedExportEntriesCached(),
-        ...getForecastExportEntries()
-      ]
-        .filter(entry => entryTimeMs(entry) != null)
-        .sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
-
-      if (!combined.length) {
-        return currentSeriesHours.map(entry => ({ ...entry, exportSourceMode: currentDataMode }));
-      }
-
-      const byHour = new Map();
-      combined.forEach(entry => {
-        const d = getEntryESTDate(entry);
-        const key = d ? formatNyLocalIso(d) : String(entryTimeMs(entry));
-        const existing = byHour.get(key);
-        if (!existing || entry.exportSourceMode === "forecast") {
-          byHour.set(key, entry);
-        }
-      });
-
-      return Array.from(byHour.values()).sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+      return currentSeriesHours.map(entry => ({
+        ...entry,
+        exportSourceMode: currentDataMode === "observed" ? "observed" : "forecast"
+      }));
     }
 
     function getDownloadCurrentEntry() {
@@ -4384,18 +4430,38 @@
 
       wrap.hidden = scopeValue !== "range";
 
-      const includeHistorical = scopeValue === "range" && isDownloadModalOpen();
-      const entries = getDownloadSourceEntries(includeHistorical);
-      if (!entries.length) {
+      let firstDate = null;
+      let lastDate = null;
+
+      if (scopeValue === "range") {
+        const observedBounds = getObservedArchiveDateBounds();
+        const forecastEntries = getForecastExportEntries();
+        const forecastFirst = forecastEntries.length ? getEntryESTDate(forecastEntries[0]) : null;
+        const forecastLast = forecastEntries.length ? getEntryESTDate(forecastEntries[forecastEntries.length - 1]) : null;
+
+        firstDate = observedBounds?.firstDate || forecastFirst || getEntryESTDate(getDownloadCurrentEntry());
+        lastDate = observedBounds?.lastDate || forecastLast || getEntryESTDate(getDownloadCurrentEntry());
+
+        if (forecastFirst && (!firstDate || forecastFirst.getTime() < firstDate.getTime())) firstDate = forecastFirst;
+        if (forecastLast && (!lastDate || forecastLast.getTime() > lastDate.getTime())) lastDate = forecastLast;
+      } else {
+        const entries = getDownloadSourceEntries(false);
+        if (!entries.length) {
+          startEl.value = "";
+          endEl.value = "";
+          if (note) note.textContent = "";
+          return;
+        }
+        firstDate = getEntryESTDate(entries[0]);
+        lastDate = getEntryESTDate(entries[entries.length - 1]);
+      }
+
+      if (!firstDate || !lastDate) {
         startEl.value = "";
         endEl.value = "";
         if (note) note.textContent = "";
         return;
       }
-
-      const firstDate = getEntryESTDate(entries[0]);
-      const lastDate = getEntryESTDate(entries[entries.length - 1]);
-      if (!firstDate || !lastDate) return;
 
       const minValue = formatNyLocalIso(firstDate);
       const maxValue = formatNyLocalIso(lastDate);
@@ -4404,7 +4470,10 @@
       endEl.min = minValue;
       endEl.max = maxValue;
 
-      const defaultStart = getEntryESTDate(getDownloadCurrentEntry()) || firstDate;
+      const currentDate = getEntryESTDate(getDownloadCurrentEntry());
+      const defaultStart = currentDate
+        ? new Date(Math.min(Math.max(currentDate.getTime(), firstDate.getTime()), lastDate.getTime()))
+        : firstDate;
       const defaultEnd = new Date(Math.min(lastDate.getTime(), defaultStart.getTime() + 24 * 60 * 60 * 1000));
 
       let startDate = (!force && startEl.value) ? (parseStoredLocalNyToDate(startEl.value) || defaultStart) : defaultStart;
@@ -4440,24 +4509,19 @@
         return item ? [item] : [];
       }
 
-      const entries = getDownloadSourceEntries(true);
-      if (!entries.length) return [];
-      syncDownloadRangeInputs(false);
-
-      const startDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(currentEntry) || getEntryESTDate(entries[0]);
-      const endDate = getRangeInputDate("downloadEndInput") || getEntryESTDate(currentEntry) || getEntryESTDate(entries[entries.length - 1]);
+      const startDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(currentEntry);
+      const endDate = getRangeInputDate("downloadEndInput") || getEntryESTDate(currentEntry);
       if (!startDate || !endDate) return [];
 
       let startMs = startDate.getTime();
       let endMs = endDate.getTime();
       if (endMs < startMs) [startMs, endMs] = [endMs, startMs];
+      endMs = Math.min(endMs, startMs + EXPORT_RANGE_MAX_MS);
 
-      const firstMs = entryTimeMs(entries[0]);
-      const lastMs = entryTimeMs(entries[entries.length - 1]);
-      if (firstMs == null || lastMs == null) return [];
-
-      startMs = Math.max(firstMs, startMs);
-      endMs = Math.min(lastMs, Math.min(endMs, startMs + EXPORT_RANGE_MAX_MS));
+      const boundedStart = new Date(startMs);
+      const boundedEnd = new Date(endMs);
+      const entries = getDownloadSourceEntries(true, boundedStart, boundedEnd);
+      if (!entries.length) return [];
 
       const startIndex = findStartIndexForTime(entries, startMs);
       const endIndex = findEndIndexForTime(entries, endMs);
