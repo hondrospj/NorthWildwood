@@ -4749,9 +4749,22 @@
       return buildHourlyRangeFrameItems(entries, range);
     }
 
+    function getDownloadRangeSummaryFrameCount(range) {
+      if (!range || !Number.isFinite(range.startMs) || !Number.isFinite(range.endMs)) return 0;
+      const startMs = Math.min(range.startMs, range.endMs);
+      const endMs = Math.max(range.startMs, range.endMs);
+      const hourMs = 60 * 60 * 1000;
+      return Math.max(1, Math.floor((endMs - startMs) / hourMs) + 1);
+    }
+
     function updateDownloadSummary() {
       const summary = document.getElementById("downloadSummary");
       if (!summary || !isDownloadModalOpen()) return;
+
+      // Important performance rule:
+      // Opening or editing the Time range controls must not build/export frame lists.
+      // Building frame lists can scan historical observed days and should only happen
+      // after the user clicks Download.
       syncDownloadRangeInputs(false);
       const scope = getDownloadScopeValue();
       const format = getDownloadFormatValue().toUpperCase();
@@ -4771,20 +4784,18 @@
           summary.textContent = "No frames are available for export.";
           return;
         }
+
+        const frameCount = getDownloadRangeSummaryFrameCount(range);
+        summary.textContent = `${format} export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
+        return;
       }
 
-      const items = getDownloadFrameItems(scope);
-      if (!items.length) {
+      const item = getDownloadFrameItemFromEntry(getDownloadCurrentEntry(), currentHourIndex);
+      if (!item) {
         summary.textContent = "No frames are available for export.";
         return;
       }
-      if (scope === "current" || items.length === 1) {
-        summary.textContent = `${format} export at ${formatHourEntryTime(items[0].entry)}.`;
-        return;
-      }
-      const first = items[0].entry;
-      const last = items[items.length - 1].entry;
-      summary.textContent = `${format} export of ${items.length} hourly frames from ${formatHourEntryTime(first)} to ${formatHourEntryTime(last)}.`;
+      summary.textContent = `${format} export at ${formatHourEntryTime(item.entry)}.`;
     }
 
     function updateExportSegmentedUI() {
