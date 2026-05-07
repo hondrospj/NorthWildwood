@@ -1200,7 +1200,7 @@
     }
 
     .download-range-grid{
-      display:grid;
+      display:none !important;
       grid-template-columns:1fr 1fr;
       gap:10px;
     }
@@ -1271,6 +1271,116 @@
       color:var(--muted);
       text-transform:uppercase;
       letter-spacing:.08em;
+    }
+
+    .export-picker-head{
+      display:none !important;
+    }
+
+    .export-picker-hint{
+      display:none !important;
+    }
+
+    .export-datetime-row{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+
+    .export-datetime-panel{
+      display:grid;
+      gap:7px;
+      padding:10px;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:rgba(255,255,255,.035);
+      min-width:0;
+    }
+
+    .export-datetime-title{
+      font-size:10px;
+      font-weight:900;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.10em;
+    }
+
+    .export-wheel-grid{
+      display:grid;
+      grid-template-columns:1.05fr .88fr 1fr 1.35fr;
+      gap:5px;
+      align-items:stretch;
+    }
+
+    .export-wheel-field{
+      display:grid;
+      gap:4px;
+      min-width:0;
+    }
+
+    .export-wheel-field span{
+      font-size:8px;
+      line-height:1;
+      color:var(--muted);
+      font-weight:900;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      text-align:center;
+    }
+
+    .export-wheel-field select{
+      width:100%;
+      min-height:72px;
+      max-height:72px;
+      border-radius:14px;
+      border:1px solid rgba(191,219,254,.16);
+      background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.035));
+      color:#eaf0ff;
+      font-size:13px;
+      font-weight:900;
+      text-align:center;
+      text-align-last:center;
+      padding:4px 3px;
+      overflow-y:auto;
+      scrollbar-width:thin;
+      scroll-snap-type:y mandatory;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    .export-wheel-field select option{
+      font-weight:850;
+      background:#111827;
+      color:#eaf0ff;
+      scroll-snap-align:center;
+    }
+
+    .export-wheel-field select:focus{
+      outline:none;
+      border-color:#bfdbfe;
+      box-shadow:0 0 0 2px rgba(96,165,250,.18), inset 0 1px 0 rgba(255,255,255,.08);
+    }
+
+    .export-manual-input{
+      width:100%;
+      min-height:36px;
+      padding:0 10px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.045);
+      color:#eaf0ff;
+      font-size:12px;
+      font-weight:800;
+      outline:none;
+    }
+
+    .export-manual-input:focus{
+      border-color:#bfdbfe;
+      box-shadow:0 0 0 2px rgba(96,165,250,.16);
+    }
+
+    @media (max-width: 720px){
+      .export-datetime-row{ grid-template-columns:1fr; }
+      .export-wheel-grid{ grid-template-columns:repeat(4, minmax(0, 1fr)); }
     }
 
     .export-picker-tools{
@@ -5591,29 +5701,41 @@
           </div>
         </label>
         <div id="downloadRangeFields" class="download-range-grid" hidden>
-          <label class="download-field">
-            Start (ET)
-            <input id="downloadStartInput" type="datetime-local" step="3600" />
-          </label>
-          <label class="download-field">
-            End (ET)
-            <input id="downloadEndInput" type="datetime-local" step="3600" />
-          </label>
+          <input id="downloadStartInput" type="hidden" />
+          <input id="downloadEndInput" type="hidden" />
         </div>
         <div id="downloadRangeNote" class="download-note"></div>
-        <section id="exportTimePicker" class="export-picker" aria-label="Available export dates">
+        <section id="exportTimePicker" class="export-picker" aria-label="Export date and time picker">
           <div class="export-picker-head">
-            <span id="exportPickerTitle">Available export range</span>
+            <span id="exportPickerTitle"></span>
             <div class="export-picker-tools">
-              <span id="exportSelectionCount">Loading range</span>
+              <span id="exportSelectionCount"></span>
               <button id="clearPngSelectionsBtn" type="button" hidden>Clear</button>
             </div>
           </div>
-          <div class="export-hour-select-row" aria-label="Export start and end time controls">
-            <label>Start time <select id="exportStartHourSelect"></select></label>
-            <label>End time <select id="exportEndHourSelect"></select></label>
+          <div class="export-datetime-row" aria-label="Export start and end date-time controls">
+            <div class="export-datetime-panel">
+              <div class="export-datetime-title">Start date / time</div>
+              <div class="export-wheel-grid">
+                <label class="export-wheel-field"><span>Month</span><select id="exportStartMonthSelect" size="3"></select></label>
+                <label class="export-wheel-field"><span>Day</span><select id="exportStartDaySelect" size="3"></select></label>
+                <label class="export-wheel-field"><span>Year</span><select id="exportStartYearSelect" size="3"></select></label>
+                <label class="export-wheel-field"><span>Time</span><select id="exportStartHourSelect" size="3"></select></label>
+              </div>
+              <input id="exportStartManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YYYY 1:00 AM" aria-label="Manual start date and time" />
+            </div>
+            <div class="export-datetime-panel">
+              <div class="export-datetime-title">End date / time</div>
+              <div class="export-wheel-grid">
+                <label class="export-wheel-field"><span>Month</span><select id="exportEndMonthSelect" size="3"></select></label>
+                <label class="export-wheel-field"><span>Day</span><select id="exportEndDaySelect" size="3"></select></label>
+                <label class="export-wheel-field"><span>Year</span><select id="exportEndYearSelect" size="3"></select></label>
+                <label class="export-wheel-field"><span>Time</span><select id="exportEndHourSelect" size="3"></select></label>
+              </div>
+              <input id="exportEndManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YYYY 1:00 AM" aria-label="Manual end date and time" />
+            </div>
           </div>
-          <div id="exportPickerHint" class="export-picker-hint">Pick a highlighted date, then choose the start and end time. Blank red X dates have no data.</div>
+          <div id="exportPickerHint" class="export-picker-hint"></div>
           <div class="export-calendar-nav" aria-label="Export calendar month navigation">
             <button id="exportCalendarPrevBtn" type="button" aria-label="Previous export month">‹</button>
             <div id="exportCalendarTitle" class="export-calendar-title">--</div>
@@ -7969,6 +8091,191 @@
       const end = getRangeInputDate("downloadEndInput");
       setExportHourSelectFromDate("exportStartHourSelect", start);
       setExportHourSelectFromDate("exportEndHourSelect", end);
+      syncExportDateTimeWheelsFromInputs();
+    }
+
+    function getExportWheelIds(prefix) {
+      const cap = prefix === "end" ? "End" : "Start";
+      return {
+        month: `export${cap}MonthSelect`,
+        day: `export${cap}DaySelect`,
+        year: `export${cap}YearSelect`,
+        hour: `export${cap}HourSelect`,
+        manual: `export${cap}ManualInput`,
+        hidden: prefix === "end" ? "downloadEndInput" : "downloadStartInput"
+      };
+    }
+
+    function getExportWheelSelect(prefix, part) {
+      const ids = getExportWheelIds(prefix);
+      return document.getElementById(ids[part]);
+    }
+
+    function getExportBoundsYears() {
+      const bounds = getExportAvailabilityBounds();
+      const firstParts = getNyParts(bounds?.firstDate || new Date());
+      const lastParts = getNyParts(bounds?.lastDate || new Date());
+      return {
+        first: firstParts?.year || 2007,
+        last: lastParts?.year || new Date().getFullYear()
+      };
+    }
+
+    function populateExportDateTimeWheels() {
+      const { first, last } = getExportBoundsYears();
+      ["start", "end"].forEach(prefix => {
+        const monthSelect = getExportWheelSelect(prefix, "month");
+        const daySelect = getExportWheelSelect(prefix, "day");
+        const yearSelect = getExportWheelSelect(prefix, "year");
+        const hourSelect = getExportWheelSelect(prefix, "hour");
+        if (!monthSelect || !daySelect || !yearSelect || !hourSelect) return;
+        if (!monthSelect.options.length) {
+          monthSelect.innerHTML = "";
+          for (let m = 1; m <= 12; m++) {
+            const opt = document.createElement("option");
+            opt.value = String(m);
+            opt.textContent = String(m).padStart(2, "0");
+            monthSelect.appendChild(opt);
+          }
+        }
+        const oldYear = yearSelect.value;
+        const yearValues = Array.from(yearSelect.options).map(opt => opt.value).join(",");
+        const wantedYears = Array.from({ length: Math.max(0, last - first + 1) }, (_, i) => String(first + i)).join(",");
+        if (yearValues !== wantedYears) {
+          yearSelect.innerHTML = "";
+          for (let y = first; y <= last; y++) {
+            const opt = document.createElement("option");
+            opt.value = String(y);
+            opt.textContent = String(y);
+            yearSelect.appendChild(opt);
+          }
+          if (oldYear && Number(oldYear) >= first && Number(oldYear) <= last) yearSelect.value = oldYear;
+        }
+        populateExportHourSelects();
+        updateExportWheelDayOptions(prefix, false);
+      });
+    }
+
+    function updateExportWheelDayOptions(prefix, preserve = true) {
+      const monthSelect = getExportWheelSelect(prefix, "month");
+      const daySelect = getExportWheelSelect(prefix, "day");
+      const yearSelect = getExportWheelSelect(prefix, "year");
+      if (!monthSelect || !daySelect || !yearSelect) return;
+      const oldDay = preserve ? Number(daySelect.value || 1) : 1;
+      const y = Number(yearSelect.value) || getExportBoundsYears().first;
+      const m = Number(monthSelect.value) || 1;
+      const days = new Date(y, m, 0).getDate();
+      if (daySelect.options.length !== days) {
+        daySelect.innerHTML = "";
+        for (let d = 1; d <= days; d++) {
+          const opt = document.createElement("option");
+          opt.value = String(d);
+          opt.textContent = String(d).padStart(2, "0");
+          daySelect.appendChild(opt);
+        }
+      }
+      daySelect.value = String(Math.min(days, Math.max(1, oldDay)));
+    }
+
+    function formatExportManualDate(date) {
+      const p = date ? getNyParts(date) : null;
+      if (!p) return "";
+      const hour12 = (p.hour % 12) || 12;
+      return `${String(p.month).padStart(2, "0")}/${String(p.day).padStart(2, "0")}/${p.year} ${hour12}:00 ${p.hour >= 12 ? "PM" : "AM"}`;
+    }
+
+    function parseExportManualDate(value) {
+      const raw = String(value || "").trim();
+      const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\s+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+      if (!match) return null;
+      let month = Number(match[1]);
+      let day = Number(match[2]);
+      let year = Number(match[3]);
+      let hour = Number(match[4]);
+      const minute = Number(match[5] || 0);
+      const ampm = (match[6] || "").toUpperCase();
+      if (year < 100) year += 2000;
+      if (ampm === "PM" && hour < 12) hour += 12;
+      if (ampm === "AM" && hour === 12) hour = 0;
+      if (!Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(year) || !Number.isFinite(hour)) return null;
+      if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute >= 60) return null;
+      return parseStoredLocalNyToDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00`);
+    }
+
+    function getExportDateFromWheels(prefix) {
+      const monthSelect = getExportWheelSelect(prefix, "month");
+      const daySelect = getExportWheelSelect(prefix, "day");
+      const yearSelect = getExportWheelSelect(prefix, "year");
+      const hourSelect = getExportWheelSelect(prefix, "hour");
+      if (!monthSelect || !daySelect || !yearSelect || !hourSelect) return null;
+      const y = Number(yearSelect.value);
+      const m = Number(monthSelect.value);
+      const d = Number(daySelect.value);
+      const h = Number(hourSelect.value);
+      if (![y, m, d, h].every(Number.isFinite)) return null;
+      return parseStoredLocalNyToDate(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}T${String(h).padStart(2, "0")}:00`);
+    }
+
+    function setExportWheelsFromDate(prefix, date) {
+      populateExportDateTimeWheels();
+      const p = date ? getNyParts(date) : null;
+      if (!p) return;
+      const monthSelect = getExportWheelSelect(prefix, "month");
+      const yearSelect = getExportWheelSelect(prefix, "year");
+      const daySelect = getExportWheelSelect(prefix, "day");
+      const hourSelect = getExportWheelSelect(prefix, "hour");
+      const manual = getExportWheelSelect(prefix, "manual");
+      if (monthSelect) monthSelect.value = String(p.month);
+      if (yearSelect) yearSelect.value = String(p.year);
+      updateExportWheelDayOptions(prefix, true);
+      if (daySelect) daySelect.value = String(p.day);
+      if (hourSelect) hourSelect.value = String(p.hour);
+      if (manual && document.activeElement !== manual) manual.value = formatExportManualDate(date);
+    }
+
+    function syncExportDateTimeWheelsFromInputs() {
+      populateExportDateTimeWheels();
+      setExportWheelsFromDate("start", getRangeInputDate("downloadStartInput"));
+      setExportWheelsFromDate("end", getRangeInputDate("downloadEndInput"));
+    }
+
+    function setHiddenExportDate(prefix, date) {
+      const ids = getExportWheelIds(prefix);
+      const input = document.getElementById(ids.hidden);
+      if (!input || !date) return;
+      setRangeInputDate(ids.hidden, date);
+      input.dataset.userEdited = "1";
+    }
+
+    function handleExportDateTimeWheelChange(prefix) {
+      updateExportWheelDayOptions(prefix, true);
+      const date = getExportDateFromWheels(prefix);
+      if (!date) return;
+      setHiddenExportDate(prefix, date);
+      let start = getRangeInputDate("downloadStartInput");
+      let end = getRangeInputDate("downloadEndInput");
+      if (start && end && end.getTime() < start.getTime()) {
+        if (prefix === "start") setHiddenExportDate("end", start);
+        else setHiddenExportDate("start", end);
+      }
+      const selected = getRangeInputDate(prefix === "end" ? "downloadEndInput" : "downloadStartInput") || date;
+      exportCalendarSelectedDayKey = getExportDayKeyFromDate(selected);
+      exportCalendarCursorDate = getExportMonthStart(selected);
+      syncExportDateTimeWheelsFromInputs();
+      scheduleExportTimePickerRender(true);
+      updateDownloadSummary();
+    }
+
+    function handleExportManualInput(prefix) {
+      const manual = getExportWheelSelect(prefix, "manual");
+      const date = parseExportManualDate(manual?.value);
+      if (!date) return;
+      setHiddenExportDate(prefix, date);
+      exportCalendarSelectedDayKey = getExportDayKeyFromDate(date);
+      exportCalendarCursorDate = getExportMonthStart(date);
+      syncExportDateTimeWheelsFromInputs();
+      scheduleExportTimePickerRender(true);
+      updateDownloadSummary();
     }
 
     function getExportDateForDayAndHour(dayKey, hour) {
@@ -7985,11 +8292,7 @@
 
     function updateExportPickModeUI() {
       const hint = document.getElementById("exportPickerHint");
-      if (hint) {
-        hint.textContent = exportRangePickMode === "end"
-          ? "Now click the end date. Use End time for the exact hour. Blank red X dates have no data."
-          : "Pick a highlighted date to start. Use Start time and End time for exact hours. Blank red X dates have no data.";
-      }
+      if (hint) hint.textContent = "";
     }
 
     function setExportRangeBoundaryFromDayKey(dayKey, boundary = exportRangePickMode) {
@@ -8144,7 +8447,8 @@
       const scope = getDownloadScopeValue();
       const startSig = document.getElementById("downloadStartInput")?.value || "";
       const endSig = document.getElementById("downloadEndInput")?.value || "";
-      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportRangePickMode, startHourSelect?.value || "", endHourSelect?.value || "", exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig].join("|");
+      const wheelSig = ["exportStartMonthSelect","exportStartDaySelect","exportStartYearSelect","exportEndMonthSelect","exportEndDaySelect","exportEndYearSelect"].map(id => document.getElementById(id)?.value || "").join("/");
+      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportRangePickMode, startHourSelect?.value || "", endHourSelect?.value || "", wheelSig, exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig].join("|");
       if (!force && signature === exportTimePickerLastSignature) return;
       exportTimePickerLastSignature = signature;
 
@@ -8163,9 +8467,10 @@
 
       ensureExportCalendarCursor();
       populateExportHourSelects();
+      syncExportDateTimeWheelsFromInputs();
       updateExportPickModeUI();
-      if (title) title.textContent = "Available export range";
-      if (count) count.textContent = getExportAvailabilityRangeText();
+      if (title) title.textContent = "";
+      if (count) count.textContent = "";
       if (clearBtn) clearBtn.hidden = true;
 
       const start = getRangeInputDate("downloadStartInput");
@@ -10469,20 +10774,24 @@
         });
       });
 
-      ["exportStartHourSelect", "exportEndHourSelect"].forEach(id => {
-        const select = document.getElementById(id);
-        if (!select) return;
-        select.addEventListener("change", () => {
-          const dayKey = exportCalendarSelectedDayKey || getExportDayKeyFromDate(getRangeInputDate("downloadStartInput"));
-          if (dayKey) {
-            const previousMode = exportRangePickMode;
-            exportRangePickMode = "start";
-            setExportRangeFromDayKey(dayKey);
-            exportRangePickMode = previousMode === "end" ? "end" : "start";
-          }
-          scheduleExportTimePickerRender(true);
-          updateDownloadSummary();
+      ["start", "end"].forEach(prefix => {
+        ["month", "day", "year", "hour"].forEach(part => {
+          const select = getExportWheelSelect(prefix, part);
+          if (!select) return;
+          select.addEventListener("change", () => {
+            if (!exportInProgress) setDownloadStatus("", false);
+            handleExportDateTimeWheelChange(prefix);
+          });
+          select.addEventListener("input", () => {
+            if (!exportInProgress) setDownloadStatus("", false);
+            handleExportDateTimeWheelChange(prefix);
+          });
         });
+        const manual = getExportWheelSelect(prefix, "manual");
+        if (manual) {
+          manual.addEventListener("change", () => handleExportManualInput(prefix));
+          manual.addEventListener("blur", () => handleExportManualInput(prefix));
+        }
       });
 
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
