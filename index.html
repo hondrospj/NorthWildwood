@@ -1130,10 +1130,9 @@
     }
 
     .download-modal-card{
-      width:min(720px, calc(100vw - 32px));
+      width:min(560px, calc(100vw - 32px));
       max-height:calc(100vh - 40px);
       overflow-y:auto;
-      overflow-x:hidden;
       border-radius:24px;
       border:1px solid rgba(191,219,254,.18);
       background:rgba(11,18,32,.97);
@@ -1284,9 +1283,8 @@
 
     .export-datetime-row{
       display:grid;
-      grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
-      gap:10px;
-      min-width:0;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
     }
 
     .export-datetime-panel{
@@ -1297,7 +1295,6 @@
       border-radius:16px;
       background:rgba(255,255,255,.035);
       min-width:0;
-      overflow:hidden;
     }
 
     .export-datetime-title{
@@ -1365,21 +1362,17 @@
 
     .export-manual-input{
       width:100%;
-      min-width:0;
-      max-width:100%;
       min-height:58px;
-      padding:0 14px;
+      padding:0 26px;
       border-radius:18px;
       border:1px solid var(--line);
       background:rgba(255,255,255,.045);
       color:#eaf0ff;
-      font-size:clamp(21px, 2vw, 26px);
+      font-size:28px;
       line-height:1;
       font-weight:950;
-      letter-spacing:-.025em;
+      letter-spacing:-.045em;
       outline:none;
-      font-variant-numeric:tabular-nums;
-      text-overflow:clip;
     }
 
     .export-manual-input:focus{
@@ -1423,55 +1416,10 @@
       box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
     }
 
-    @media (min-width: 721px){
-      .download-modal-card{
-        width:min(760px, calc(100vw - 40px));
-      }
-      .export-datetime-row{
-        grid-template-columns:minmax(0, 1fr) minmax(0, 1fr);
-      }
-      .export-manual-input{
-        font-size:clamp(20px, 1.55vw, 25px);
-        padding-left:13px;
-        padding-right:13px;
-      }
-    }
-
-    @media (min-width: 721px) and (max-height: 760px){
-      .download-modal-card{
-        width:min(780px, calc(100vw - 28px));
-        max-height:calc(100vh - 24px);
-        padding:14px;
-      }
-      .download-modal .download-grid{
-        gap:9px;
-      }
-      .export-picker{
-        padding:8px;
-        gap:7px;
-      }
-      .export-manual-input{
-        min-height:50px;
-        font-size:22px;
-        padding-left:12px;
-        padding-right:12px;
-      }
-      .export-ampm-toggle button{
-        min-height:30px;
-      }
-      .export-calendar-day{
-        min-height:28px;
-      }
-      .download-summary{
-        min-height:48px;
-        padding:10px 12px;
-      }
-    }
-
     @media (max-width: 720px){
       .export-datetime-row{ grid-template-columns:1fr; }
       .export-wheel-grid{ grid-template-columns:repeat(4, minmax(0, 1fr)); }
-      .export-manual-input{ font-size:clamp(20px, 6.2vw, 24px); min-height:54px; padding:0 12px; }
+      .export-manual-input{ font-size:24px; min-height:54px; padding:0 18px; }
       .export-data-range{ display:grid; gap:2px; }
     }
 
@@ -1536,8 +1484,10 @@
     .export-calendar-weekdays,.export-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
     .export-calendar-weekdays div{text-align:center;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;}
     .export-calendar-day{min-height:30px;border-radius:10px;border:1px solid transparent;background:transparent;color:transparent;padding:0;font-size:11px;font-weight:900;box-shadow:none;pointer-events:none;}
-    .export-calendar-day.available{color:#dbe8ff;background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.34);pointer-events:auto;}
-    .export-calendar-day.forecast-day{background:rgba(45,212,191,.13);border-color:rgba(45,212,191,.30);}
+    .export-calendar-day.available{position:relative;color:#dbe8ff;background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.34);pointer-events:auto;}
+    .export-calendar-day.available::after{content:"H";position:absolute;top:2px;right:5px;font-size:7px;line-height:1;font-weight:950;letter-spacing:.02em;color:#bfdbfe;opacity:.88;}
+    .export-calendar-day.forecast-day{background:rgba(20,184,166,.28);border-color:rgba(94,234,212,.72);color:#ecfeff;}
+    .export-calendar-day.forecast-day::after{content:"F";color:#99f6e4;opacity:1;}
     .export-calendar-day.no-data{position:relative;color:transparent;background:rgba(127,29,29,.08);border-color:rgba(248,113,113,.28);pointer-events:none;opacity:1;}
     .export-calendar-day.no-data::before,
     .export-calendar-day.no-data::after{content:"";position:absolute;left:18%;right:18%;top:50%;height:2px;border-radius:999px;background:#ef4444;box-shadow:0 0 8px rgba(239,68,68,.28);}
@@ -1545,6 +1495,14 @@
     .export-calendar-day.no-data::after{transform:rotate(-45deg);}
     .export-calendar-day.empty{background:transparent;border-color:transparent;color:transparent;pointer-events:none;}
     .export-calendar-day.selected{color:#fff;background:linear-gradient(180deg,rgba(96,165,250,.32),rgba(96,165,250,.18));border-color:#bfdbfe;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
+    .export-calendar-day.forecast-day.selected,
+    .export-calendar-day.forecast-day.range-start,
+    .export-calendar-day.forecast-day.range-end{
+      background:linear-gradient(180deg,rgba(20,184,166,.42),rgba(20,184,166,.24));
+      border-color:#99f6e4;
+      color:#ffffff;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.16), 0 0 0 1px rgba(45,212,191,.18);
+    }
     .export-range-status{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;line-height:1.3;color:var(--muted);}
     .export-range-status span{min-width:0;padding:7px 8px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .export-range-status strong{color:#eaf0ff;}
@@ -1556,12 +1514,12 @@
     .export-hour-select-row select{min-height:34px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);font-size:12px;font-weight:850;padding:0 10px;}
     .export-calendar-day.in-range{color:#fff;background:rgba(96,165,250,.20);border-color:rgba(191,219,254,.40);}
     .export-calendar-day.range-start,.export-calendar-day.range-end{background:linear-gradient(180deg,rgba(96,165,250,.34),rgba(96,165,250,.20));border-color:#bfdbfe;color:#fff;}
-    .export-calendar-day.forecast-day.in-range{background:rgba(45,212,191,.20);}
+    .export-calendar-day.forecast-day.in-range{background:rgba(20,184,166,.32);border-color:rgba(94,234,212,.78);color:#ffffff;}
     .export-picker-hint{font-size:10.5px;line-height:1.35;color:var(--muted);}
     .export-calendar-key{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:2px;font-size:10px;font-weight:850;color:var(--muted);line-height:1.25;}
     .export-calendar-key-item{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
     .export-calendar-key-swatch{width:18px;height:18px;border-radius:7px;border:1px solid rgba(96,165,250,.34);background:rgba(96,165,250,.12);display:inline-block;}
-    .export-calendar-key-swatch.forecast{border-color:rgba(45,212,191,.30);background:rgba(45,212,191,.13);}
+    .export-calendar-key-swatch.forecast{border-color:rgba(94,234,212,.78);background:rgba(20,184,166,.32);}
     .export-calendar-key-swatch.no-data{position:relative;border-color:rgba(248,113,113,.28);background:rgba(127,29,29,.08);}
     .export-calendar-key-swatch.no-data::before,
     .export-calendar-key-swatch.no-data::after{content:"";position:absolute;left:4px;right:4px;top:8px;height:2px;border-radius:999px;background:#ef4444;}
@@ -5834,7 +5792,7 @@
           <div class="export-datetime-row" aria-label="Export start and end date-time controls">
             <div class="export-datetime-panel">
               <div class="export-datetime-title">Start date / time</div>
-              <input id="exportStartManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YY/2:00" aria-label="Manual start date and time" />
+              <input id="exportStartManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YY 2:00" aria-label="Manual start date and time" />
               <div class="export-ampm-toggle" role="tablist" aria-label="Start AM or PM">
                 <button type="button" class="active" data-export-ampm-prefix="start" data-export-ampm="AM" aria-pressed="true">AM</button>
                 <button type="button" data-export-ampm-prefix="start" data-export-ampm="PM" aria-pressed="false">PM</button>
@@ -5847,7 +5805,7 @@
             </div>
             <div class="export-datetime-panel">
               <div class="export-datetime-title">End date / time</div>
-              <input id="exportEndManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YY/2:00" aria-label="Manual end date and time" />
+              <input id="exportEndManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YY 2:00" aria-label="Manual end date and time" />
               <div class="export-ampm-toggle" role="tablist" aria-label="End AM or PM">
                 <button type="button" class="active" data-export-ampm-prefix="end" data-export-ampm="AM" aria-pressed="true">AM</button>
                 <button type="button" data-export-ampm-prefix="end" data-export-ampm="PM" aria-pressed="false">PM</button>
@@ -7883,7 +7841,7 @@
         if (range.startMs < firstMs || range.endMs > lastMs) {
           return {
             ok: false,
-            message: `That export range is outside the available historical record. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
+            message: `That export range is outside the available data range. Please choose a start and end between ${formatFixedESTFromUtc(bounds.firstDate.toISOString())} and ${formatFixedESTFromUtc(bounds.lastDate.toISOString())}.`
           };
         }
       }
@@ -8077,7 +8035,8 @@
         meta.count += Math.max(1, hours.length || 24);
       });
 
-      getForecastExportEntriesLimited().forEach(entry => {
+      const limitedForecastEntries = getForecastExportEntriesLimited();
+      limitedForecastEntries.forEach(entry => {
         const d = getEntryESTDate(entry);
         const dayKey = getExportDayKeyFromDate(d);
         const meta = ensureMeta(dayKey);
@@ -8089,6 +8048,27 @@
           if (!meta.lastDate || d.getTime() > meta.lastDate.getTime()) meta.lastDate = d;
         }
       });
+
+      // Make the forecast portion visually obvious on the calendar. If the current
+      // forecast spans only part of a day, the whole calendar day is still marked green.
+      if (limitedForecastEntries.length) {
+        const forecastFirst = getEntryESTDate(limitedForecastEntries[0]);
+        const forecastLast = getEntryESTDate(limitedForecastEntries[limitedForecastEntries.length - 1]);
+        let cursor = forecastFirst ? parseStoredLocalNyToDate(`${getExportDayKeyFromDate(forecastFirst)}T00:00`) : null;
+        const lastKey = forecastLast ? getExportDayKeyFromDate(forecastLast) : "";
+        let guard = 0;
+        while (cursor && guard < 8) {
+          const dayKey = getExportDayKeyFromDate(cursor);
+          const meta = ensureMeta(dayKey);
+          if (meta) {
+            meta.forecast = true;
+            meta.count = Math.max(1, meta.count || 0);
+          }
+          if (!dayKey || dayKey === lastKey) break;
+          cursor = parseStoredLocalNyToDate(`${getExportDayKeyFromDate(new Date(cursor.getTime() + 30 * 60 * 60 * 1000))}T00:00`);
+          guard += 1;
+        }
+      }
 
       exportAvailabilityDayMapCache = map;
       return map;
@@ -8381,7 +8361,7 @@
       if (!p) return "";
       const hour12 = (p.hour % 12) || 12;
       const yy = String(p.year % 100).padStart(2, "0");
-      return `${String(p.month).padStart(2, "0")}/${String(p.day).padStart(2, "0")}/${yy}/${hour12}:00`;
+      return `${String(p.month).padStart(2, "0")}/${String(p.day).padStart(2, "0")}/${yy} ${hour12}:00`;
     }
 
     function parseExportManualDate(value, prefix = null) {
@@ -8824,7 +8804,7 @@
           const range = getDownloadRangeRequest();
           const count = range ? Math.min(getDownloadRangeSummaryFrameCount(range), EXPORT_PNG_SELECTION_LIMIT) : 0;
           summary.textContent = count
-            ? `PNG (${aspectLabel}) export of up to ${count} hourly frame${count === 1 ? "" : "s"}. PNG export is limited to ${EXPORT_PNG_SELECTION_LIMIT} frames; GIF can export up to ${EXPORT_RANGE_MAX_HOURS} hourly frames.`
+            ? `PNG (${aspectLabel}) will download ${count} hourly PNG frame${count === 1 ? "" : "s"}. PNG export is limited to ${EXPORT_PNG_SELECTION_LIMIT} frames.`
             : "No frames are available for export.";
           return;
         }
@@ -8844,7 +8824,7 @@
           return;
         }
         const frameCount = getDownloadRangeSummaryFrameCount(range);
-        summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
+        summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}. GIF can export up to ${EXPORT_FRAME_LIMIT} hourly frames.`;
         return;
       }
 
@@ -9644,6 +9624,10 @@
         }
       } else {
         frameItems = getDownloadFrameItems();
+        if (frameItems.length > EXPORT_FRAME_LIMIT) {
+          frameItems = frameItems.slice(0, EXPORT_FRAME_LIMIT);
+          toast(`GIF export is limited to ${EXPORT_FRAME_LIMIT} hourly frames.`);
+        }
       }
 
       if (!frameItems.length) {
