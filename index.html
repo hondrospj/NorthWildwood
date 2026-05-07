@@ -4849,6 +4849,22 @@
       }
     }
 
+  
+
+    /* Play/Pause state: one button clearly shows current playback state on mobile and desktop */
+    #playBtn.is-playing{
+      color:#1d4ed8 !important;
+      font-size:20px !important;
+      letter-spacing:-.08em !important;
+      padding-left:0 !important;
+    }
+
+    @media (max-width: 860px), (max-height: 560px) and (pointer: coarse){
+      #playBtn.is-playing{
+        font-size:18px !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -8289,10 +8305,29 @@
       checkNwsAlerts().catch(() => {});
     }
 
+    function updatePlayPauseButton() {
+      const playBtn = document.getElementById("playBtn");
+      if (!playBtn) return;
+      const isPlaying = Boolean(playTimer);
+      playBtn.textContent = isPlaying ? "Ⅱ" : "▶";
+      playBtn.classList.toggle("is-playing", isPlaying);
+      playBtn.setAttribute("aria-label", isPlaying ? "Pause" : "Play");
+      playBtn.setAttribute("title", isPlaying ? "Pause" : "Play");
+    }
+
     function stopPlayback() {
       if (playTimer) {
         clearInterval(playTimer);
         playTimer = null;
+      }
+      updatePlayPauseButton();
+    }
+
+    function togglePlayback() {
+      if (playTimer) {
+        stopPlayback();
+      } else {
+        startPlayback();
       }
     }
 
@@ -8329,7 +8364,10 @@
 
     function startPlayback() {
       stopPlayback();
-      if (!currentSeriesHours.length) return;
+      if (!currentSeriesHours.length) {
+        updatePlayPauseButton();
+        return;
+      }
 
       playTimer = setInterval(() => {
         stepPlaybackForward().catch(err => {
@@ -8337,6 +8375,7 @@
           stopPlayback();
         });
       }, 1200);
+      updatePlayPauseButton();
     }
 
     async function goToCalendarSelection() {
@@ -8557,7 +8596,7 @@
         switchOverlayMode("dynamic").catch(err => toast(err.message));
       });
 
-      document.getElementById("playBtn").addEventListener("click", startPlayback);
+      document.getElementById("playBtn").addEventListener("click", togglePlayback);
       document.getElementById("stopBtn").addEventListener("click", stopPlayback);
       document.getElementById("reloadBtn").addEventListener("click", () => {
         reloadAll().catch(err => toast(err.message));
