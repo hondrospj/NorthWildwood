@@ -7678,61 +7678,144 @@
       return exportAvailabilityCache;
     }
 
-    function clearExportAvailabilityCache() { exportAvailabilityCache = null; }
+    function clearExportAvailabilityCache() {
+      // This intentionally no longer builds a full all-hour export cache.
+      // The export panel must open instantly; archive hours are resolved only for
+      // the single date/range the user actually chooses.
+      exportAvailabilityCache = null;
+    }
+
+    function getForecastExportEntriesLimited() {
+      const entries = getForecastExportEntries()
+        .filter(entry => entryTimeMs(entry) != null)
+        .sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+      if (!entries.length) return [];
+      const firstMs = entryTimeMs(entries[0]);
+      const maxMs = firstMs + (72 * 60 * 60 * 1000);
+      return entries.filter(entry => {
+        const t = entryTimeMs(entry);
+        return t != null && t <= maxMs;
+      });
+    }
 
     function getExportAvailabilityDayMap() {
+      // Fast day-level map only. Do NOT flatten every historical hour here.
+      // Flattening the full observed archive was why opening the export panel hung.
       const map = new Map();
-      getAllExportAvailabilityEntries().forEach((entry, idx) => {
-        const key = getExportDayKeyFromDate(getEntryESTDate(entry));
-        if (!key) return;
-        if (!map.has(key)) map.set(key, []);
-        map.get(key).push({ entry, idx });
+
+      function ensureMeta(dayKey) {
+        if (!dayKey) return null;
+        if (!map.has(dayKey)) {
+          map.set(dayKey, {
+            dayKey,
+            observed: false,
+            forecast: false,
+            count: 0,
+            firstDate: parseStoredLocalNyToDate(`${dayKey}T00:00`),
+            lastDate: parseStoredLocalNyToDate(`${dayKey}T23:00`)
+          });
+        }
+        return map.get(dayKey);
+      }
+
+      getObservedDays().forEach(day => {
+        const dayKey = String(day?.date || "").slice(0, 10);
+        if (!dayKey) return;
+        const meta = ensureMeta(dayKey);
+        if (!meta) return;
+        meta.observed = true;
+        const hours = Array.isArray(day?.hours) ? day.hours : [];
+        // Counting the array length is cheap. We do not parse each hour until the date is clicked.
+        meta.count += Math.max(1, hours.length || 24);
       });
-      map.forEach(items => items.sort((a, b) => entryTimeMs(a.entry) - entryTimeMs(b.entry)));
+
+      getForecastExportEntriesLimited().forEach(entry => {
+        const dayKey = getExportDayKeyFromDate(getEntryESTDate(entry));
+        const meta = ensureMeta(dayKey);
+        if (!meta) return;
+        meta.forecast = true;
+        meta.count += 1;
+        const d = getEntryESTDate(entry);
+        if (d) {
+          if (!meta.firstDate || d.getTime() < meta.firstDate.getTime()) meta.firstDate = d;
+          if (!meta.lastDate || d.getTime() > meta.lastDate.getTime()) meta.lastDate = d;
+        }
+      });
+
       return map;
     }
 
     function getExportAvailabilityBounds() {
-      const entries = getAllExportAvailabilityEntries();
-      if (!entries.length) return null;
-      return { firstDate: getEntryESTDate(entries[0]), lastDate: getEntryESTDate(entries[entries.length - 1]) };
+      const dayMap = getExportAvailabilityDayMap();
+      if (!dayMap.size) return null;
+      let firstDate = null;
+      let lastDate = null;
+      dayMap.forEach(meta => {
+        const a = meta.firstDate || parseStoredLocalNyToDate(`${meta.dayKey}T00:00`);
+        const b = meta.lastDate || parseStoredLocalNyToDate(`${meta.dayKey}T23:00`);
+        if (a && (!firstDate || a.getTime() < firstDate.getTime())) firstDate = a;
+        if (b && (!lastDate || b.getTime() > lastDate.getTime())) lastDate = b;
+      });
+      return firstDate && lastDate ? { firstDate, lastDate } : null;
     }
 
-    function ensureExportCalendarCursor() {
-      const dayMap = getExportAvailabilityDayMap();
-      const bounds = getExportAvailabilityBounds();
-      if (!bounds) return;
-      const currentDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(getDownloadCurrentEntry()) || bounds.lastDate || bounds.firstDate;
-      let selectedKey = getExportDayKeyFromDate(currentDate);
-      if (!dayMap.has(selectedKey)) {
-        const currentMs = currentDate ? currentDate.getTime() : null;
-        let best = null;
-        let bestDiff = Infinity;
-        dayMap.forEach((items, key) => {
-          const t = entryTimeMs(items[0].entry);
-          const diff = currentMs == null ? 0 : Math.abs(t - currentMs);
-          if (diff < bestDiff) { best = key; bestDiff = diff; }
+    function getExportEntriesForDay(dayKey) {
+      // Only parse one selected day, plus the current 72-hour forecast run.
+      if (!dayKey) return [];
+      const combined = [];
+
+      const day = getObservedDays().find(item => String(item?.date || "").slice(0, 10) === dayKey);
+      if (day) {
+        const hours = Array.isArray(day.hours) ? day.hours : [];
+        hours.forEach((hour, idx) => {
+          const t = entryTimeMs(hour);
+          if (t == null) return;
+          const rawStage = getStageValue(hour);
+          if (rawStage == null || !Number.isFinite(Number(rawStage))) return;
+          const hourKey = getExportDayKeyFromDate(getEntryESTDate(hour));
+          if (hourKey !== dayKey) return;
+          combined.push({
+            ...hour,
+            observedDate: day.date,
+            classification: day.classification || "none",
+            peakNAVD88: day.peakNAVD88,
+            sourceHourIndex: idx,
+            exportSourceMode: "observed"
+          });
         });
-        selectedKey = best || getExportDayKeyFromDate(bounds.firstDate);
       }
-      if (!exportCalendarSelectedDayKey || !dayMap.has(exportCalendarSelectedDayKey)) exportCalendarSelectedDayKey = selectedKey;
-      if (!exportCalendarCursorDate) {
-        const cursorSource = parseStoredLocalNyToDate(`${exportCalendarSelectedDayKey}T00:00`) || bounds.firstDate;
-        exportCalendarCursorDate = getExportMonthStart(cursorSource);
-      }
+
+      getForecastExportEntriesLimited().forEach(entry => {
+        const entryDayKey = getExportDayKeyFromDate(getEntryESTDate(entry));
+        if (entryDayKey === dayKey) combined.push({ ...entry, exportSourceMode: "forecast" });
+      });
+
+      const byHour = new Map();
+      combined.forEach(entry => {
+        const d = getEntryESTDate(entry);
+        const key = d ? formatNyLocalIso(d) : String(entryTimeMs(entry));
+        const existing = byHour.get(key);
+        // Forecast wins where observed and forecast overlap because it is the active future run.
+        if (!existing || entry.exportSourceMode === "forecast") byHour.set(key, entry);
+      });
+
+      return Array.from(byHour.values())
+        .filter(entry => entryTimeMs(entry) != null)
+        .sort((a, b) => entryTimeMs(a) - entryTimeMs(b))
+        .map((entry, idx) => ({ entry, idx }));
     }
 
     function getExportPickerEntries() {
       const scope = getDownloadScopeValue();
       const range = scope === "range" ? getDownloadRangeRequest() : null;
-      let entries = getAllExportAvailabilityEntries();
+      const selected = getExportEntriesForDay(exportCalendarSelectedDayKey).map(item => item.entry);
       if (scope === "range" && range) {
-        entries = entries.filter(entry => {
+        return selected.filter(entry => {
           const t = entryTimeMs(entry);
           return t != null && t >= range.startMs - 1000 && t <= range.endMs + 1000;
         });
       }
-      return entries;
+      return selected;
     }
 
     function getSelectedPngFrameItems() {
@@ -7740,7 +7823,7 @@
     }
 
     function prunePngSelectionsToAvailable(entries) {
-      const available = new Set(entries.map(item => getEntryExportKey(item.entry || item)));
+      const available = new Set((entries || []).map(item => getEntryExportKey(item.entry || item)));
       Array.from(exportPngSelections.keys()).forEach(key => { if (!available.has(key)) exportPngSelections.delete(key); });
     }
 
@@ -7762,18 +7845,15 @@
       if (!d) return;
       const startEl = document.getElementById("downloadStartInput");
       const endEl = document.getElementById("downloadEndInput");
-      const existingStart = getRangeInputDate("downloadStartInput");
-      const existingEnd = getRangeInputDate("downloadEndInput");
-      if (exportRangePickMode === "start" || (existingStart && existingEnd)) {
+      const start = getRangeInputDate("downloadStartInput");
+      const end = getRangeInputDate("downloadEndInput");
+      if (!start || (start && end && Math.abs(end.getTime() - start.getTime()) > 0)) {
         setRangeInputDate("downloadStartInput", d);
-        if (!existingEnd || existingEnd.getTime() < d.getTime()) setRangeInputDate("downloadEndInput", d);
-        exportRangePickMode = "end";
+        setRangeInputDate("downloadEndInput", d);
+      } else if (d.getTime() < start.getTime()) {
+        setRangeInputDate("downloadStartInput", d);
       } else {
         setRangeInputDate("downloadEndInput", d);
-        const newStart = getRangeInputDate("downloadStartInput");
-        const newEnd = getRangeInputDate("downloadEndInput");
-        if (newStart && newEnd && newEnd.getTime() < newStart.getTime()) { setRangeInputDate("downloadStartInput", newEnd); setRangeInputDate("downloadEndInput", newStart); }
-        exportRangePickMode = "start";
       }
       if (startEl) startEl.dataset.userEdited = "1";
       if (endEl) endEl.dataset.userEdited = "1";
@@ -7787,6 +7867,37 @@
       if (!parts) return "--";
       const hour12 = (parts.hour % 12) || 12;
       return `${hour12} ${parts.hour >= 12 ? "PM" : "AM"}`;
+    }
+
+    function ensureExportCalendarCursor() {
+      const dayMap = getExportAvailabilityDayMap();
+      const bounds = getExportAvailabilityBounds();
+      if (!bounds || !dayMap.size) return;
+      const currentDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(getDownloadCurrentEntry()) || bounds.lastDate || bounds.firstDate;
+      let selectedKey = getExportDayKeyFromDate(currentDate);
+      if (!dayMap.has(selectedKey)) {
+        const currentMs = currentDate ? currentDate.getTime() : null;
+        let best = null;
+        let bestDiff = Infinity;
+        dayMap.forEach((meta, key) => {
+          const t = meta.firstDate ? meta.firstDate.getTime() : (parseStoredLocalNyToDate(`${key}T00:00`)?.getTime() || 0);
+          const diff = currentMs == null ? 0 : Math.abs(t - currentMs);
+          if (diff < bestDiff) { best = key; bestDiff = diff; }
+        });
+        selectedKey = best || getExportDayKeyFromDate(bounds.firstDate);
+      }
+      if (!exportCalendarSelectedDayKey || !dayMap.has(exportCalendarSelectedDayKey)) exportCalendarSelectedDayKey = selectedKey;
+      if (!exportCalendarCursorDate) {
+        const cursorSource = parseStoredLocalNyToDate(`${exportCalendarSelectedDayKey}T00:00`) || bounds.firstDate;
+        exportCalendarCursorDate = getExportMonthStart(cursorSource);
+      }
+    }
+
+    function getExportPickerHourEstimate() {
+      const dayMap = getExportAvailabilityDayMap();
+      let total = 0;
+      dayMap.forEach(meta => { total += Number(meta.count) || 0; });
+      return total;
     }
 
     function renderExportTimePicker() {
@@ -7803,6 +7914,7 @@
       const startText = document.getElementById("exportRangeStartText");
       const endText = document.getElementById("exportRangeEndText");
       if (!wrap || !calendarGrid || !hourGrid) return;
+
       const format = getDownloadFormatValue();
       const scope = getDownloadScopeValue();
       const dayMap = getExportAvailabilityDayMap();
@@ -7810,21 +7922,31 @@
       wrap.hidden = false;
       calendarGrid.innerHTML = "";
       hourGrid.innerHTML = "";
+
       if (!bounds || !dayMap.size) {
         calendarGrid.innerHTML = `<div class="export-picker-empty" style="grid-column:1/-1">No exportable dates are available.</div>`;
         if (title) title.textContent = "Available export dates";
         if (count) count.textContent = "0 hours";
         return;
       }
+
       ensureExportCalendarCursor();
-      prunePngSelectionsToAvailable(getAllExportAvailabilityEntries());
+      const selectedItems = getExportEntriesForDay(exportCalendarSelectedDayKey);
+      prunePngSelectionsToAvailable(selectedItems);
+
       if (title) title.textContent = scope === "range" ? "Choose export range" : (format === "png" ? "Choose PNG times" : "Available export dates");
-      if (count) count.textContent = format === "png" ? `${exportPngSelections.size}/${EXPORT_PNG_SELECTION_LIMIT} selected` : `${getExportPickerEntries().length} hours`;
+      if (count) {
+        count.textContent = format === "png"
+          ? `${exportPngSelections.size}/${EXPORT_PNG_SELECTION_LIMIT} selected`
+          : `${getExportPickerHourEstimate()} available hours`;
+      }
       if (clearBtn) clearBtn.hidden = format !== "png" || exportPngSelections.size === 0;
+
       const start = getRangeInputDate("downloadStartInput");
       const end = getRangeInputDate("downloadEndInput");
       if (startText) startText.textContent = start ? formatFixedESTFromUtc(start.toISOString()).replace(/^[A-Za-z]+\s+/, "") : "--";
       if (endText) endText.textContent = end ? formatFixedESTFromUtc(end.toISOString()).replace(/^[A-Za-z]+\s+/, "") : "--";
+
       const cursorParts = getNyParts(exportCalendarCursorDate || bounds.firstDate);
       const monthName = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/New_York" }).format(exportCalendarCursorDate || bounds.firstDate);
       if (monthTitle) monthTitle.textContent = monthName;
@@ -7833,28 +7955,31 @@
       const currentMonth = getExportMonthKey(exportCalendarCursorDate);
       if (prevBtn) prevBtn.disabled = currentMonth <= firstMonth;
       if (nextBtn) nextBtn.disabled = currentMonth >= lastMonth;
+
       const year = cursorParts.year;
       const month = cursorParts.month;
       const firstOfMonth = parseStoredLocalNyToDate(`${year}-${String(month).padStart(2, "0")}-01T00:00`);
       const firstParts = getNyParts(firstOfMonth);
       const startPad = firstParts ? firstParts.weekday : 0;
       const daysInMonth = new Date(year, month, 0).getDate();
+
       for (let i = 0; i < startPad; i++) {
         const blank = document.createElement("div");
         blank.className = "export-calendar-day";
         calendarGrid.appendChild(blank);
       }
+
       for (let day = 1; day <= daysInMonth; day++) {
         const dayKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-        const items = dayMap.get(dayKey) || [];
+        const meta = dayMap.get(dayKey);
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "export-calendar-day";
-        if (items.length) {
+        if (meta) {
           btn.classList.add("available");
-          if (items.some(item => item.entry.exportSourceMode === "forecast")) btn.classList.add("forecast-day");
+          if (meta.forecast) btn.classList.add("forecast-day");
           btn.textContent = String(day);
-          btn.title = `${items.length} exportable hour${items.length === 1 ? "" : "s"}`;
+          btn.title = `${meta.count || 0} exportable hour${(meta.count || 0) === 1 ? "" : "s"}`;
           btn.addEventListener("click", () => { exportCalendarSelectedDayKey = dayKey; renderExportTimePicker(); });
         } else {
           btn.textContent = "";
@@ -7863,19 +7988,23 @@
         btn.classList.toggle("selected", dayKey === exportCalendarSelectedDayKey);
         calendarGrid.appendChild(btn);
       }
-      const selectedItems = (dayMap.get(exportCalendarSelectedDayKey) || []);
+
       if (hourTitle) {
-        const sourceLabel = selectedItems.some(item => item.entry.exportSourceMode === "forecast") ? "forecast + historical" : "historical";
+        const meta = dayMap.get(exportCalendarSelectedDayKey);
+        const sourceLabel = meta?.forecast && meta?.observed ? "forecast + historical" : meta?.forecast ? "forecast" : "historical";
         hourTitle.textContent = selectedItems.length ? `${exportCalendarSelectedDayKey} available hours (${sourceLabel})` : "Select an available date";
       }
+
       if (!selectedItems.length) {
         hourGrid.innerHTML = `<div class="export-picker-empty" style="grid-column:1/-1">Select a highlighted date to choose export hours.</div>`;
         return;
       }
+
       const startMs = start ? start.getTime() : null;
       const endMs = end ? end.getTime() : null;
       const minMs = startMs != null && endMs != null ? Math.min(startMs, endMs) : null;
       const maxMs = startMs != null && endMs != null ? Math.max(startMs, endMs) : null;
+
       selectedItems.forEach(({ entry, idx }) => {
         const button = document.createElement("button");
         button.type = "button";
@@ -7893,7 +8022,12 @@
         } else if (scope === "range") {
           button.addEventListener("click", () => setExportRangeBoundaryFromEntry(entry));
         } else {
-          button.addEventListener("click", () => { setRangeInputDate("downloadStartInput", getEntryESTDate(entry)); setRangeInputDate("downloadEndInput", getEntryESTDate(entry)); renderExportTimePicker(); updateDownloadSummary(); });
+          button.addEventListener("click", () => {
+            setRangeInputDate("downloadStartInput", getEntryESTDate(entry));
+            setRangeInputDate("downloadEndInput", getEntryESTDate(entry));
+            renderExportTimePicker();
+            updateDownloadSummary();
+          });
         }
         hourGrid.appendChild(button);
       });
@@ -7917,9 +8051,10 @@
           return;
         }
         if (scope === "range") {
-          const items = getDownloadFrameItems("range");
-          summary.textContent = items.length
-            ? `PNG (${aspectLabel}) export of ${Math.min(items.length, EXPORT_PNG_SELECTION_LIMIT)} hourly frame${Math.min(items.length, EXPORT_PNG_SELECTION_LIMIT) === 1 ? "" : "s"}. Select individual times above for up to ${EXPORT_PNG_SELECTION_LIMIT} PNGs.`
+          const range = getDownloadRangeRequest();
+          const count = range ? Math.min(getDownloadRangeSummaryFrameCount(range), EXPORT_PNG_SELECTION_LIMIT) : 0;
+          summary.textContent = count
+            ? `PNG (${aspectLabel}) export of up to ${count} selected hourly frame${count === 1 ? "" : "s"}. Select individual times above for up to ${EXPORT_PNG_SELECTION_LIMIT} PNGs.`
             : "No frames are available for export.";
           return;
         }
