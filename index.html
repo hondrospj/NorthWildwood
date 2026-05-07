@@ -4907,6 +4907,247 @@
       }
     }
 
+  
+
+    /* Windows / short-desktop viewport fix: keep both side panes above the timeline. */
+    @media (min-width: 761px) and (max-height: 920px){
+      #leftPanel{
+        top:12px !important;
+        bottom:152px !important;
+        left:12px !important;
+        width:310px !important;
+        gap:7px !important;
+        padding-right:2px !important;
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        overscroll-behavior:contain !important;
+      }
+
+      #rightRail{
+        top:12px !important;
+        bottom:152px !important;
+        right:12px !important;
+        width:214px !important;
+        gap:8px !important;
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        overscroll-behavior:contain !important;
+      }
+
+      #legendDock{
+        top:12px !important;
+        left:334px !important;
+        width:176px !important;
+        padding:10px !important;
+      }
+
+      .brand{
+        min-height:70px !important;
+        padding:9px 12px !important;
+      }
+
+      h1{
+        font-size:clamp(18px, 1.7vw, 26px) !important;
+        line-height:.94 !important;
+      }
+
+      .panel-card,
+      .rail-card{
+        padding:8px 10px !important;
+        border-radius:16px !important;
+      }
+
+      .compact-card{
+        padding:8px 10px !important;
+      }
+
+      .section-title{
+        margin-bottom:5px !important;
+      }
+
+      .section-title h2,
+      .rail-head h3{
+        font-size:12px !important;
+      }
+
+      .pill{
+        min-height:20px !important;
+        padding:0 7px !important;
+        font-size:9px !important;
+      }
+
+      .button-grid-2,
+      .segmented-control{
+        gap:5px !important;
+      }
+
+      button,
+      select,
+      .segmented-control button,
+      .datum-card .segmented-control button{
+        min-height:32px !important;
+        font-size:11px !important;
+        padding:6px 8px !important;
+      }
+
+      .datum-card,
+      .opacity-card{
+        min-height:86px !important;
+        padding-top:8px !important;
+        padding-bottom:8px !important;
+      }
+
+      .opacity-card .control-row{
+        gap:5px !important;
+      }
+
+      .opacity-card .muted{
+        display:none !important;
+      }
+
+      .snapshot-card .stat-grid{
+        gap:6px !important;
+      }
+
+      .snapshot-card .stat-box{
+        min-height:64px !important;
+        padding:9px 10px !important;
+        border-radius:14px !important;
+        gap:3px !important;
+      }
+
+      .stat-label{
+        font-size:9px !important;
+      }
+
+      #timeText{
+        font-size:13px !important;
+      }
+
+      #timeSubText,
+      .stat-sub{
+        font-size:10px !important;
+      }
+
+      #stageText{
+        font-size:20px !important;
+      }
+
+      .legend-title{
+        font-size:12px !important;
+        margin-bottom:5px !important;
+      }
+
+      .legend-list{
+        gap:5px !important;
+      }
+
+      .legend-row{
+        font-size:10px !important;
+        gap:6px !important;
+      }
+
+      .legend-swatch{
+        width:11px !important;
+        height:11px !important;
+      }
+
+      .layer-item{
+        padding:8px 9px !important;
+        border-radius:12px !important;
+      }
+
+      .toggle{
+        width:38px !important;
+        height:22px !important;
+      }
+
+      .toggle::after{
+        width:16px !important;
+        height:16px !important;
+      }
+
+      .toggle.on::after{
+        left:19px !important;
+      }
+
+      .top-tides-card .rail-head{
+        margin-bottom:6px !important;
+      }
+
+      .top-tides-card .rail-head h3{
+        font-size:13px !important;
+      }
+
+      .top-tide-list{
+        gap:6px !important;
+      }
+
+      .top-tide-item{
+        padding:7px 8px !important;
+        border-radius:12px !important;
+        gap:2px !important;
+      }
+
+      .top-tide-rank{
+        font-size:10px !important;
+      }
+
+      .top-tide-main{
+        font-size:13px !important;
+      }
+
+      .top-tide-sub{
+        font-size:11px !important;
+      }
+
+      .download-launch-meta,
+      .right-rail-note{
+        font-size:10px !important;
+        line-height:1.35 !important;
+      }
+
+      .download-launch-btn,
+      .right-rail-action{
+        min-height:36px !important;
+        font-size:11px !important;
+      }
+
+      #timelineDock{
+        left:12px !important;
+        right:12px !important;
+        bottom:10px !important;
+      }
+
+      .leaflet-top.leaflet-right .leaflet-control-zoom{
+        margin-top:12px !important;
+        margin-right:232px !important;
+      }
+    }
+
+    @media (min-width: 761px) and (max-height: 760px){
+      #leftPanel,
+      #rightRail{
+        bottom:134px !important;
+      }
+      #timelineDock{
+        padding:22px 10px 8px !important;
+      }
+      .timeline-day{
+        padding:7px 6px !important;
+      }
+      .playFab{
+        width:40px !important;
+        min-width:40px !important;
+        height:40px !important;
+        min-height:40px !important;
+      }
+      .miniAction{
+        min-height:28px !important;
+        padding:0 9px !important;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -7253,6 +7494,45 @@
       await wait(EXPORT_CAPTURE_DELAY_MS);
     }
 
+
+    function waitForTileLayerReady(layer, timeoutMs = 3500) {
+      return new Promise(resolve => {
+        if (!layer || typeof layer.on !== "function") {
+          resolve();
+          return;
+        }
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          layer.off?.("load", done);
+          layer.off?.("tileerror", done);
+          resolve();
+        };
+        const timer = setTimeout(done, timeoutMs);
+        layer.on("load", done);
+        layer.on("tileerror", done);
+        if (typeof layer.isLoading === "function" && !layer.isLoading()) {
+          setTimeout(done, 80);
+        }
+      });
+    }
+
+    async function waitForExportMapReady(extraDelayMs = 120) {
+      if (!exportMap) return;
+      exportMap.invalidateSize(false);
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const waits = [];
+      if (exportBasemapColorLayer) waits.push(waitForTileLayerReady(exportBasemapColorLayer));
+      if (exportRoadsLayer && Number(exportRoadsLayer.options?.opacity || 0) > 0) waits.push(waitForTileLayerReady(exportRoadsLayer));
+      await Promise.race([
+        Promise.all(waits),
+        wait(3800)
+      ]).catch(() => null);
+      await wait(extraDelayMs);
+    }
+
     function getFriendlyExportError(err, format = "") {
       const raw = String(err?.message || err || "Download failed.").trim();
       const formatLabel = String(format || "export").toUpperCase();
@@ -7487,6 +7767,7 @@
     async function prepareExportFrame(item) {
       applyExportStageAspect(getDownloadAspectValue());
       const mapInstance = ensureExportMap();
+      mapInstance.invalidateSize(false);
       updateExportLegend();
       updateExportBoundaryVisibility();
       updateExportTimestampLabel(item.entry);
@@ -7494,9 +7775,10 @@
       if (map) {
         mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
       } else if (floodLatLngBounds) {
-        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16] });
+        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16], animate: false });
       }
 
+      mapInstance.invalidateSize(false);
       updateExportRoadLayerAppearance();
 
       const rawStage = getStageValue(item.entry);
@@ -7506,7 +7788,8 @@
       }
 
       await setExportFloodLayer(currentOverlayMode, displayStage);
-      mapInstance.invalidateSize();
+      mapInstance.invalidateSize(false);
+      await waitForExportMapReady(160);
       await waitForStableRender();
     }
 
@@ -7643,6 +7926,9 @@
         setDownloadStatus(message);
         setExportProgress(message, pct, false);
         await prepareExportFrame(item);
+        if (i === 0) {
+          await waitForExportMapReady(420);
+        }
         const canvas = await captureExportCanvas();
         await onFrame({ sequence: i, item, entry: item.entry, canvas });
         canvas.width = 1;
