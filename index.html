@@ -4248,15 +4248,25 @@
       return raw.replace(/[:\s]/g, "-").replace(/[^a-z0-9\-_]+/gi, "").toLowerCase();
     }
 
-    function getObservedExportSourceEntries() {
+    function isDownloadModalOpen() {
+      return document.getElementById("downloadModal")?.classList.contains("open") || false;
+    }
+
+    function getObservedExportEntriesCached() {
       const source = observedFlatHours.length ? observedFlatHours : currentSeriesHours;
-      return getObservedDisplaySeries(source).map(entry => ({
+      const cacheKey = `${source.length}|${source[0]?.timeEST || source[0]?.displayTimeEST || source[0]?.timeUtc || ""}|${source[source.length - 1]?.timeEST || source[source.length - 1]?.displayTimeEST || source[source.length - 1]?.timeUtc || ""}`;
+      if (getObservedExportEntriesCached.cacheKey === cacheKey && Array.isArray(getObservedExportEntriesCached.cache)) {
+        return getObservedExportEntriesCached.cache.slice();
+      }
+      getObservedExportEntriesCached.cacheKey = cacheKey;
+      getObservedExportEntriesCached.cache = getObservedDisplaySeries(source).map(entry => ({
         ...entry,
         exportSourceMode: "observed"
       }));
+      return getObservedExportEntriesCached.cache.slice();
     }
 
-    function getForecastExportSourceEntries() {
+    function getForecastExportEntries() {
       const source = Array.isArray(forecastData?.hours) && forecastData.hours.length
         ? forecastData.hours
         : currentDataMode === "forecast"
@@ -4268,15 +4278,28 @@
       }));
     }
 
-    function getDownloadSourceEntries() {
+    function getDownloadSourceEntries(includeHistorical = false) {
+      if (!includeHistorical) {
+        if (currentDataMode === "observed") {
+          return currentSeriesHours.map(entry => ({ ...entry, exportSourceMode: "observed" }));
+        }
+        return currentSeriesHours.map(entry => ({ ...entry, exportSourceMode: "forecast" }));
+      }
+
+      if (currentDataMode === "observed") {
+        return getObservedExportEntriesCached();
+      }
+
       const combined = [
-        ...getObservedExportSourceEntries(),
-        ...getForecastExportSourceEntries()
+        ...getObservedExportEntriesCached(),
+        ...getForecastExportEntries()
       ]
         .filter(entry => entryTimeMs(entry) != null)
         .sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
 
-      if (!combined.length) return currentSeriesHours.slice();
+      if (!combined.length) {
+        return currentSeriesHours.map(entry => ({ ...entry, exportSourceMode: currentDataMode }));
+      }
 
       const byHour = new Map();
       combined.forEach(entry => {
@@ -4292,7 +4315,12 @@
     }
 
     function getDownloadCurrentEntry() {
-      return currentSeriesHours[currentHourIndex] || null;
+      const entry = currentSeriesHours[currentHourIndex] || null;
+      if (!entry) return null;
+      return {
+        ...entry,
+        exportSourceMode: currentDataMode === "observed" ? "observed" : "forecast"
+      };
     }
 
     function getDownloadFrameItemFromEntry(entry, fallbackIndex = 0) {
@@ -4356,7 +4384,8 @@
 
       wrap.hidden = scopeValue !== "range";
 
-      const entries = getDownloadSourceEntries();
+      const includeHistorical = scopeValue === "range" && isDownloadModalOpen();
+      const entries = getDownloadSourceEntries(includeHistorical);
       if (!entries.length) {
         startEl.value = "";
         endEl.value = "";
@@ -4411,7 +4440,7 @@
         return item ? [item] : [];
       }
 
-      const entries = getDownloadSourceEntries();
+      const entries = getDownloadSourceEntries(true);
       if (!entries.length) return [];
       syncDownloadRangeInputs(false);
 
@@ -4445,7 +4474,7 @@
 
     function updateDownloadSummary() {
       const summary = document.getElementById("downloadSummary");
-      if (!summary) return;
+      if (!summary || !isDownloadModalOpen()) return;
       syncDownloadRangeInputs(false);
       const scope = document.getElementById("downloadScopeSelect")?.value || "current";
       const format = String(document.getElementById("downloadFormatSelect")?.value || "png").toUpperCase();
