@@ -4561,7 +4561,48 @@
         font-size:8.5px !important;
       }
     }
-</style>
+
+
+    /* Final mobile legend sync fix: preview updates when switching overlay mode */
+    @media (max-width: 860px), (max-height: 560px) and (pointer: coarse){
+      body.mobile-optimized #legendDock::before{
+        background:linear-gradient(90deg,
+          var(--depth-0) 0 14%,
+          var(--depth-1) 14% 28%,
+          var(--depth-3) 28% 42%,
+          var(--depth-5) 42% 56%,
+          var(--depth-7) 56% 70%,
+          var(--depth-8) 70% 84%,
+          var(--depth-10) 84% 100%) !important;
+      }
+
+      body.mobile-optimized #legendDock[data-legend-mode="dynamic"]::before{
+        background:linear-gradient(90deg,
+          var(--below) 0 24%,
+          var(--minor) 24% 52%,
+          var(--moderate) 52% 76%,
+          var(--major) 76% 100%) !important;
+      }
+
+      body.mobile-optimized #legendDock::after{
+        content:attr(data-preview-text) !important;
+        white-space:pre-line !important;
+        display:block !important;
+        font-size:11px !important;
+        line-height:1.02 !important;
+        font-weight:950 !important;
+        letter-spacing:.01em !important;
+        text-align:left !important;
+        color:#eaf0ff !important;
+      }
+
+      body.mobile-optimized.mobile-legend-open #legendDock::after{
+        content:"Tap to close" !important;
+        white-space:nowrap !important;
+      }
+    }
+
+  </style>
 </head>
 <body>
   <div id="topBanner">
@@ -5529,10 +5570,19 @@
       const title = document.getElementById("legendTitle");
       const sub = document.getElementById("legendSub");
       const note = document.getElementById("legendNote");
+      const legendDock = document.getElementById("legendDock");
       const items = currentOverlayMode === "depth" ? DEPTH_LEGEND : DYNAMIC_LEGEND;
 
       title.textContent = currentOverlayMode === "depth" ? "Flood depth" : "Impact thresholds";
       sub.textContent = "";
+      if (legendDock) {
+        legendDock.dataset.legendMode = currentOverlayMode;
+        legendDock.dataset.previewText = currentOverlayMode === "depth"
+          ? "Flood depth
+Tap to open"
+          : "Impact thresholds
+Tap to open";
+      }
 
       list.innerHTML = "";
       items.forEach(item => {
