@@ -1362,20 +1362,40 @@
 
     .export-manual-input{
       width:100%;
-      min-height:36px;
-      padding:0 10px;
-      border-radius:12px;
+      min-height:52px;
+      padding:0 16px;
+      border-radius:14px;
       border:1px solid var(--line);
       background:rgba(255,255,255,.045);
       color:#eaf0ff;
-      font-size:12px;
-      font-weight:800;
+      font-size:20px;
+      line-height:1.1;
+      font-weight:900;
+      letter-spacing:-.02em;
       outline:none;
+    }
+
+    .export-manual-input::placeholder{
+      color:rgba(219,232,255,.55);
+      font-size:18px;
+      font-weight:850;
     }
 
     .export-manual-input:focus{
       border-color:#bfdbfe;
       box-shadow:0 0 0 2px rgba(96,165,250,.16);
+    }
+
+
+    @media (max-width: 720px){
+      .export-manual-input{
+        min-height:50px;
+        font-size:18px;
+        padding:0 14px;
+      }
+      .export-manual-input::placeholder{
+        font-size:16px;
+      }
     }
 
     .export-ampm-toggle{
