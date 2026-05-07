@@ -160,11 +160,28 @@
     }
 
     .brand{
-      padding:14px 16px;
+      padding:12px 14px;
       display:flex;
       align-items:center;
       justify-content:center;
-      min-height:110px;
+      min-height:124px;
+    }
+
+    .shorelysafe-logo{
+      display:block;
+      width:min(210px, 92%);
+      max-height:44px;
+      object-fit:contain;
+      margin:0 auto 10px;
+      filter:drop-shadow(0 8px 14px rgba(0,0,0,.24));
+    }
+
+    .brand-stack{
+      width:100%;
+      display:grid;
+      gap:2px;
+      align-items:center;
+      justify-items:center;
     }
 
     .brand-top{
@@ -1194,7 +1211,7 @@
 
     .export-segmented{
       display:grid;
-      grid-template-columns:repeat(2, minmax(0, 1fr));
+      grid-template-columns:repeat(var(--seg-cols, 2), minmax(0, 1fr));
       gap:6px;
       padding:4px;
       border:1px solid rgba(255,255,255,.09);
@@ -1232,6 +1249,109 @@
       border-color:rgba(191,219,254,.55);
       color:#eef6ff;
       box-shadow:0 8px 18px rgba(15,23,42,.18), inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
+    .export-picker{
+      display:grid;
+      gap:8px;
+      padding:10px;
+      border-radius:16px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.035);
+    }
+
+    .export-picker-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      font-size:10px;
+      font-weight:850;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .export-picker-tools{
+      display:flex;
+      gap:6px;
+      align-items:center;
+      justify-content:flex-end;
+    }
+
+    .export-picker-tools button{
+      min-height:28px;
+      padding:0 9px;
+      border-radius:999px;
+      font-size:10px;
+      letter-spacing:.02em;
+    }
+
+    .export-picker-grid{
+      display:grid;
+      gap:8px;
+      max-height:220px;
+      overflow:auto;
+      padding-right:2px;
+    }
+
+    .export-picker-day{
+      display:grid;
+      gap:6px;
+      padding:8px;
+      border-radius:14px;
+      background:rgba(255,255,255,.035);
+      border:1px solid rgba(255,255,255,.06);
+    }
+
+    .export-picker-day-title{
+      font-size:11px;
+      font-weight:900;
+      color:#eaf0ff;
+      letter-spacing:-.01em;
+    }
+
+    .export-picker-hours{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0, 1fr));
+      gap:5px;
+    }
+
+    .export-hour-btn{
+      min-height:30px;
+      padding:0 5px;
+      border-radius:10px;
+      font-size:10.5px;
+      font-weight:850;
+      color:#dbe8ff;
+      background:rgba(255,255,255,.045);
+    }
+
+    .export-hour-btn.has-data{
+      border-color:rgba(96,165,250,.42);
+      background:rgba(96,165,250,.12);
+    }
+
+    .export-hour-btn.selected{
+      border-color:#bfdbfe;
+      background:linear-gradient(180deg, rgba(96,165,250,.30), rgba(96,165,250,.18));
+      color:#fff;
+      box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+    }
+
+    .export-hour-btn:disabled{
+      opacity:.42;
+      cursor:default;
+    }
+
+    .export-picker-empty{
+      padding:10px;
+      border-radius:12px;
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.4;
+      background:rgba(255,255,255,.035);
+      border:1px dashed rgba(255,255,255,.14);
     }
 
     .download-note{
@@ -5163,8 +5283,11 @@
   <div id="app">
     <aside id="leftPanel">
       <section class="panel-card brand">
-        <div class="brand-top">
-          <h1>North&nbsp;Wildwood <br> Flood Map</h1>
+        <div class="brand-stack">
+          <img class="shorelysafe-logo" src="assets/ShorelySafe.jpg" alt="ShorelySafe" loading="eager" decoding="async" />
+          <div class="brand-top">
+            <h1>North&nbsp;Wildwood <br> Flood Map</h1>
+          </div>
         </div>
       </section>
 
@@ -5337,7 +5460,7 @@
         <section id="downloadCard" class="rail-card download-card download-launch-card">
           <div class="rail-head">
             <div>
-              <h3>Export as GIF</h3>
+              <h3>Export as GIF/PNG</h3>
             </div>
           </div>
           <div class="download-launch-meta">Export a range of times out to 84 hours.</div>
@@ -5401,10 +5524,26 @@
               </div>
         </label>
         <label class="download-field">
+          Format
+          <div id="downloadFormatControl" class="export-segmented" role="tablist" aria-label="Export format">
+            <button id="exportFormatGifBtn" type="button" class="active" data-format="gif" aria-pressed="true">GIF</button>
+            <button id="exportFormatPngBtn" type="button" data-format="png" aria-pressed="false">PNG</button>
+          </div>
+        </label>
+        <label class="download-field">
           Aspect ratio
-          <div id="downloadAspectControl" class="export-segmented" role="tablist" aria-label="GIF aspect ratio">
+          <div id="downloadAspectControl" class="export-segmented" role="tablist" aria-label="Export aspect ratio" style="--seg-cols:3">
             <button id="exportAspectLandscapeBtn" type="button" class="active" data-aspect="16:9" aria-pressed="true">16:9</button>
             <button id="exportAspectPortraitBtn" type="button" data-aspect="9:16" aria-pressed="false">9:16</button>
+            <button id="exportAspectSquareBtn" type="button" data-aspect="1:1" aria-pressed="false">1:1</button>
+          </div>
+        </label>
+        <label id="gifSpeedField" class="download-field">
+          GIF speed
+          <div id="downloadSpeedControl" class="export-segmented" role="tablist" aria-label="GIF speed" style="--seg-cols:3">
+            <button id="exportSpeedSlowBtn" type="button" data-speed="slow" aria-pressed="false">Slow</button>
+            <button id="exportSpeedNormalBtn" type="button" class="active" data-speed="normal" aria-pressed="true">Normal</button>
+            <button id="exportSpeedFastBtn" type="button" data-speed="fast" aria-pressed="false">Fast</button>
           </div>
         </label>
         <div id="downloadRangeFields" class="download-range-grid" hidden>
@@ -5419,9 +5558,20 @@
         </div>
         <p class="export-modal-copy">Export a range of times out to 84 hours.</p>
             <div id="downloadRangeNote" class="download-note"></div>
+        <section id="exportTimePicker" class="export-picker" aria-label="Available export times">
+          <div class="export-picker-head">
+            <span id="exportPickerTitle">Available times</span>
+            <div class="export-picker-tools">
+              <span id="exportSelectionCount">0 selected</span>
+              <button id="clearPngSelectionsBtn" type="button">Clear</button>
+            </div>
+          </div>
+          <div id="exportTimePickerGrid" class="export-picker-grid"></div>
+        </section>
         <input id="downloadScopeSelect" type="hidden" value="current" />
             <input id="downloadFormatSelect" type="hidden" value="gif" />
             <input id="downloadAspectSelect" type="hidden" value="16:9" />
+            <input id="downloadSpeedSelect" type="hidden" value="normal" />
             <div id="downloadSummary" class="download-summary">GIF (16:9) export at the selected time.</div>
         <div class="download-actions">
           <button id="downloadBtn" class="download-btn active" type="button"><span class="download-btn-spinner" aria-hidden="true"></span><span id="downloadBtnLabel">Download</span></button>
@@ -5458,6 +5608,7 @@
   <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   
   <script>
     const APP_BASE = new URL(".", window.location.href);
@@ -5503,14 +5654,20 @@
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 45;
-    const EXPORT_GIF_FRAME_DELAY_MS = 1000;
-    const EXPORT_CAPTURE_SCALE_DEFAULT = 1.6;
-    const EXPORT_GIF_QUALITY = 9;
-    const EXPORT_GIF_MAX_WORKERS = 6;
+    const EXPORT_GIF_SPEEDS = {
+      slow: { value: "slow", label: "Slow", delayMs: 2000 },
+      normal: { value: "normal", label: "Normal", delayMs: 1000 },
+      fast: { value: "fast", label: "Fast", delayMs: 500 }
+    };
+    const EXPORT_CAPTURE_SCALE_DEFAULT = 1;
+    const EXPORT_GIF_QUALITY = 13;
+    const EXPORT_GIF_MAX_WORKERS = 8;
+    const EXPORT_PNG_SELECTION_LIMIT = 10;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
     const EXPORT_GIF_ASPECTS = {
       "16:9": { value: "16:9", width: 1280, height: 720, label: "16:9" },
-      "9:16": { value: "9:16", width: 720, height: 1280, label: "9:16" }
+      "9:16": { value: "9:16", width: 720, height: 1280, label: "9:16" },
+      "1:1": { value: "1:1", width: 960, height: 960, label: "1:1" }
     };
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
@@ -5818,6 +5975,7 @@
     let exportInProgress = false;
     let ffmpegClientPromise = null;
     let gifWorkerUrlPromise = null;
+    let exportPngSelections = new Map();
 
     function pad2(n) {
       return String(n).padStart(2, "0");
@@ -6255,6 +6413,7 @@
         updateExportSegmentedUI();
         applyExportStageAspect(getDownloadAspectValue());
         syncDownloadRangeInputs(true);
+        renderExportTimePicker();
         updateDownloadSummary();
         document.getElementById("exportScopeCurrentBtn")?.focus();
       }
@@ -7184,8 +7343,24 @@
 
     function getDownloadFormatValue() {
       const hiddenFormat = document.getElementById("downloadFormatSelect");
-      if (hiddenFormat && hiddenFormat.value !== "gif") hiddenFormat.value = "gif";
-      return "gif";
+      const activeFormatButton = document.querySelector("#downloadFormatControl button[data-format].active");
+      const raw = hiddenFormat?.value || activeFormatButton?.dataset?.format || "gif";
+      const normalized = raw === "png" ? "png" : "gif";
+      if (hiddenFormat && hiddenFormat.value !== normalized) hiddenFormat.value = normalized;
+      return normalized;
+    }
+
+    function getDownloadSpeedValue() {
+      const hiddenSpeed = document.getElementById("downloadSpeedSelect");
+      const activeSpeedButton = document.querySelector("#downloadSpeedControl button[data-speed].active");
+      const raw = hiddenSpeed?.value || activeSpeedButton?.dataset?.speed || "normal";
+      const normalized = EXPORT_GIF_SPEEDS[raw] ? raw : "normal";
+      if (hiddenSpeed && hiddenSpeed.value !== normalized) hiddenSpeed.value = normalized;
+      return normalized;
+    }
+
+    function getGifFrameDelayMs() {
+      return EXPORT_GIF_SPEEDS[getDownloadSpeedValue()]?.delayMs || 1000;
     }
 
     function getDownloadAspectValue() {
@@ -7217,7 +7392,7 @@
         stageFrame.dataset.exportAspect = config.value;
       }
       if (legendDock) {
-        legendDock.style.width = `${config.value === "9:16" ? 176 : 192}px`;
+        legendDock.style.width = `${config.value === "9:16" ? 176 : config.value === "1:1" ? 184 : 192}px`;
       }
       if (timestamp) {
         timestamp.style.maxWidth = `calc(${config.width}px - 48px)`;
@@ -7405,18 +7580,163 @@
       return Math.max(1, Math.floor((endMs - startMs) / hourMs) + 1);
     }
 
+
+    function getEntryExportKey(entry) {
+      const t = entryTimeMs(entry);
+      if (t != null) return String(t);
+      return String(entry?.displayTimeEST || entry?.timeEST || entry?.timeUtc || Math.random());
+    }
+
+    function getExportPickerEntries() {
+      const scope = getDownloadScopeValue();
+      const range = scope === "range" ? getDownloadRangeRequest() : null;
+      let entries = [];
+      if (scope === "range" && range) {
+        entries = getDownloadSourceEntries(true, range.startDate, range.endDate)
+          .filter(entry => entryTimeMs(entry) != null)
+          .filter(entry => {
+            const t = entryTimeMs(entry);
+            return t >= range.startMs - 1000 && t <= range.endMs + 1000;
+          });
+      } else {
+        entries = getDownloadSourceEntries(false).filter(entry => entryTimeMs(entry) != null);
+      }
+
+      entries = entries.sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+      if (currentDataMode === "forecast" || entries.some(e => e.exportSourceMode === "forecast")) {
+        const firstForecast = entries.find(e => e.exportSourceMode === "forecast") || entries[0];
+        const startMs = entryTimeMs(firstForecast);
+        const maxMs = startMs == null ? Infinity : startMs + 72 * 60 * 60 * 1000;
+        entries = entries.filter(e => e.exportSourceMode !== "forecast" || entryTimeMs(e) <= maxMs);
+      }
+      return entries;
+    }
+
+    function getSelectedPngFrameItems() {
+      return Array.from(exportPngSelections.values())
+        .sort((a, b) => entryTimeMs(a.entry) - entryTimeMs(b.entry));
+    }
+
+    function prunePngSelectionsToAvailable(entries) {
+      const available = new Set(entries.map(getEntryExportKey));
+      Array.from(exportPngSelections.keys()).forEach(key => {
+        if (!available.has(key)) exportPngSelections.delete(key);
+      });
+    }
+
+    function togglePngExportSelection(entry, fallbackIndex = 0) {
+      const key = getEntryExportKey(entry);
+      if (exportPngSelections.has(key)) {
+        exportPngSelections.delete(key);
+      } else {
+        if (exportPngSelections.size >= EXPORT_PNG_SELECTION_LIMIT) {
+          toast(`You can select up to ${EXPORT_PNG_SELECTION_LIMIT} PNG times.`);
+          return;
+        }
+        const item = getDownloadFrameItemFromEntry(entry, fallbackIndex);
+        if (item) exportPngSelections.set(key, item);
+      }
+      renderExportTimePicker();
+      updateDownloadSummary();
+    }
+
+    function renderExportTimePicker() {
+      const wrap = document.getElementById("exportTimePicker");
+      const grid = document.getElementById("exportTimePickerGrid");
+      const title = document.getElementById("exportPickerTitle");
+      const count = document.getElementById("exportSelectionCount");
+      const clearBtn = document.getElementById("clearPngSelectionsBtn");
+      if (!wrap || !grid) return;
+
+      const format = getDownloadFormatValue();
+      const entries = getExportPickerEntries();
+      prunePngSelectionsToAvailable(entries);
+      wrap.hidden = false;
+      if (title) title.textContent = format === "png" ? "PNG times" : "Available GIF hours";
+      if (count) count.textContent = format === "png" ? `${exportPngSelections.size}/${EXPORT_PNG_SELECTION_LIMIT} selected` : `${entries.length} hours`;
+      if (clearBtn) clearBtn.hidden = format !== "png" || exportPngSelections.size === 0;
+      grid.innerHTML = "";
+
+      if (!entries.length) {
+        grid.innerHTML = `<div class="export-picker-empty">No exportable hours are available for this selection.</div>`;
+        return;
+      }
+
+      const byDay = new Map();
+      entries.forEach((entry, idx) => {
+        const d = getEntryESTDate(entry);
+        if (!d) return;
+        const p = getNyParts(d);
+        const dayKey = `${p.year}-${p.month}-${p.day}`;
+        if (!byDay.has(dayKey)) byDay.set(dayKey, []);
+        byDay.get(dayKey).push({ entry, idx });
+      });
+
+      byDay.forEach((items, dayKey) => {
+        const day = document.createElement("div");
+        day.className = "export-picker-day";
+        const firstDate = getEntryESTDate(items[0].entry);
+        const heading = document.createElement("div");
+        heading.className = "export-picker-day-title";
+        heading.textContent = firstDate ? formatFixedESTFromUtc(firstDate.toISOString()).replace(/,?\s*\d{1,2}:00\s*[AP]M\s*E[DS]T/i, "") : dayKey;
+        const hours = document.createElement("div");
+        hours.className = "export-picker-hours";
+
+        items.forEach(({ entry, idx }) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "export-hour-btn has-data";
+          const d = getEntryESTDate(entry);
+          const parts = d ? getNyParts(d) : null;
+          const hour = parts ? parts.hour : null;
+          const hour12 = hour == null ? "--" : ((hour % 12) || 12);
+          const ampm = hour == null ? "" : (hour >= 12 ? "PM" : "AM");
+          button.textContent = `${hour12} ${ampm}`.trim();
+          button.title = formatHourEntryTime(entry);
+          const key = getEntryExportKey(entry);
+          button.classList.toggle("selected", exportPngSelections.has(key));
+          if (format !== "png") {
+            button.disabled = true;
+          } else {
+            button.addEventListener("click", () => togglePngExportSelection(entry, idx));
+          }
+          hours.appendChild(button);
+        });
+
+        day.appendChild(heading);
+        day.appendChild(hours);
+        grid.appendChild(day);
+      });
+    }
     function updateDownloadSummary() {
       const summary = document.getElementById("downloadSummary");
       if (!summary || !isDownloadModalOpen()) return;
 
-      // Important performance rule:
-      // Opening or editing the Time range controls must not build/export frame lists.
-      // Building frame lists can scan historical observed days and should only happen
-      // after the user clicks Download.
       syncDownloadRangeInputs(false);
       const scope = getDownloadScopeValue();
-      const format = getDownloadFormatValue().toUpperCase();
+      const format = getDownloadFormatValue();
+      const formatLabel = format.toUpperCase();
       const aspectLabel = getExportAspectConfig().label;
+      const speed = EXPORT_GIF_SPEEDS[getDownloadSpeedValue()]?.label || "Normal";
+      renderExportTimePicker();
+
+      if (format === "png") {
+        const selectedItems = getSelectedPngFrameItems();
+        if (selectedItems.length) {
+          summary.textContent = `PNG (${aspectLabel}) export of ${selectedItems.length} selected frame${selectedItems.length === 1 ? "" : "s"}.`;
+          return;
+        }
+        if (scope === "range") {
+          const items = getDownloadFrameItems("range");
+          summary.textContent = items.length
+            ? `PNG (${aspectLabel}) export of ${Math.min(items.length, EXPORT_PNG_SELECTION_LIMIT)} hourly frame${Math.min(items.length, EXPORT_PNG_SELECTION_LIMIT) === 1 ? "" : "s"}. Select individual times above for up to ${EXPORT_PNG_SELECTION_LIMIT} PNGs.`
+            : "No frames are available for export.";
+          return;
+        }
+        const item = getDownloadFrameItemFromEntry(getDownloadCurrentEntry(), currentHourIndex);
+        summary.textContent = item ? `PNG (${aspectLabel}) export at ${formatHourEntryTime(item.entry)}.` : "No frames are available for export.";
+        return;
+      }
 
       if (scope === "range") {
         const range = getDownloadRangeRequest();
@@ -7425,13 +7745,11 @@
           return;
         }
         if (range.durationMs > EXPORT_RANGE_MAX_MS) {
-          summary.textContent = `${format} (${aspectLabel}) export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
+          summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
           return;
         }
-        // Do not check historical archive bounds here. That check can require
-        // archive inspection and should only happen after Download is pressed.
         const frameCount = getDownloadRangeSummaryFrameCount(range);
-        summary.textContent = `${format} (${aspectLabel}) export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
+        summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
         return;
       }
 
@@ -7440,14 +7758,22 @@
         summary.textContent = "No frames are available for export.";
         return;
       }
-      summary.textContent = `${format} (${aspectLabel}) export at ${formatHourEntryTime(item.entry)}.`;
+      summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export at ${formatHourEntryTime(item.entry)}.`;
     }
 
     function updateExportSegmentedUI() {
       const scopeValue = getDownloadScopeValue();
+      const formatValue = getDownloadFormatValue();
       const aspectValue = getDownloadAspectValue();
+      const speedValue = getDownloadSpeedValue();
+
       document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
         const active = btn.dataset.scope === scopeValue;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+      document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
+        const active = btn.dataset.format === formatValue;
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", String(active));
       });
@@ -7456,6 +7782,13 @@
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", String(active));
       });
+      document.querySelectorAll("#downloadSpeedControl button[data-speed]").forEach(btn => {
+        const active = btn.dataset.speed === speedValue;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+      const speedField = document.getElementById("gifSpeedField");
+      if (speedField) speedField.hidden = formatValue !== "gif";
     }
 
     function setDownloadBusy(isBusy, message = "") {
@@ -7464,6 +7797,9 @@
       const btnLabel = document.getElementById("downloadBtnLabel");
       const scope = document.getElementById("downloadScopeSelect");
       const start = document.getElementById("downloadStartInput");
+      const format = document.getElementById("downloadFormatSelect");
+      const aspect = document.getElementById("downloadAspectSelect");
+      const speed = document.getElementById("downloadSpeedSelect");
       const end = document.getElementById("downloadEndInput");
       if (btn) {
         btn.disabled = isBusy;
@@ -7473,9 +7809,10 @@
         btnLabel.textContent = isBusy ? "Exporting..." : "Download";
       }
       if (scope) scope.disabled = isBusy;
-      document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
-        btn.disabled = isBusy;
-      });
+      if (format) format.disabled = isBusy;
+      if (aspect) aspect.disabled = isBusy;
+      if (speed) speed.disabled = isBusy;
+      document.querySelectorAll("#downloadScopeControl button, #downloadFormatControl button, #downloadAspectControl button, #downloadSpeedControl button, #exportTimePicker button").forEach(el => { el.disabled = isBusy; });
       if (start) start.disabled = isBusy;
       if (end) end.disabled = isBusy;
       if (isBusy) {
@@ -7537,6 +7874,9 @@
       const raw = String(err?.message || err || "Download failed.").trim();
       const formatLabel = String(format || "export").toUpperCase();
       if (!raw) return `${formatLabel} export failed.`;
+      if (/JSZip|zip export library/i.test(raw)) {
+        return "PNG export could not package multiple images. Reload the page and try again.";
+      }
       if (/gif\.worker|Failed to construct 'Worker'|cannot be accessed from origin/i.test(raw)) {
         return "GIF export was blocked by a worker loading issue. Reload the page and try again.";
       }
@@ -7971,7 +8311,7 @@
         height: aspectConfig.height
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
-        gif.addFrame(canvas, { delay: EXPORT_GIF_FRAME_DELAY_MS, copy: true });
+        gif.addFrame(canvas, { delay: getGifFrameDelayMs(), copy: true });
       }, 4, 74);
       setDownloadStatus("Encoding GIF...");
       setExportProgress("Encoding GIF...", 76, false);
@@ -7992,10 +8332,42 @@
       downloadBlob(blob, `${getExportBaseName()}.gif`);
     }
 
+    async function exportPng(frameItems) {
+      const aspectConfig = applyExportStageAspect(getDownloadAspectValue());
+      const items = frameItems.slice(0, EXPORT_PNG_SELECTION_LIMIT);
+      setDownloadStatus(`Preparing ${items.length} PNG frame${items.length === 1 ? "" : "s"}...`);
+      setExportProgress(`Preparing ${aspectConfig.label} PNG export...`, 2, false);
+      await preloadExportFrameAssets(items);
+
+      if (items.length === 1) {
+        await withExportFrames(items, async ({ canvas, entry, sequence }) => {
+          const blob = await canvasToBlob(canvas, "image/png");
+          downloadBlob(blob, `${getExportBaseName()}-${getSafeFrameStamp(entry, sequence)}.png`);
+        }, 8, 94);
+        return;
+      }
+
+      if (typeof JSZip === "undefined") {
+        throw new Error("PNG zip export library did not load.");
+      }
+      const zip = new JSZip();
+      await withExportFrames(items, async ({ canvas, entry, sequence }) => {
+        const blob = await canvasToBlob(canvas, "image/png");
+        zip.file(`${String(sequence + 1).padStart(2, "0")}-${getSafeFrameStamp(entry, sequence)}.png`, blob);
+      }, 8, 76);
+      setDownloadStatus("Packaging PNG files...");
+      setExportProgress("Packaging PNG files...", 82, false);
+      const zipBlob = await zip.generateAsync({ type: "blob", compression: "STORE" }, metadata => {
+        const pct = 82 + ((Number(metadata.percent) || 0) * 0.16);
+        setExportProgress(`Packaging PNG files... ${Math.round(metadata.percent || 0)}%`, pct, false);
+      });
+      downloadBlob(zipBlob, `${getExportBaseName()}-pngs.zip`);
+    }
+
     async function downloadCurrentSelection() {
       if (exportInProgress) return;
       syncDownloadRangeInputs(false);
-      const format = "gif";
+      const format = getDownloadFormatValue();
       const validation = validateDownloadRangeForExport();
       if (!validation.ok) {
         toast(validation.message);
@@ -8003,7 +8375,19 @@
         updateDownloadSummary();
         return;
       }
-      const frameItems = getDownloadFrameItems();
+
+      let frameItems = [];
+      if (format === "png") {
+        frameItems = getSelectedPngFrameItems();
+        if (!frameItems.length) frameItems = getDownloadFrameItems();
+        if (frameItems.length > EXPORT_PNG_SELECTION_LIMIT) {
+          frameItems = frameItems.slice(0, EXPORT_PNG_SELECTION_LIMIT);
+          toast(`PNG export is limited to ${EXPORT_PNG_SELECTION_LIMIT} selected times.`);
+        }
+      } else {
+        frameItems = getDownloadFrameItems();
+      }
+
       if (!frameItems.length) {
         toast("No frames are available for export.");
         setDownloadStatus("No frames are available for export.", true);
@@ -8011,10 +8395,15 @@
       }
       setDownloadModalOpen(false);
       setDownloadBusy(true, "Preparing export...");
-      setExportProgress(`Preparing ${getDownloadAspectValue()} GIF export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
+      const label = format === "png" ? "PNG" : `${getDownloadAspectValue()} GIF`;
+      setExportProgress(`Preparing ${label} export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
       try {
-        await exportGif(frameItems);
-        const doneMessage = "Downloaded GIF export.";
+        if (format === "png") {
+          await exportPng(frameItems);
+        } else {
+          await exportGif(frameItems);
+        }
+        const doneMessage = `Downloaded ${format.toUpperCase()} export.`;
         setDownloadStatus(doneMessage);
         finishExportProgress(doneMessage, false);
       } catch (err) {
@@ -9466,6 +9855,19 @@
         updateDownloadSummary();
       });
 
+      document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
+          const input = document.getElementById("downloadFormatSelect");
+          if (!input) return;
+          input.value = btn.dataset.format || "gif";
+          if (!exportInProgress) setDownloadStatus("", false);
+          updateExportSegmentedUI();
+          renderExportTimePicker();
+          updateDownloadSummary();
+        });
+      });
+
       document.querySelectorAll("#downloadAspectControl button[data-aspect]").forEach(btn => {
         btn.addEventListener("click", event => {
           event.preventDefault();
@@ -9485,6 +9887,30 @@
         updateExportSegmentedUI();
         updateDownloadSummary();
       });
+
+      document.querySelectorAll("#downloadSpeedControl button[data-speed]").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
+          const input = document.getElementById("downloadSpeedSelect");
+          if (!input) return;
+          input.value = btn.dataset.speed || "normal";
+          if (!exportInProgress) setDownloadStatus("", false);
+          updateExportSegmentedUI();
+          updateDownloadSummary();
+        });
+      });
+
+      document.getElementById("downloadSpeedSelect")?.addEventListener("change", () => {
+        if (!exportInProgress) setDownloadStatus("", false);
+        updateExportSegmentedUI();
+        updateDownloadSummary();
+      });
+
+      document.getElementById("clearPngSelectionsBtn")?.addEventListener("click", () => {
+        exportPngSelections.clear();
+        renderExportTimePicker();
+        updateDownloadSummary();
+      });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
         const input = document.getElementById(id);
         input.addEventListener("focus", () => {
@@ -9493,17 +9919,19 @@
         input.addEventListener("input", () => {
           input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
+          renderExportTimePicker();
           updateDownloadSummary();
         });
         input.addEventListener("change", () => {
           input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
+          renderExportTimePicker();
           updateDownloadSummary();
         });
       });
       document.getElementById("downloadBtn").addEventListener("click", () => {
         downloadCurrentSelection().catch(err => {
-          const format = "gif";
+          const format = getDownloadFormatValue();
           const friendlyMessage = getFriendlyExportError(err, format);
           console.error(err);
           toast(friendlyMessage);
