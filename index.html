@@ -3093,8 +3093,11 @@
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 220;
-    const EXPORT_MOV_FPS = 8;
-    const EXPORT_VIDEO_BITRATE = 90000000;
+    const EXPORT_MOV_FPS = 20;
+    const EXPORT_VIDEO_BITRATE = 140000000;
+    const EXPORT_VIDEO_MAX_WIDTH = 2560;
+    const EXPORT_VIDEO_MAX_HEIGHT = 1440;
+    const EXPORT_MOV_FRAME_HOLD_MS = 900;
     const EXPORT_CAPTURE_SCALE_DEFAULT = 2;
     const EXPORT_CAPTURE_SCALE_VIDEO = 4;
     const EXPORT_GIF_QUALITY = 4;
@@ -5331,14 +5334,16 @@
     function getBestNativeVideoType() {
       if (typeof MediaRecorder === "undefined") return null;
       const candidates = [
-        { mimeType: "video/quicktime;codecs=h264", extension: "mov", label: "MOV" },
-        { mimeType: "video/quicktime", extension: "mov", label: "MOV" },
+        { mimeType: "video/mp4;codecs=avc1.64002A", extension: "mp4", label: "MP4" },
+        { mimeType: "video/mp4;codecs=avc1.4d4028", extension: "mp4", label: "MP4" },
         { mimeType: "video/mp4;codecs=avc1.42E01E", extension: "mp4", label: "MP4" },
         { mimeType: "video/mp4;codecs=h264", extension: "mp4", label: "MP4" },
         { mimeType: "video/mp4", extension: "mp4", label: "MP4" },
         { mimeType: "video/webm;codecs=vp9", extension: "webm", label: "WEBM" },
         { mimeType: "video/webm;codecs=vp8", extension: "webm", label: "WEBM" },
-        { mimeType: "video/webm", extension: "webm", label: "WEBM" }
+        { mimeType: "video/webm", extension: "webm", label: "WEBM" },
+        { mimeType: "video/quicktime;codecs=h264", extension: "mov", label: "MOV" },
+        { mimeType: "video/quicktime", extension: "mov", label: "MOV" }
       ];
       for (const candidate of candidates) {
         try {
@@ -5346,6 +5351,23 @@
         } catch (err) {}
       }
       return null;
+    }
+
+    function getPreferredVideoCanvasSize(sourceWidth, sourceHeight) {
+      if (!(sourceWidth > 0) || !(sourceHeight > 0)) return null;
+      let scale = Math.min(
+        EXPORT_VIDEO_MAX_WIDTH / sourceWidth,
+        EXPORT_VIDEO_MAX_HEIGHT / sourceHeight,
+        1
+      );
+      if (!Number.isFinite(scale) || scale <= 0) scale = 1;
+      let width = Math.round(sourceWidth * scale);
+      let height = Math.round(sourceHeight * scale);
+      if (width % 2) width -= 1;
+      if (height % 2) height -= 1;
+      width = Math.max(2, width);
+      height = Math.max(2, height);
+      return { width, height };
     }
 
     async function exportMov(frameItems) {
@@ -5396,11 +5418,11 @@
 
       setDownloadStatus("Starting MOV export...");
       setExportProgress("Starting MOV export...", 3, false);
-      recorder.start(250);
+      recorder.start(1000);
 
       const total = Math.max(1, frameItems.length);
       const perVideoFrameMs = Math.max(1, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
-      const frameHoldMs = 700;
+      const frameHoldMs = EXPORT_MOV_FRAME_HOLD_MS;
       const holdFrameCount = Math.max(1, Math.round(frameHoldMs / perVideoFrameMs));
 
       try {
@@ -5415,8 +5437,9 @@
           const captured = await captureExportCanvas();
 
           if (!outputCanvas.width || !outputCanvas.height) {
-            outputCanvas.width = captured.width;
-            outputCanvas.height = captured.height;
+            const preferredSize = getPreferredVideoCanvasSize(captured.width, captured.height);
+            outputCanvas.width = preferredSize?.width || captured.width;
+            outputCanvas.height = preferredSize?.height || captured.height;
           }
 
           outputCtx.fillStyle = "#050b16";
@@ -5427,6 +5450,7 @@
           captured.height = 1;
 
           for (let hold = 0; hold < holdFrameCount; hold++) {
+            outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
             requestVideoFrame();
             await wait(perVideoFrameMs);
           }
