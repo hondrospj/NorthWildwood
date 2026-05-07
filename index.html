@@ -1262,6 +1262,90 @@
       to{ transform:rotate(360deg); }
     }
 
+
+    .export-progress-overlay{
+      position:fixed;
+      inset:0;
+      z-index:6200;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      background:rgba(5,11,22,.46);
+      backdrop-filter:blur(6px);
+      -webkit-backdrop-filter:blur(6px);
+      pointer-events:auto;
+    }
+
+    .export-progress-overlay.open{
+      display:flex;
+    }
+
+    .export-progress-card{
+      width:min(420px, calc(100vw - 32px));
+      border-radius:24px;
+      border:1px solid rgba(191,219,254,.18);
+      background:rgba(11,18,32,.97);
+      box-shadow:0 28px 70px rgba(0,0,0,.42);
+      padding:22px 20px 18px;
+      display:grid;
+      justify-items:center;
+      gap:14px;
+      color:#dbe8ff;
+      text-align:center;
+    }
+
+    .export-progress-wheel{
+      width:46px;
+      height:46px;
+      border-radius:999px;
+      border:4px solid rgba(255,255,255,.18);
+      border-top-color:#bfdbfe;
+      animation:download-spin .8s linear infinite;
+    }
+
+    .export-progress-title{
+      font-size:17px;
+      font-weight:900;
+      letter-spacing:-.02em;
+      color:#ffffff;
+    }
+
+    .export-progress-message{
+      min-height:20px;
+      font-size:12px;
+      line-height:1.45;
+      color:#c7d2fe;
+      word-break:break-word;
+    }
+
+    .export-progress-message.error{
+      color:#fecaca;
+    }
+
+    .export-progress-bar{
+      width:100%;
+      height:10px;
+      overflow:hidden;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.08);
+    }
+
+    .export-progress-fill{
+      height:100%;
+      width:0%;
+      border-radius:999px;
+      background:#60a5fa;
+      transition:width .18s ease;
+    }
+
+    .export-progress-percent{
+      font-size:11px;
+      font-weight:850;
+      color:var(--muted);
+    }
+
     .export-stage{
       position:fixed;
       left:-20000px;
@@ -2915,6 +2999,18 @@
     </div>
   </div>
 
+
+
+  <div id="exportProgressOverlay" class="export-progress-overlay" hidden aria-live="polite" aria-busy="true">
+    <div class="export-progress-card" role="status">
+      <div class="export-progress-wheel" aria-hidden="true"></div>
+      <div class="export-progress-title">Preparing export</div>
+      <div id="exportProgressMessage" class="export-progress-message">Preparing export...</div>
+      <div class="export-progress-bar" aria-hidden="true"><div id="exportProgressFill" class="export-progress-fill"></div></div>
+      <div id="exportProgressPercent" class="export-progress-percent">0%</div>
+    </div>
+  </div>
+
   <div id="exportStage" class="export-stage" aria-hidden="true">
     <div id="exportStageFrame" class="export-stage-frame">
       <div id="exportMap" class="export-stage-map"></div>
@@ -4228,9 +4324,47 @@
 
     function setDownloadStatus(message = "", isError = false) {
       const el = document.getElementById("downloadStatus");
-      if (!el) return;
-      el.textContent = message;
-      el.classList.toggle("error", Boolean(isError));
+      if (el) {
+        el.textContent = message;
+        el.classList.toggle("error", Boolean(isError));
+      }
+      if (exportInProgress || isExportProgressOpen()) {
+        setExportProgress(message, null, isError);
+      }
+    }
+
+    function isExportProgressOpen() {
+      return document.getElementById("exportProgressOverlay")?.classList.contains("open") || false;
+    }
+
+    function setExportProgressVisible(isVisible) {
+      const overlay = document.getElementById("exportProgressOverlay");
+      if (!overlay) return;
+      overlay.hidden = !isVisible;
+      overlay.classList.toggle("open", Boolean(isVisible));
+      overlay.setAttribute("aria-busy", String(Boolean(isVisible)));
+    }
+
+    function setExportProgress(message = "", percent = null, isError = false) {
+      const messageEl = document.getElementById("exportProgressMessage");
+      const fillEl = document.getElementById("exportProgressFill");
+      const pctEl = document.getElementById("exportProgressPercent");
+      if (messageEl) {
+        messageEl.textContent = message || (isError ? "Export failed." : "Working...");
+        messageEl.classList.toggle("error", Boolean(isError));
+      }
+      if (Number.isFinite(percent)) {
+        const pct = Math.max(0, Math.min(100, Math.round(percent)));
+        if (fillEl) fillEl.style.width = `${pct}%`;
+        if (pctEl) pctEl.textContent = `${pct}%`;
+      }
+    }
+
+    function finishExportProgress(message = "", isError = false) {
+      setExportProgress(message, isError ? null : 100, isError);
+      window.setTimeout(() => {
+        if (!exportInProgress) setExportProgressVisible(false);
+      }, isError ? 5200 : 1600);
     }
 
     function getExportBaseName() {
@@ -4587,20 +4721,12 @@
       const range = getDownloadRangeRequest();
       if (!range) return [];
 
-      const entries = getDownloadSourceEntries(true, range.startDate, range.endDate);
+      const entries = getDownloadSourceEntries(true, range.startDate, range.endDate)
+        .filter(entry => entryTimeMs(entry) != null)
+        .sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
       if (!entries.length) return [];
 
-      const startIndex = findStartIndexForTime(entries, range.startMs);
-      const endIndex = findEndIndexForTime(entries, range.endMs);
-      if (endIndex < startIndex) {
-        const item = getDownloadFrameItemFromEntry(entries[startIndex], currentHourIndex);
-        return item ? [item] : [];
-      }
-
-      return entries.slice(startIndex, endIndex + 1).map(entry => {
-        const fallbackIndex = entry.exportSourceMode === "forecast" ? findClosestEntryIndex(currentSeriesHours, entry) : 0;
-        return getDownloadFrameItemFromEntry(entry, fallbackIndex);
-      }).filter(Boolean);
+      return buildHourlyRangeFrameItems(entries, range);
     }
 
     function updateDownloadSummary() {
@@ -4679,6 +4805,10 @@
       });
       if (start) start.disabled = isBusy;
       if (end) end.disabled = isBusy;
+      if (isBusy) {
+        setExportProgressVisible(true);
+        setExportProgress(message || "Preparing export...", 0, false);
+      }
       setDownloadStatus(message, false);
     }
 
@@ -4697,6 +4827,9 @@
       if (!raw) return `${formatLabel} export failed.`;
       if (/gif\.worker|Failed to construct 'Worker'|cannot be accessed from origin/i.test(raw)) {
         return "GIF export was blocked by a worker loading issue. Reload the page and try again.";
+      }
+      if (/Failed to fetch|NetworkError|Load failed/i.test(raw) && String(format).toLowerCase() === "mov") {
+        return "MOV export could not load or encode one of its local video components. Reload the page and try again; PNG and GIF should still work.";
       }
       if (/SharedArrayBuffer|cross-origin isolation|ffmpeg|wasm/i.test(raw) && String(format).toLowerCase() === "mov") {
         return "MOV export is unavailable in this browser build right now. PNG and GIF should still work.";
@@ -4964,15 +5097,88 @@
       };
     }
 
-    async function withExportFrames(frameItems, onFrame) {
+    function findClosestExportEntryForSlot(entries, slotMs, usedKeys = new Set()) {
+      if (!Array.isArray(entries) || !entries.length || !Number.isFinite(slotMs)) return null;
+      const toleranceMs = 61 * 60 * 1000;
+      let best = null;
+      let bestDiff = Infinity;
+      entries.forEach((entry, idx) => {
+        const t = entryTimeMs(entry);
+        if (t == null) return;
+        const diff = Math.abs(t - slotMs);
+        const key = String(t);
+        if (diff <= toleranceMs && diff < bestDiff && !usedKeys.has(key)) {
+          best = { entry, idx, key, diff };
+          bestDiff = diff;
+        }
+      });
+      if (best) return best;
+      entries.forEach((entry, idx) => {
+        const t = entryTimeMs(entry);
+        if (t == null) return;
+        const diff = Math.abs(t - slotMs);
+        const key = String(t);
+        if (diff < bestDiff && !usedKeys.has(key)) {
+          best = { entry, idx, key, diff };
+          bestDiff = diff;
+        }
+      });
+      return best;
+    }
+
+    function buildHourlyRangeFrameItems(entries, range) {
+      if (!Array.isArray(entries) || !entries.length || !range) return [];
+      const sorted = entries.slice().sort((a, b) => entryTimeMs(a) - entryTimeMs(b));
+      const usedKeys = new Set();
+      const items = [];
+      const hourMs = 60 * 60 * 1000;
+      for (let slotMs = range.startMs; slotMs <= range.endMs + 1000; slotMs += hourMs) {
+        const match = findClosestExportEntryForSlot(sorted, slotMs, usedKeys);
+        if (!match) continue;
+        usedKeys.add(match.key);
+        const fallbackIndex = match.entry.exportSourceMode === "forecast" ? findClosestEntryIndex(currentSeriesHours, match.entry) : match.idx;
+        const item = getDownloadFrameItemFromEntry(match.entry, fallbackIndex);
+        if (item) items.push(item);
+      }
+      if (items.length > 1) return items;
+      const startIndex = findStartIndexForTime(sorted, range.startMs);
+      const endIndex = findEndIndexForTime(sorted, range.endMs);
+      if (endIndex >= startIndex) {
+        return sorted.slice(startIndex, endIndex + 1).map((entry, idx) => {
+          const fallbackIndex = entry.exportSourceMode === "forecast" ? findClosestEntryIndex(currentSeriesHours, entry) : startIndex + idx;
+          return getDownloadFrameItemFromEntry(entry, fallbackIndex);
+        }).filter(Boolean);
+      }
+      return items;
+    }
+
+    async function blobToUint8Array(blob) {
+      if (blob && typeof blob.arrayBuffer === "function") {
+        return new Uint8Array(await blob.arrayBuffer());
+      }
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(new Uint8Array(reader.result));
+        reader.onerror = () => reject(reader.error || new Error("Could not read export frame."));
+        reader.readAsArrayBuffer(blob);
+      });
+    }
+
+    async function withExportFrames(frameItems, onFrame, progressStart = 4, progressEnd = 82) {
+      const total = Math.max(1, frameItems.length);
       for (let i = 0; i < frameItems.length; i++) {
         const item = frameItems[i];
-        setDownloadStatus(`Rendering frame ${i + 1} of ${frameItems.length}...`);
+        const pct = progressStart + ((i / total) * (progressEnd - progressStart));
+        const message = `Rendering frame ${i + 1} of ${frameItems.length}...`;
+        setDownloadStatus(message);
+        setExportProgress(message, pct, false);
         await prepareExportFrame(item);
         const canvas = await captureExportCanvas();
         await onFrame({ sequence: i, item, entry: item.entry, canvas });
         canvas.width = 1;
         canvas.height = 1;
+        const donePct = progressStart + (((i + 1) / total) * (progressEnd - progressStart));
+        setExportProgress(`Rendered frame ${i + 1} of ${frameItems.length}...`, donePct, false);
       }
     }
 
@@ -5000,7 +5206,8 @@
         await withExportFrames(frameItems, async ({ entry, canvas }) => {
           frameName = `${base}-${getSafeFrameStamp(entry, 0)}`;
           singleBlob = await canvasToBlob(canvas, "image/png");
-        });
+        }, 5, 90);
+        setExportProgress("Starting PNG download...", 96, false);
         downloadBlob(singleBlob, `${frameName}.png`);
         return;
       }
@@ -5011,9 +5218,14 @@
       await withExportFrames(frameItems, async ({ sequence, entry, canvas }) => {
         const blob = await canvasToBlob(canvas, "image/png");
         zip.file(`${String(sequence + 1).padStart(3, "0")}-${getSafeFrameStamp(entry, sequence)}.png`, blob);
-      });
+      }, 4, 84);
       setDownloadStatus("Packing PNG files...");
-      const zipBlob = await zip.generateAsync({ type: "blob" });
+      setExportProgress("Packing PNG files...", 88, false);
+      const zipBlob = await zip.generateAsync({ type: "blob" }, meta => {
+        const pct = 88 + ((Number(meta.percent) || 0) * 0.10);
+        setExportProgress(`Packing PNG files... ${Math.round(meta.percent || 0)}%`, pct, false);
+      });
+      setExportProgress("Starting PNG download...", 99, false);
       downloadBlob(zipBlob, `${base}.zip`);
     }
 
@@ -5029,9 +5241,14 @@
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
         gif.addFrame(canvas, { delay: 700, copy: true });
-      });
+      }, 4, 78);
       setDownloadStatus("Encoding GIF...");
+      setExportProgress("Encoding GIF...", 80, false);
       const blob = await new Promise((resolve, reject) => {
+        gif.on("progress", value => {
+          const pct = 80 + ((Number(value) || 0) * 18);
+          setExportProgress(`Encoding GIF... ${Math.round((Number(value) || 0) * 100)}%`, pct, false);
+        });
         gif.on("finished", resolve);
         gif.on("abort", () => reject(new Error("GIF export was aborted.")));
         try {
@@ -5040,6 +5257,7 @@
           reject(err);
         }
       });
+      setExportProgress("Starting GIF download...", 99, false);
       downloadBlob(blob, `${getExportBaseName()}.gif`);
     }
 
@@ -5051,8 +5269,16 @@
       ffmpegClientPromise = (async () => {
         const client = FFmpeg.createFFmpeg({
           log: false,
-          corePath: "https://unpkg.com/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js"
+          corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js"
         });
+        client.setProgress(({ ratio }) => {
+          if (!exportInProgress) return;
+          const safeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
+          const pct = 84 + safeRatio * 14;
+          setExportProgress(`Encoding MOV... ${Math.round(safeRatio * 100)}%`, pct, false);
+        });
+        setDownloadStatus("Loading MOV encoder...");
+        setExportProgress("Loading MOV encoder...", 2, false);
         await client.load();
         return client;
       })();
@@ -5065,10 +5291,11 @@
       await withExportFrames(frameItems, async ({ sequence, canvas }) => {
         const filename = `frame-${String(sequence + 1).padStart(3, "0")}.png`;
         const blob = await canvasToBlob(canvas, "image/png");
-        ffmpeg.FS("writeFile", filename, await FFmpeg.fetchFile(blob));
+        ffmpeg.FS("writeFile", filename, await blobToUint8Array(blob));
         written.push(filename);
-      });
+      }, 4, 82);
       setDownloadStatus("Encoding MOV... this can take a minute.");
+      setExportProgress("Encoding MOV... this can take a minute.", 84, false);
       const outName = "north-wildwood-export.mov";
       try {
         await ffmpeg.run(
@@ -5076,10 +5303,12 @@
           "-framerate", String(EXPORT_MOV_FPS),
           "-i", "frame-%03d.png",
           "-c:v", "mpeg4",
+          "-q:v", "4",
           "-pix_fmt", "yuv420p",
           outName
         );
         const data = ffmpeg.FS("readFile", outName);
+        setExportProgress("Starting MOV download...", 99, false);
         downloadBlob(new Blob([data.buffer], { type: "video/quicktime" }), `${getExportBaseName()}.mov`);
       } finally {
         for (const name of [...written, outName]) {
@@ -5107,6 +5336,7 @@
       }
       setDownloadModalOpen(false);
       setDownloadBusy(true, "Preparing export...");
+      setExportProgress(`Preparing ${String(format).toUpperCase()} export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
       try {
         if (format === "gif") {
           await exportGif(frameItems);
@@ -5115,12 +5345,15 @@
         } else {
           await exportPng(frameItems);
         }
-        setDownloadStatus(`Downloaded ${String(format).toUpperCase()} export.`);
+        const doneMessage = `Downloaded ${String(format).toUpperCase()} export.`;
+        setDownloadStatus(doneMessage);
+        finishExportProgress(doneMessage, false);
       } catch (err) {
         console.error(err);
         const friendlyMessage = getFriendlyExportError(err, format);
         toast(friendlyMessage);
         setDownloadStatus(friendlyMessage, true);
+        finishExportProgress(friendlyMessage, true);
       } finally {
         setDownloadBusy(false, document.getElementById("downloadStatus")?.textContent || "");
         updateDownloadSummary();
