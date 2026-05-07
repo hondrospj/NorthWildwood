@@ -1460,6 +1460,13 @@
       white-space:nowrap;
     }
 
+    .export-data-range span{
+      color:var(--muted);
+      font-weight:950;
+      letter-spacing:.08em;
+      white-space:nowrap;
+    }
+
     .export-picker-grid{
       display:grid;
       gap:8px;
@@ -5736,13 +5743,6 @@
       <p class="download-modal-sub">Export a range of times out to 84 hours.</p>
       <div class="download-grid">
         <label class="download-field">
-          Scope
-          <div id="downloadScopeControl" class="export-segmented" role="tablist" aria-label="Export scope">
-                <button id="exportScopeCurrentBtn" type="button" class="active" data-scope="current" aria-pressed="true">Current map</button>
-                <button id="exportScopeRangeBtn" type="button" data-scope="range" aria-pressed="false">Time range</button>
-              </div>
-        </label>
-        <label class="download-field">
           Format
           <div id="downloadFormatControl" class="export-segmented" role="tablist" aria-label="Export format">
             <button id="exportFormatGifBtn" type="button" class="active" data-format="gif" aria-pressed="true">GIF</button>
@@ -5823,11 +5823,11 @@
             <span class="export-calendar-key-item"><span class="export-calendar-key-swatch no-data"></span>No data</span>
           </div>
         </section>
-        <input id="downloadScopeSelect" type="hidden" value="current" />
+        <input id="downloadScopeSelect" type="hidden" value="range" />
             <input id="downloadFormatSelect" type="hidden" value="gif" />
             <input id="downloadAspectSelect" type="hidden" value="16:9" />
             <input id="downloadSpeedSelect" type="hidden" value="normal" />
-            <div id="downloadSummary" class="download-summary">GIF (16:9) export at the selected time.</div>
+            <div id="downloadSummary" class="download-summary">GIF (16:9, Normal) export range ready.</div>
         <div class="download-actions">
           <button id="downloadBtn" class="download-btn active" type="button"><span class="download-btn-spinner" aria-hidden="true"></span><span id="downloadBtnLabel">Download</span></button>
         </div>
@@ -6687,7 +6687,7 @@
         updateExportPickModeUI();
         updateDownloadSummary();
         scheduleExportTimePickerRender(true);
-        document.getElementById("exportScopeCurrentBtn")?.focus();
+        document.getElementById("downloadBtn")?.focus();
       }
     }
 
@@ -7607,8 +7607,8 @@
     function getDownloadScopeValue() {
       const hiddenScope = document.getElementById("downloadScopeSelect");
       const activeScopeButton = document.querySelector("#downloadScopeControl button[data-scope].active");
-      const raw = hiddenScope?.value || activeScopeButton?.dataset?.scope || "current";
-      const normalized = raw === "range" ? "range" : "current";
+      const raw = hiddenScope?.value || activeScopeButton?.dataset?.scope || "range";
+      const normalized = raw === "current" ? "current" : "range";
       if (hiddenScope && hiddenScope.value !== normalized) hiddenScope.value = normalized;
       return normalized;
     }
@@ -8619,7 +8619,7 @@
       }
 
       ensureExportCalendarCursor();
-      if (dataRangeEl) dataRangeEl.innerHTML = `<strong>${getExportDataRangeDetailedText()}</strong>`;
+      if (dataRangeEl) dataRangeEl.innerHTML = `<span>Range</span><strong>${getExportDataRangeDetailedText()}</strong>`;
       populateExportHourSelects();
       syncExportDateTimeWheelsFromInputs();
       updateExportPickModeUI();
@@ -8838,7 +8838,7 @@
       if (format) format.disabled = isBusy;
       if (aspect) aspect.disabled = isBusy;
       if (speed) speed.disabled = isBusy;
-      document.querySelectorAll("#downloadScopeControl button, #downloadFormatControl button, #downloadAspectControl button, #downloadSpeedControl button").forEach(el => { el.disabled = isBusy; });
+      document.querySelectorAll("#downloadFormatControl button, #downloadAspectControl button, #downloadSpeedControl button").forEach(el => { el.disabled = isBusy; });
       const picker = document.getElementById("exportTimePicker");
       if (picker) picker.classList.toggle("is-busy", isBusy);
       if (start) start.disabled = isBusy;
