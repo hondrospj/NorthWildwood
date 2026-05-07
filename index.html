@@ -1496,7 +1496,7 @@
     .export-hour-select-row label{display:grid;gap:4px;font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
     .export-hour-select-row select{min-height:34px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);font-size:12px;font-weight:850;padding:0 10px;}
     .export-calendar-day.in-range{color:#fff;background:rgba(96,165,250,.20);border-color:rgba(191,219,254,.40);}
-    .export-calendar-day.range-start,.export-calendar-day.range-end{background:rgba(213,138,0,.30);border-color:#fef3c7;color:#fff;}
+    .export-calendar-day.range-start,.export-calendar-day.range-end{background:linear-gradient(180deg,rgba(96,165,250,.34),rgba(96,165,250,.20));border-color:#bfdbfe;color:#fff;}
     .export-calendar-day.forecast-day.in-range{background:rgba(45,212,191,.20);}
     .export-picker-hint{font-size:10.5px;line-height:1.35;color:var(--muted);}
     .export-calendar-key{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-top:2px;font-size:10px;font-weight:850;color:var(--muted);line-height:1.25;}
@@ -1509,7 +1509,7 @@
     .export-calendar-key-swatch.no-data::before{transform:rotate(45deg);}
     .export-calendar-key-swatch.no-data::after{transform:rotate(-45deg);}
     .export-picker-hours-title{margin-top:2px;font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
-    .export-hour-btn.range-start,.export-hour-btn.range-end{border-color:#fef3c7;background:rgba(213,138,0,.30);color:#fff;}
+    .export-hour-btn.range-start,.export-hour-btn.range-end{border-color:#bfdbfe;background:rgba(96,165,250,.26);color:#fff;}
     .export-hour-btn.in-range{border-color:rgba(191,219,254,.36);background:rgba(96,165,250,.20);color:#fff;}
 
     .export-picker-day{
@@ -5915,7 +5915,7 @@
       fast: { value: "fast", label: "Fast", delayMs: 500 }
     };
     const EXPORT_CAPTURE_SCALE_DEFAULT = 1;
-    const EXPORT_GIF_QUALITY = 28;
+    const EXPORT_GIF_QUALITY = 36;
     const EXPORT_GIF_MAX_WORKERS = 16;
     const EXPORT_PNG_SELECTION_LIMIT = 10;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
@@ -7802,7 +7802,8 @@
       if (range.durationMs > EXPORT_RANGE_MAX_MS) {
         return {
           ok: false,
-          message: `This export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours. Please choose a shorter range, then download again.`
+          reason: "range-too-long",
+          message: `This export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours and is not allowed. Please choose a shorter range, then download again.`
         };
       }
 
@@ -8068,23 +8069,6 @@
     }
 
     function getExportDataRangeDetailedText() {
-      const dayMap = getExportAvailabilityDayMap();
-      let histFirst = null, histLast = null, fcstFirst = null, fcstLast = null;
-      dayMap.forEach(meta => {
-        const a = meta.firstDate || parseStoredLocalNyToDate(`${meta.dayKey}T00:00`);
-        const b = meta.lastDate || parseStoredLocalNyToDate(`${meta.dayKey}T23:00`);
-        if (meta.observed) {
-          if (a && (!histFirst || a.getTime() < histFirst.getTime())) histFirst = a;
-          if (b && (!histLast || b.getTime() > histLast.getTime())) histLast = b;
-        }
-        if (meta.forecast) {
-          if (a && (!fcstFirst || a.getTime() < fcstFirst.getTime())) fcstFirst = a;
-          if (b && (!fcstLast || b.getTime() > fcstLast.getTime())) fcstLast = b;
-        }
-      });
-      if (histFirst && histLast && fcstLast) return `Historical: ${formatExportCompactDate(histFirst)}–${formatExportCompactDate(histLast)} · Forecast through ${formatExportCompactDate(fcstLast)}`;
-      if (histFirst && histLast) return `Historical: ${formatExportCompactDate(histFirst)}–${formatExportCompactDate(histLast)}`;
-      if (fcstFirst && fcstLast) return `Forecast: ${formatExportCompactDate(fcstFirst)}–${formatExportCompactDate(fcstLast)}`;
       return getExportAvailabilityRangeText();
     }
 
@@ -8172,7 +8156,12 @@
 
     function formatExportCompactDate(date) {
       if (!date) return "--";
-      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" }).format(date);
+      const parts = getNyParts(date);
+      if (!parts) return "--";
+      const mm = String(Number(parts.month)).padStart(2, "0");
+      const dd = String(Number(parts.day)).padStart(2, "0");
+      const yy = String(Number(parts.year) % 100).padStart(2, "0");
+      return `${mm}/${dd}/${yy}`;
     }
 
     function getExportAvailabilityRangeText() {
@@ -8630,7 +8619,7 @@
       }
 
       ensureExportCalendarCursor();
-      if (dataRangeEl) dataRangeEl.innerHTML = `<span>Data range</span><strong>${getExportDataRangeDetailedText()}</strong>`;
+      if (dataRangeEl) dataRangeEl.innerHTML = `<strong>${getExportDataRangeDetailedText()}</strong>`;
       populateExportHourSelects();
       syncExportDateTimeWheelsFromInputs();
       updateExportPickModeUI();
@@ -8782,7 +8771,7 @@
           return;
         }
         if (range.durationMs > EXPORT_RANGE_MAX_MS) {
-          summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
+          summary.textContent = `${formatLabel} (${aspectLabel}, ${speed}) export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours and is not allowed.`;
           return;
         }
         const frameCount = getDownloadRangeSummaryFrameCount(range);
@@ -9409,6 +9398,9 @@
       const format = getDownloadFormatValue();
       const validation = validateDownloadRangeForExport();
       if (!validation.ok) {
+        if (validation.reason === "range-too-long") {
+          alert(validation.message);
+        }
         toast(validation.message);
         setDownloadStatus(validation.message, true);
         updateDownloadSummary();
