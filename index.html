@@ -5706,6 +5706,29 @@
       return new Date(guessUtcMs);
     }
 
+    function makeObservedHourKeyFromDate(date) {
+      const parts = getNyParts(date);
+      if (!parts) return null;
+      return `${parts.year}-${parts.month}-${parts.day}-${pad2(Number(parts.hour24))}`;
+    }
+
+    function makeObservedMissingHourEntry(slotMs, options = {}) {
+      const displayTimeEST = formatNyLocalIso(new Date(slotMs));
+      const observedDate = displayTimeEST ? displayTimeEST.slice(0, 10) : (options.observedDate || selectedObservedDate || "");
+      return {
+        displayTimeEST,
+        displayTimeUtc: new Date(slotMs).toISOString(),
+        timeUtc: new Date(slotMs).toISOString(),
+        observedDate,
+        navd88StageFt: MIN_STAGE,
+        stageFt: MIN_STAGE,
+        value: MIN_STAGE,
+        observationInterval: "1hour",
+        isMissingObservedHour: true,
+        sourceResolutionMinutes: null
+      };
+    }
+
     function getObservedDisplaySeries(entries = [], options = {}) {
       if (!Array.isArray(entries)) return [];
 
@@ -5714,23 +5737,60 @@
         .filter(item => item.t != null)
         .sort((a, b) => a.t - b.t);
 
-      if (!valid.length) return entries.map(entry => ({ ...entry, observationInterval: "1hour" }));
+      const rangeStartMs = Number.isFinite(options.rangeStartMs) ? options.rangeStartMs : null;
+      const rangeEndMs = Number.isFinite(options.rangeEndMs) ? options.rangeEndMs : null;
+      const fillMissingSlots = options.fillMissingSlots !== false && rangeStartMs != null && rangeEndMs != null;
+
+      if (!valid.length) {
+        if (!fillMissingSlots) return entries.map(entry => ({ ...entry, observationInterval: "1hour" }));
+        const start = roundDownToQuarterHourMs(Math.min(rangeStartMs, rangeEndMs));
+        const end = roundDownToQuarterHourMs(Math.max(rangeStartMs, rangeEndMs));
+        const out = [];
+        for (let slot = start; slot <= end; slot += 60 * 60 * 1000) {
+          out.push(makeObservedMissingHourEntry(slot, options));
+        }
+        return out;
+      }
 
       const sourceResolutionMinutes = detectSeriesResolutionMinutes(entries);
       const buckets = new Map();
-      entries.forEach((entry, idx) => {
+      valid.forEach(({ entry, idx }) => {
         const d = getEntryESTDate(entry);
         if (!d) return;
+        if (rangeStartMs != null && d.getTime() < rangeStartMs - 60 * 60 * 1000) return;
+        if (rangeEndMs != null && d.getTime() > rangeEndMs + 60 * 60 * 1000) return;
         const parts = getNyParts(d);
         if (!parts) return;
-        const key = `${parts.year}-${parts.month}-${parts.day}-${pad2(Number(parts.hour24))}`;
+        const key = makeObservedHourKeyFromDate(d);
         const minute = Number(parts.minute || 0);
         const score = Math.abs(minute);
+        const slotIso = `${parts.year}-${parts.month}-${parts.day}T${pad2(Number(parts.hour24))}:00`;
         const existing = buckets.get(key);
         if (!existing || score < existing.score || (score === existing.score && idx < existing.idx)) {
-          buckets.set(key, { entry, idx, score, slotIso: `${parts.year}-${parts.month}-${parts.day}T${pad2(Number(parts.hour24))}:00` });
+          buckets.set(key, { entry, idx, score, slotIso });
         }
       });
+
+      if (fillMissingSlots) {
+        const start = roundDownToQuarterHourMs(Math.min(rangeStartMs, rangeEndMs));
+        const end = roundDownToQuarterHourMs(Math.max(rangeStartMs, rangeEndMs));
+        const out = [];
+        for (let slot = start; slot <= end; slot += 60 * 60 * 1000) {
+          const key = makeObservedHourKeyFromDate(new Date(slot));
+          const item = key ? buckets.get(key) : null;
+          if (item) {
+            out.push({
+              ...item.entry,
+              displayTimeEST: item.slotIso,
+              observationInterval: "1hour",
+              sourceResolutionMinutes
+            });
+          } else {
+            out.push(makeObservedMissingHourEntry(slot, { ...options, sourceResolutionMinutes }));
+          }
+        }
+        return out;
+      }
 
       return Array.from(buckets.values())
         .sort((a, b) => a.slotIso.localeCompare(b.slotIso))
@@ -7926,8 +7986,13 @@
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").textContent = formatSnapshotTime(entry);
-      document.getElementById("stageText").textContent = formatStageForDisplay(rawStage);
-      document.getElementById("stageSubText").textContent = getDatumLongLabel();
+      if (entry?.isMissingObservedHour) {
+        document.getElementById("stageText").textContent = "No data";
+        document.getElementById("stageSubText").textContent = "No observed record for this hour";
+      } else {
+        document.getElementById("stageText").textContent = formatStageForDisplay(rawStage);
+        document.getElementById("stageSubText").textContent = getDatumLongLabel();
+      }
       document.getElementById("selectedText").textContent = currentSelectedLabel;
       document.getElementById("selectedSubText").textContent = currentSelectedSubLabel;
       const snapshotSubLabel = getSnapshotSubLabel(entry);
@@ -8167,7 +8232,9 @@
       const dayEnd = parseStoredLocalNyToDate(`${dateStr}T23:45`);
       currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours, {
         rangeStartMs: dayStart ? dayStart.getTime() : null,
-        rangeEndMs: dayEnd ? dayEnd.getTime() : null
+        rangeEndMs: dayEnd ? dayEnd.getTime() : null,
+        fillMissingSlots: true,
+        observedDate: dateStr
       });
       currentViewType = "observed-day";
       currentTopTideIndex = null;
@@ -8216,7 +8283,8 @@
       const eventEnd = event.series.length ? entryTimeMs(event.series[event.series.length - 1]) : null;
       currentSeriesHours = getObservedDisplaySeries(currentRawSeriesHours, {
         rangeStartMs: eventStart != null ? roundDownToQuarterHourMs(eventStart) : null,
-        rangeEndMs: eventEnd != null ? roundUpToQuarterHourMs(eventEnd) : null
+        rangeEndMs: eventEnd != null ? roundUpToQuarterHourMs(eventEnd) : null,
+        fillMissingSlots: false
       });
 
       syncSliderBounds();
