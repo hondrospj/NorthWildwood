@@ -8231,9 +8231,26 @@
     }
 
     async function switchOverlayMode(mode) {
-      if (mode === currentOverlayMode) return;
+      const forceForecastForImpact = mode === "dynamic" && (currentDataMode !== "forecast" || currentViewType !== "forecast");
+      if (mode === currentOverlayMode && !forceForecastForImpact) return;
+
+      stopPlayback();
+      toast("");
       currentOverlayMode = mode;
       updateModeButtons();
+
+      if (forceForecastForImpact) {
+        currentDataMode = "forecast";
+        currentViewType = "forecast";
+        currentTopTideIndex = null;
+        updateDataModeButtons();
+        clearFloodLayer();
+        await loadForecast();
+        renderTopTides();
+        await renderHour(currentHourIndex);
+        return;
+      }
+
       await renderHour(currentHourIndex);
     }
 
