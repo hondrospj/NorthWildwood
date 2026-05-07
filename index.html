@@ -2932,7 +2932,7 @@
         <section id="downloadCard" class="rail-card download-card download-launch-card">
           <div class="rail-head">
             <div>
-              <h3>Export as GIF, MOV, PNG</h3>
+              <h3>Export as GIF</h3>
             </div>
           </div>
           <div class="download-launch-meta">Export a range of times out to 84 hours.</div>
@@ -2995,14 +2995,6 @@
                 <button id="exportScopeRangeBtn" type="button" data-scope="range" aria-pressed="false">Time range</button>
               </div>
         </label>
-        <label class="download-field">
-          Format
-          <div id="downloadFormatControl" class="export-segmented export-segmented-3" role="tablist" aria-label="Export format">
-                <button id="exportFormatPngBtn" type="button" class="active" data-format="png" aria-pressed="true">PNG</button>
-                <button id="exportFormatGifBtn" type="button" data-format="gif" aria-pressed="false">GIF</button>
-                <button id="exportFormatMovBtn" type="button" data-format="mov" aria-pressed="false">MOV</button>
-              </div>
-        </label>
         <div id="downloadRangeFields" class="download-range-grid" hidden>
           <label class="download-field">
             Start (ET)
@@ -3016,7 +3008,7 @@
         <p class="export-modal-copy">Export a range of times out to 84 hours.</p>
             <div id="downloadRangeNote" class="download-note"></div>
         <input id="downloadScopeSelect" type="hidden" value="current" />
-            <input id="downloadFormatSelect" type="hidden" value="png" />
+            <input id="downloadFormatSelect" type="hidden" value="gif" />
             <div id="downloadSummary" class="download-summary">Current map at the selected time.</div>
         <div class="download-actions">
           <button id="downloadBtn" class="download-btn active" type="button"><span class="download-btn-spinner" aria-hidden="true"></span><span id="downloadBtnLabel">Download</span></button>
@@ -3053,8 +3045,7 @@
   <script src="https://unpkg.com/proj4leaflet@1.0.2/src/proj4leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-
+  
   <script>
     const APP_BASE = new URL(".", window.location.href);
     const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
@@ -3093,14 +3084,8 @@
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 220;
-    const EXPORT_MOV_FPS = 10;
-    const EXPORT_VIDEO_BITRATE = 36000000;
-    const EXPORT_VIDEO_MAX_WIDTH = 1920;
-    const EXPORT_VIDEO_MAX_HEIGHT = 1080;
-    const EXPORT_MOV_FRAME_HOLD_MS = 1000;
     const EXPORT_GIF_FRAME_DELAY_MS = 1000;
     const EXPORT_CAPTURE_SCALE_DEFAULT = 2;
-    const EXPORT_CAPTURE_SCALE_VIDEO = 2;
     const EXPORT_GIF_QUALITY = 4;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
 
@@ -4600,11 +4585,8 @@
 
     function getDownloadFormatValue() {
       const hiddenFormat = document.getElementById("downloadFormatSelect");
-      const activeFormatButton = document.querySelector("#downloadFormatControl button[data-format].active");
-      const value = String(hiddenFormat?.value || activeFormatButton?.dataset?.format || "png").toLowerCase();
-      const normalized = ["png", "gif", "mov"].includes(value) ? value : "png";
-      if (hiddenFormat && hiddenFormat.value !== normalized) hiddenFormat.value = normalized;
-      return normalized;
+      if (hiddenFormat && hiddenFormat.value !== "gif") hiddenFormat.value = "gif";
+      return "gif";
     }
 
     function syncDownloadRangeInputs(force = false) {
@@ -4830,13 +4812,6 @@
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", String(active));
       });
-
-      const formatValue = getDownloadFormatValue();
-      document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
-        const active = btn.dataset.format === formatValue;
-        btn.classList.toggle("active", active);
-        btn.setAttribute("aria-pressed", String(active));
-      });
     }
 
     function setDownloadBusy(isBusy, message = "") {
@@ -4844,7 +4819,6 @@
       const btn = document.getElementById("downloadBtn");
       const btnLabel = document.getElementById("downloadBtnLabel");
       const scope = document.getElementById("downloadScopeSelect");
-      const format = document.getElementById("downloadFormatSelect");
       const start = document.getElementById("downloadStartInput");
       const end = document.getElementById("downloadEndInput");
       if (btn) {
@@ -4855,8 +4829,7 @@
         btnLabel.textContent = isBusy ? "Exporting..." : "Download";
       }
       if (scope) scope.disabled = isBusy;
-      if (format) format.disabled = isBusy;
-      document.querySelectorAll("#downloadScopeControl button, #downloadFormatControl button").forEach(btn => {
+      document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
         btn.disabled = isBusy;
       });
       if (start) start.disabled = isBusy;
@@ -4885,16 +4858,10 @@
         return "GIF export was blocked by a worker loading issue. Reload the page and try again.";
       }
       if (/Failed to fetch|NetworkError|Load failed/i.test(raw) && String(format).toLowerCase() === "mov") {
-        return "Video export could not finish loading one of its browser components. Reload the page and try again; PNG and GIF should still work.";
-      }
-      if (/MediaRecorder|canvas video|video encoder|native video recording|SharedArrayBuffer|cross-origin isolation|ffmpeg|wasm/i.test(raw) && String(format).toLowerCase() === "mov") {
-        return "MOV/video export is unavailable in this browser build right now. PNG and GIF should still work.";
+        return "GIF export failed while loading browser export components. Reload the page and try again.";
       }
       if (/html2canvas|canvasToBlob|CanvasToBlob|Canvas export failed|taint|cross-origin resource/i.test(raw)) {
         return `${formatLabel} export could not capture the map cleanly. Reload the page and try again.`;
-      }
-      if (/JSZip did not load/i.test(raw)) {
-        return "PNG sequence export is unavailable because the ZIP library did not load.";
       }
       if (raw.length > 140) {
         return `${formatLabel} export failed. Check the browser console for the full error.`;
@@ -5145,9 +5112,7 @@
       }
       const stage = document.getElementById("exportStageFrame");
       if (!stage) throw new Error("Export stage is unavailable.");
-      const format = getDownloadFormatValue();
-      const preferredScale = format === "mov" ? EXPORT_CAPTURE_SCALE_VIDEO : EXPORT_CAPTURE_SCALE_DEFAULT;
-      const captureScale = Math.min(4.5, Math.max(preferredScale, window.devicePixelRatio || 1));
+      const captureScale = Math.min(3, Math.max(EXPORT_CAPTURE_SCALE_DEFAULT, window.devicePixelRatio || 1));
       return await html2canvas(stage, {
         backgroundColor: null,
         useCORS: true,
@@ -5269,37 +5234,6 @@
       });
     }
 
-    async function exportPng(frameItems) {
-      const base = getExportBaseName();
-      if (frameItems.length === 1) {
-        let singleBlob = null;
-        let frameName = base;
-        await withExportFrames(frameItems, async ({ entry, canvas }) => {
-          frameName = `${base}-${getSafeFrameStamp(entry, 0)}`;
-          singleBlob = await canvasToBlob(canvas, "image/png");
-        }, 5, 90);
-        setExportProgress("Starting PNG download...", 96, false);
-        downloadBlob(singleBlob, `${frameName}.png`);
-        return;
-      }
-      if (typeof JSZip === "undefined") {
-        throw new Error("JSZip did not load, so multi-frame PNG export is unavailable.");
-      }
-      const zip = new JSZip();
-      await withExportFrames(frameItems, async ({ sequence, entry, canvas }) => {
-        const blob = await canvasToBlob(canvas, "image/png");
-        zip.file(`${String(sequence + 1).padStart(3, "0")}-${getSafeFrameStamp(entry, sequence)}.png`, blob);
-      }, 4, 84);
-      setDownloadStatus("Packing PNG files...");
-      setExportProgress("Packing PNG files...", 88, false);
-      const zipBlob = await zip.generateAsync({ type: "blob" }, meta => {
-        const pct = 88 + ((Number(meta.percent) || 0) * 0.10);
-        setExportProgress(`Packing PNG files... ${Math.round(meta.percent || 0)}%`, pct, false);
-      });
-      setExportProgress("Starting PNG download...", 99, false);
-      downloadBlob(zipBlob, `${base}.zip`);
-    }
-
     async function exportGif(frameItems) {
       if (typeof GIF === "undefined") {
         throw new Error("GIF export library did not load.");
@@ -5332,244 +5266,10 @@
       downloadBlob(blob, `${getExportBaseName()}.gif`);
     }
 
-    function getBestNativeVideoType() {
-      if (typeof MediaRecorder === "undefined") return null;
-      const candidates = [
-        { mimeType: "video/mp4;codecs=avc1.64002A", extension: "mp4", label: "MP4" },
-        { mimeType: "video/mp4;codecs=avc1.4d4028", extension: "mp4", label: "MP4" },
-        { mimeType: "video/mp4;codecs=avc1.42E01E", extension: "mp4", label: "MP4" },
-        { mimeType: "video/mp4;codecs=h264", extension: "mp4", label: "MP4" },
-        { mimeType: "video/mp4", extension: "mp4", label: "MP4" },
-        { mimeType: "video/webm;codecs=vp9", extension: "webm", label: "WEBM" },
-        { mimeType: "video/webm;codecs=vp8", extension: "webm", label: "WEBM" },
-        { mimeType: "video/webm", extension: "webm", label: "WEBM" },
-        { mimeType: "video/quicktime;codecs=h264", extension: "mov", label: "MOV" },
-        { mimeType: "video/quicktime", extension: "mov", label: "MOV" }
-      ];
-      for (const candidate of candidates) {
-        try {
-          if (MediaRecorder.isTypeSupported(candidate.mimeType)) return candidate;
-        } catch (err) {}
-      }
-      return null;
-    }
-
-    function getPreferredVideoCanvasSize(sourceWidth, sourceHeight) {
-      if (!(sourceWidth > 0) || !(sourceHeight > 0)) return null;
-      let scale = Math.min(
-        EXPORT_VIDEO_MAX_WIDTH / sourceWidth,
-        EXPORT_VIDEO_MAX_HEIGHT / sourceHeight,
-        1
-      );
-      if (!Number.isFinite(scale) || scale <= 0) scale = 1;
-      let width = Math.round(sourceWidth * scale);
-      let height = Math.round(sourceHeight * scale);
-      if (width % 2) width -= 1;
-      if (height % 2) height -= 1;
-      width = Math.max(2, width);
-      height = Math.max(2, height);
-      return { width, height };
-    }
-
-    function createVideoOutputCanvas(width, height) {
-      const outputCanvas = document.createElement("canvas");
-      outputCanvas.width = width;
-      outputCanvas.height = height;
-      const outputCtx = outputCanvas.getContext("2d", { alpha: false, desynchronized: true });
-      if (outputCtx) {
-        outputCtx.imageSmoothingEnabled = true;
-        outputCtx.imageSmoothingQuality = "high";
-      }
-      return { outputCanvas, outputCtx };
-    }
-
-    function drawVideoFrameToCanvas(ctx, source, width, height) {
-      ctx.fillStyle = "#050b16";
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(source, 0, 0, width, height);
-    }
-
-    async function canvasToVideoStillImage(canvas, width, height) {
-      const frameCanvas = document.createElement("canvas");
-      frameCanvas.width = width;
-      frameCanvas.height = height;
-      const frameCtx = frameCanvas.getContext("2d", { alpha: false });
-      if (!frameCtx) throw new Error("Video export could not prepare a still frame.");
-      frameCtx.imageSmoothingEnabled = true;
-      frameCtx.imageSmoothingQuality = "high";
-      drawVideoFrameToCanvas(frameCtx, canvas, width, height);
-
-      const blob = await canvasToBlob(frameCanvas, "image/png");
-      frameCanvas.width = 1;
-      frameCanvas.height = 1;
-
-      const url = URL.createObjectURL(blob);
-      const image = new Image();
-      image.decoding = "sync";
-      image.src = url;
-      try {
-        if (typeof image.decode === "function") {
-          await image.decode();
-        } else {
-          await new Promise((resolve, reject) => {
-            image.onload = resolve;
-            image.onerror = reject;
-          });
-        }
-      } catch (err) {
-        URL.revokeObjectURL(url);
-        throw err;
-      }
-      return { image, url };
-    }
-
-    async function renderVideoStillFrames(frameItems) {
-      const total = Math.max(1, frameItems.length);
-      const stills = [];
-      let videoSize = null;
-
-      try {
-        for (let i = 0; i < frameItems.length; i++) {
-          const item = frameItems[i];
-          const pct = 4 + ((i / total) * 68);
-          const message = `Rendering video pane ${i + 1} of ${frameItems.length}...`;
-          setDownloadStatus(message);
-          setExportProgress(message, pct, false);
-
-          await prepareExportFrame(item);
-          const captured = await captureExportCanvas();
-          if (!videoSize) {
-            videoSize = getPreferredVideoCanvasSize(captured.width, captured.height) || { width: captured.width, height: captured.height };
-          }
-          const still = await canvasToVideoStillImage(captured, videoSize.width, videoSize.height);
-          stills.push(still);
-          captured.width = 1;
-          captured.height = 1;
-
-          const donePct = 4 + (((i + 1) / total) * 68);
-          setExportProgress(`Prepared video pane ${i + 1} of ${frameItems.length}...`, donePct, false);
-        }
-      } catch (err) {
-        stills.forEach(still => {
-          try { URL.revokeObjectURL(still.url); } catch (e) {}
-        });
-        throw err;
-      }
-
-      return { stills, videoSize };
-    }
-
-    async function exportMov(frameItems) {
-      if (typeof MediaRecorder === "undefined") {
-        throw new Error("MOV export is unavailable because this browser does not support native video recording.");
-      }
-      const videoType = getBestNativeVideoType();
-      if (!videoType) {
-        throw new Error("MOV export is unavailable because this browser does not support a compatible video encoder.");
-      }
-      if (!Array.isArray(frameItems) || !frameItems.length) {
-        throw new Error("No frames are available for MOV export.");
-      }
-
-      setDownloadStatus("Preparing video frames...");
-      setExportProgress("Preparing video frames...", 3, false);
-      const { stills, videoSize } = await renderVideoStillFrames(frameItems);
-
-      const { outputCanvas, outputCtx } = createVideoOutputCanvas(videoSize.width, videoSize.height);
-      if (!outputCtx || typeof outputCanvas.captureStream !== "function") {
-        stills.forEach(still => {
-          try { URL.revokeObjectURL(still.url); } catch (e) {}
-        });
-        throw new Error("MOV export is unavailable because this browser cannot record canvas video.");
-      }
-
-      const stream = outputCanvas.captureStream(EXPORT_MOV_FPS);
-      const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
-      const requestVideoFrame = () => {
-        try {
-          if (videoTrack && typeof videoTrack.requestFrame === "function") videoTrack.requestFrame();
-        } catch (err) {}
-      };
-
-      const chunks = [];
-      let recorder;
-      try {
-        recorder = new MediaRecorder(stream, {
-          mimeType: videoType.mimeType,
-          bitsPerSecond: EXPORT_VIDEO_BITRATE,
-          videoBitsPerSecond: EXPORT_VIDEO_BITRATE
-        });
-      } catch (err) {
-        recorder = new MediaRecorder(stream);
-      }
-
-      const stopped = new Promise((resolve, reject) => {
-        recorder.ondataavailable = event => {
-          if (event.data && event.data.size > 0) chunks.push(event.data);
-        };
-        recorder.onerror = event => reject(event?.error || new Error("Video export failed while recording."));
-        recorder.onstop = resolve;
-      });
-
-      const perVideoFrameMs = Math.max(1, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
-      const holdFrameCount = Math.max(1, Math.round(EXPORT_MOV_FRAME_HOLD_MS / perVideoFrameMs));
-      const total = Math.max(1, stills.length);
-
-      try {
-        setDownloadStatus("Recording video...");
-        setExportProgress("Recording video...", 74, false);
-        recorder.start(1000);
-
-        for (let i = 0; i < stills.length; i++) {
-          const still = stills[i];
-          const startTime = performance.now();
-          drawVideoFrameToCanvas(outputCtx, still.image, outputCanvas.width, outputCanvas.height);
-
-          for (let hold = 0; hold < holdFrameCount; hold++) {
-            requestVideoFrame();
-            const targetTime = startTime + ((hold + 1) * perVideoFrameMs);
-            await wait(Math.max(0, targetTime - performance.now()));
-          }
-
-          const elapsed = performance.now() - startTime;
-          if (elapsed < EXPORT_MOV_FRAME_HOLD_MS) {
-            await wait(EXPORT_MOV_FRAME_HOLD_MS - elapsed);
-          }
-
-          const pct = 74 + (((i + 1) / total) * 20);
-          setExportProgress(`Recorded video pane ${i + 1} of ${stills.length}...`, pct, false);
-        }
-
-        setDownloadStatus(`Encoding ${videoType.label} video...`);
-        setExportProgress(`Encoding ${videoType.label} video...`, 96, false);
-        await wait(250);
-        if (recorder.state !== "inactive") recorder.stop();
-        await stopped;
-      } finally {
-        try {
-          for (const track of stream.getTracks()) track.stop();
-        } catch (err) {}
-        if (recorder && recorder.state !== "inactive") {
-          try { recorder.stop(); } catch (err) {}
-        }
-        stills.forEach(still => {
-          try { URL.revokeObjectURL(still.url); } catch (e) {}
-        });
-      }
-
-      if (!chunks.length) {
-        throw new Error("MOV export failed because no video data was recorded.");
-      }
-
-      const blob = new Blob(chunks, { type: recorder.mimeType || videoType.mimeType });
-      setExportProgress(`Starting ${videoType.label} download...`, 99, false);
-      downloadBlob(blob, `${getExportBaseName()}.${videoType.extension}`);
-    }
-
     async function downloadCurrentSelection() {
       if (exportInProgress) return;
       syncDownloadRangeInputs(false);
-      const format = getDownloadFormatValue();
+      const format = "gif";
       const validation = validateDownloadRangeForExport();
       if (!validation.ok) {
         toast(validation.message);
@@ -5585,16 +5285,10 @@
       }
       setDownloadModalOpen(false);
       setDownloadBusy(true, "Preparing export...");
-      setExportProgress(`Preparing ${String(format).toUpperCase()} export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
+      setExportProgress(`Preparing GIF export with ${frameItems.length} frame${frameItems.length === 1 ? "" : "s"}...`, 1, false);
       try {
-        if (format === "gif") {
-          await exportGif(frameItems);
-        } else if (format === "mov") {
-          await exportMov(frameItems);
-        } else {
-          await exportPng(frameItems);
-        }
-        const doneMessage = `Downloaded ${String(format).toUpperCase()} export.`;
+        await exportGif(frameItems);
+        const doneMessage = "Downloaded GIF export.";
         setDownloadStatus(doneMessage);
         finishExportProgress(doneMessage, false);
       } catch (err) {
@@ -6695,28 +6389,10 @@
         });
       });
 
-      document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
-        btn.addEventListener("click", event => {
-          event.preventDefault();
-          const input = document.getElementById("downloadFormatSelect");
-          if (!input) return;
-          input.value = btn.dataset.format || "png";
-          document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(other => other.classList.toggle("active", other === btn));
-          if (!exportInProgress) setDownloadStatus("", false);
-          updateExportSegmentedUI();
-          updateDownloadSummary();
-        });
-      });
-
       document.getElementById("downloadScopeSelect").addEventListener("change", () => {
         if (!exportInProgress) setDownloadStatus("", false);
         updateExportSegmentedUI();
         syncDownloadRangeInputs(true);
-        updateDownloadSummary();
-      });
-      document.getElementById("downloadFormatSelect").addEventListener("change", () => {
-        if (!exportInProgress) setDownloadStatus("", false);
-        updateExportSegmentedUI();
         updateDownloadSummary();
       });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
@@ -6737,7 +6413,7 @@
       });
       document.getElementById("downloadBtn").addEventListener("click", () => {
         downloadCurrentSelection().catch(err => {
-          const format = getDownloadFormatValue();
+          const format = "gif";
           const friendlyMessage = getFriendlyExportError(err, format);
           console.error(err);
           toast(friendlyMessage);
