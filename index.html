@@ -5908,22 +5908,23 @@
     const EXPORT_FRAME_LIMIT = 72;
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
-    const EXPORT_CAPTURE_DELAY_MS = 6;
+    const EXPORT_CAPTURE_DELAY_MS = 2;
     const EXPORT_GIF_SPEEDS = {
       slow: { value: "slow", label: "Slow", delayMs: 2000 },
       normal: { value: "normal", label: "Normal", delayMs: 1000 },
       fast: { value: "fast", label: "Fast", delayMs: 500 }
     };
     const EXPORT_CAPTURE_SCALE_DEFAULT = 1;
-    const EXPORT_GIF_QUALITY = 36;
-    const EXPORT_GIF_MAX_WORKERS = 16;
+    const EXPORT_GIF_QUALITY = 48;
+    const EXPORT_GIF_MAX_WORKERS = 8;
     const EXPORT_PNG_SELECTION_LIMIT = 10;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
     const EXPORT_GIF_ASPECTS = {
-      "16:9": { value: "16:9", width: 1120, height: 630, label: "16:9" },
-      "9:16": { value: "9:16", width: 630, height: 1120, label: "9:16" },
-      "1:1": { value: "1:1", width: 840, height: 840, label: "1:1" }
+      "16:9": { value: "16:9", width: 960, height: 540, label: "16:9" },
+      "9:16": { value: "9:16", width: 540, height: 960, label: "9:16" },
+      "1:1": { value: "1:1", width: 720, height: 720, label: "1:1" }
     };
+    const FAST_GIF_EXPORT = true;
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
     const NWS_POINT_URL = `https://api.weather.gov/points/${NORTH_WILDWOOD_POINT.lat},${NORTH_WILDWOOD_POINT.lon}`;
@@ -8895,7 +8896,7 @@
         Promise.all(waits),
         wait(3800)
       ]).catch(() => null);
-      await wait(extraDelayMs);
+      if (extraDelayMs > 0) await wait(extraDelayMs);
     }
 
     function getFriendlyExportError(err, format = "") {
@@ -9132,21 +9133,23 @@
       label.textContent = getExportFrameTimestampText(entry);
     }
 
-    async function prepareExportFrame(item) {
+    let exportFrameViewPrimed = false;
+    async function prepareExportFrame(item, options = {}) {
       applyExportStageAspect(getDownloadAspectValue());
       const mapInstance = ensureExportMap();
+      const isFirstFrame = !!options.isFirstFrame;
       mapInstance.invalidateSize(false);
-      updateExportLegend();
-      updateExportBoundaryVisibility();
-      updateExportTimestampLabel(item.entry);
-
-      if (map) {
-        mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
-      } else if (floodLatLngBounds) {
-        mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16], animate: false });
+      if (isFirstFrame) {
+        updateExportLegend();
+        updateExportBoundaryVisibility();
+        if (map) {
+          mapInstance.setView(map.getCenter(), map.getZoom(), { animate: false });
+        } else if (floodLatLngBounds && !exportFrameViewPrimed) {
+          mapInstance.fitBounds(floodLatLngBounds, { padding: [16, 16], animate: false });
+        }
+        exportFrameViewPrimed = true;
       }
-
-      mapInstance.invalidateSize(false);
+      updateExportTimestampLabel(item.entry);
       updateExportRoadLayerAppearance();
 
       const rawStage = getStageValue(item.entry);
@@ -9157,7 +9160,7 @@
 
       await setExportFloodLayer(currentOverlayMode, displayStage);
       mapInstance.invalidateSize(false);
-      await waitForExportMapReady(160);
+      await waitForExportMapReady(isFirstFrame ? 70 : 10);
       await waitForStableRender();
     }
 
@@ -9260,6 +9263,9 @@
 
     function getGifWorkerCount() {
       const cores = Number(navigator.hardwareConcurrency) || 4;
+      if (FAST_GIF_EXPORT) {
+        return Math.min(EXPORT_GIF_MAX_WORKERS, Math.max(4, Math.ceil(cores * 0.75)));
+      }
       return Math.min(EXPORT_GIF_MAX_WORKERS, Math.max(2, cores - 1));
     }
 
@@ -9287,15 +9293,16 @@
 
     async function withExportFrames(frameItems, onFrame, progressStart = 4, progressEnd = 82) {
       const total = Math.max(1, frameItems.length);
+      exportFrameViewPrimed = false;
       for (let i = 0; i < frameItems.length; i++) {
         const item = frameItems[i];
         const pct = progressStart + ((i / total) * (progressEnd - progressStart));
         const message = `Rendering frame ${i + 1} of ${frameItems.length}...`;
         setDownloadStatus(message);
         setExportProgress(message, pct, false);
-        await prepareExportFrame(item);
+        await prepareExportFrame(item, { isFirstFrame: i === 0 });
         if (i === 0) {
-          await waitForExportMapReady(420);
+          await waitForExportMapReady(40);
         }
         const canvas = await captureExportCanvas();
         await onFrame({ sequence: i, item, entry: item.entry, canvas });
@@ -9336,16 +9343,19 @@
         quality: EXPORT_GIF_QUALITY,
         workerScript,
         width: aspectConfig.width,
-        height: aspectConfig.height
+        height: aspectConfig.height,
+        dither: false,
+        repeat: 0,
+        background: "#0b1220"
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
         gif.addFrame(canvas, { delay: getGifFrameDelayMs(), copy: true });
-      }, 4, 74);
+      }, 4, 68);
       setDownloadStatus("Encoding GIF...");
-      setExportProgress("Encoding GIF...", 76, false);
+      setExportProgress("Encoding GIF...", 70, false);
       const blob = await new Promise((resolve, reject) => {
         gif.on("progress", value => {
-          const pct = 76 + ((Number(value) || 0) * 22);
+          const pct = 70 + ((Number(value) || 0) * 28);
           setExportProgress(`Encoding GIF... ${Math.round((Number(value) || 0) * 100)}%`, pct, false);
         });
         gif.on("finished", resolve);
