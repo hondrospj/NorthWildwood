@@ -4558,17 +4558,18 @@
     }
 
     function getDownloadScopeValue() {
-      const activeScopeButton = document.querySelector("#downloadScopeControl button[data-scope].active");
       const hiddenScope = document.getElementById("downloadScopeSelect");
-      const value = activeScopeButton?.dataset?.scope || hiddenScope?.value || "current";
-      if (hiddenScope && hiddenScope.value !== value) hiddenScope.value = value;
-      return value;
+      const activeScopeButton = document.querySelector("#downloadScopeControl button[data-scope].active");
+      const raw = hiddenScope?.value || activeScopeButton?.dataset?.scope || "current";
+      const normalized = raw === "range" ? "range" : "current";
+      if (hiddenScope && hiddenScope.value !== normalized) hiddenScope.value = normalized;
+      return normalized;
     }
 
     function getDownloadFormatValue() {
-      const activeFormatButton = document.querySelector("#downloadFormatControl button[data-format].active");
       const hiddenFormat = document.getElementById("downloadFormatSelect");
-      const value = String(activeFormatButton?.dataset?.format || hiddenFormat?.value || "png").toLowerCase();
+      const activeFormatButton = document.querySelector("#downloadFormatControl button[data-format].active");
+      const value = String(hiddenFormat?.value || activeFormatButton?.dataset?.format || "png").toLowerCase();
       const normalized = ["png", "gif", "mov"].includes(value) ? value : "png";
       if (hiddenFormat && hiddenFormat.value !== normalized) hiddenFormat.value = normalized;
       return normalized;
@@ -4588,16 +4589,12 @@
       let lastDate = null;
 
       if (scopeValue === "range") {
-        const observedBounds = getObservedArchiveDateBounds();
-        const forecastEntries = getForecastExportEntries();
-        const forecastFirst = forecastEntries.length ? getEntryESTDate(forecastEntries[0]) : null;
-        const forecastLast = forecastEntries.length ? getEntryESTDate(forecastEntries[forecastEntries.length - 1]) : null;
-
-        firstDate = observedBounds?.firstDate || forecastFirst || getEntryESTDate(getDownloadCurrentEntry());
-        lastDate = observedBounds?.lastDate || forecastLast || getEntryESTDate(getDownloadCurrentEntry());
-
-        if (forecastFirst && (!firstDate || forecastFirst.getTime() < firstDate.getTime())) firstDate = forecastFirst;
-        if (forecastLast && (!lastDate || forecastLast.getTime() > lastDate.getTime())) lastDate = forecastLast;
+        // IMPORTANT: Do not scan historical observed archives just because the user
+        // clicks Time range. That made the button feel unclickable/slow online.
+        // Historical bounds are checked later, only when Download is pressed.
+        const currentDate = getEntryESTDate(getDownloadCurrentEntry()) || new Date();
+        firstDate = currentDate;
+        lastDate = new Date(currentDate.getTime() + EXPORT_RANGE_MAX_MS);
       } else {
         const entries = getDownloadSourceEntries(false);
         if (!entries.length) {
@@ -4779,12 +4776,8 @@
           summary.textContent = `${format} export range is longer than ${EXPORT_RANGE_MAX_HOURS} hours.`;
           return;
         }
-        const bounds = getDownloadArchiveBounds();
-        if (bounds && (range.startMs < bounds.firstDate.getTime() || range.endMs > bounds.lastDate.getTime())) {
-          summary.textContent = "No frames are available for export.";
-          return;
-        }
-
+        // Do not check historical archive bounds here. That check can require
+        // archive inspection and should only happen after Download is pressed.
         const frameCount = getDownloadRangeSummaryFrameCount(range);
         summary.textContent = `${format} export of ${frameCount} hourly frames from ${formatFixedESTFromUtc(range.startDate.toISOString())} to ${formatFixedESTFromUtc(range.endDate.toISOString())}.`;
         return;
@@ -6541,6 +6534,7 @@
           const input = document.getElementById("downloadScopeSelect");
           if (!input) return;
           input.value = btn.dataset.scope || "current";
+          document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(other => other.classList.toggle("active", other === btn));
           if (!exportInProgress) setDownloadStatus("", false);
           updateExportSegmentedUI();
           syncDownloadRangeInputs(true);
