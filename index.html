@@ -3083,10 +3083,11 @@
     const EXPORT_FRAME_LIMIT = 72;
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
-    const EXPORT_CAPTURE_DELAY_MS = 220;
+    const EXPORT_CAPTURE_DELAY_MS = 45;
     const EXPORT_GIF_FRAME_DELAY_MS = 1000;
-    const EXPORT_CAPTURE_SCALE_DEFAULT = 2;
-    const EXPORT_GIF_QUALITY = 4;
+    const EXPORT_CAPTURE_SCALE_DEFAULT = 1.6;
+    const EXPORT_GIF_QUALITY = 9;
+    const EXPORT_GIF_MAX_WORKERS = 6;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
@@ -3861,7 +3862,7 @@
         const img = new Image();
         img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
         img.onerror = () => reject(new Error(`Could not load image: ${url}`));
-        img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        img.src = url;
       });
     }
 
@@ -3871,7 +3872,7 @@
         const img = new Image();
         img.onload = () => resolve({ ok: true });
         img.onerror = () => resolve({ ok: false });
-        img.src = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        img.src = url;
       });
       imageExistsCache.set(url, result);
       return result;
@@ -4278,7 +4279,7 @@
             subdomains: "abc",
             crossOrigin: true,
             updateWhenIdle: true,
-            keepBuffer: 3,
+            keepBuffer: 1,
             className: "basemap-color-layer",
             pane: "basemapColorPane"
           }).addTo(map);
@@ -4292,7 +4293,7 @@
           subdomains: "abc",
           crossOrigin: true,
           updateWhenIdle: true,
-          keepBuffer: 3,
+          keepBuffer: 1,
           className: "basemap-color-layer",
           pane: "basemapColorPane"
         }).addTo(map);
@@ -4306,7 +4307,7 @@
         crossOrigin: true,
         opacity: 0,
         updateWhenIdle: true,
-        keepBuffer: 2,
+        keepBuffer: 1,
         className: "roads-layer",
         pane: "roadsPane"
       }).addTo(map);
@@ -4857,7 +4858,7 @@
       if (/gif\.worker|Failed to construct 'Worker'|cannot be accessed from origin/i.test(raw)) {
         return "GIF export was blocked by a worker loading issue. Reload the page and try again.";
       }
-      if (/Failed to fetch|NetworkError|Load failed/i.test(raw) && String(format).toLowerCase() === "mov") {
+      if (/Failed to fetch|NetworkError|Load failed/i.test(raw)) {
         return "GIF export failed while loading browser export components. Reload the page and try again.";
       }
       if (/html2canvas|canvasToBlob|CanvasToBlob|Canvas export failed|taint|cross-origin resource/i.test(raw)) {
@@ -4973,7 +4974,7 @@
             subdomains: "abc",
             crossOrigin: true,
             updateWhenIdle: true,
-            keepBuffer: 3,
+            keepBuffer: 1,
             className: "basemap-color-layer",
             pane: "basemapColorPane"
           }).addTo(exportMap);
@@ -4986,7 +4987,7 @@
           subdomains: "abc",
           crossOrigin: true,
           updateWhenIdle: true,
-          keepBuffer: 3,
+          keepBuffer: 1,
           className: "basemap-color-layer",
           pane: "basemapColorPane"
         }).addTo(exportMap);
@@ -5000,7 +5001,7 @@
         crossOrigin: true,
         opacity: 0,
         updateWhenIdle: true,
-        keepBuffer: 2,
+        keepBuffer: 1,
         className: "roads-layer",
         pane: "roadsPane"
       }).addTo(exportMap);
@@ -5118,6 +5119,9 @@
         useCORS: true,
         allowTaint: false,
         logging: false,
+        removeContainer: true,
+        foreignObjectRendering: false,
+        imageTimeout: 7000,
         scale: captureScale
       });
     }
@@ -5200,6 +5204,33 @@
       });
     }
 
+    function getGifWorkerCount() {
+      const cores = Number(navigator.hardwareConcurrency) || 4;
+      return Math.min(EXPORT_GIF_MAX_WORKERS, Math.max(2, cores - 1));
+    }
+
+    async function preloadExportFrameAssets(frameItems) {
+      if (!Array.isArray(frameItems) || !frameItems.length) return;
+      const urls = [];
+      const seen = new Set();
+      for (const item of frameItems) {
+        const rawStage = getStageValue(item.entry);
+        const displayStage = getOverlayStage(rawStage);
+        if (displayStage == null) continue;
+        const record = await getOverlayRecord(currentOverlayMode, displayStage);
+        if (record?.url && !seen.has(record.url)) {
+          seen.add(record.url);
+          urls.push(record.url);
+        }
+      }
+      if (!urls.length) return;
+      const first = urls[0];
+      await Promise.all([
+        ensureOverlayBounds(first).catch(() => null),
+        ...urls.map(url => preloadImage(url))
+      ]);
+    }
+
     async function withExportFrames(frameItems, onFrame, progressStart = 4, progressEnd = 82) {
       const total = Math.max(1, frameItems.length);
       for (let i = 0; i < frameItems.length; i++) {
@@ -5238,20 +5269,23 @@
       if (typeof GIF === "undefined") {
         throw new Error("GIF export library did not load.");
       }
+      setDownloadStatus("Preloading GIF frames...");
+      setExportProgress("Preloading GIF frames...", 2, false);
+      await preloadExportFrameAssets(frameItems);
       const workerScript = await getGifWorkerUrl();
       const gif = new GIF({
-        workers: 2,
+        workers: getGifWorkerCount(),
         quality: EXPORT_GIF_QUALITY,
         workerScript
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
         gif.addFrame(canvas, { delay: EXPORT_GIF_FRAME_DELAY_MS, copy: true });
-      }, 4, 78);
+      }, 4, 74);
       setDownloadStatus("Encoding GIF...");
-      setExportProgress("Encoding GIF...", 80, false);
+      setExportProgress("Encoding GIF...", 76, false);
       const blob = await new Promise((resolve, reject) => {
         gif.on("progress", value => {
-          const pct = 80 + ((Number(value) || 0) * 18);
+          const pct = 76 + ((Number(value) || 0) * 22);
           setExportProgress(`Encoding GIF... ${Math.round((Number(value) || 0) * 100)}%`, pct, false);
         });
         gif.on("finished", resolve);
