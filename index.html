@@ -1378,6 +1378,42 @@
       box-shadow:0 0 0 2px rgba(96,165,250,.16);
     }
 
+    .export-ampm-toggle{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:5px;
+      padding:4px;
+      border:1px solid rgba(255,255,255,.09);
+      border-radius:14px;
+      background:linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02));
+    }
+
+    .export-ampm-toggle button{
+      min-height:34px;
+      padding:0 10px;
+      border-radius:10px;
+      border:1px solid transparent;
+      background:transparent;
+      color:#dbe8ff;
+      font-size:12px;
+      font-weight:900;
+      letter-spacing:.05em;
+      box-shadow:none;
+    }
+
+    .export-ampm-toggle button:hover:not(:disabled){
+      transform:none;
+      box-shadow:none;
+      background:rgba(255,255,255,.04);
+    }
+
+    .export-ampm-toggle button.active{
+      background:linear-gradient(180deg, rgba(96,165,250,.22), rgba(96,165,250,.12));
+      border-color:rgba(191,219,254,.55);
+      color:#eef6ff;
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+    }
+
     @media (max-width: 720px){
       .export-datetime-row{ grid-template-columns:1fr; }
       .export-wheel-grid{ grid-template-columns:repeat(4, minmax(0, 1fr)); }
@@ -5716,23 +5752,29 @@
           <div class="export-datetime-row" aria-label="Export start and end date-time controls">
             <div class="export-datetime-panel">
               <div class="export-datetime-title">Start date / time</div>
-              <div class="export-wheel-grid">
-                <label class="export-wheel-field"><span>Month</span><select id="exportStartMonthSelect" size="3"></select></label>
-                <label class="export-wheel-field"><span>Day</span><select id="exportStartDaySelect" size="3"></select></label>
-                <label class="export-wheel-field"><span>Year</span><select id="exportStartYearSelect" size="3"></select></label>
-                <label class="export-wheel-field"><span>Time</span><select id="exportStartHourSelect" size="3"></select></label>
+              <input id="exportStartManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YY/2:00" aria-label="Manual start date and time" />
+              <div class="export-ampm-toggle" role="tablist" aria-label="Start AM or PM">
+                <button type="button" class="active" data-export-ampm-prefix="start" data-export-ampm="AM" aria-pressed="true">AM</button>
+                <button type="button" data-export-ampm-prefix="start" data-export-ampm="PM" aria-pressed="false">PM</button>
               </div>
-              <input id="exportStartManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YYYY 1:00 AM" aria-label="Manual start date and time" />
+              <select id="exportStartMonthSelect" hidden></select>
+              <select id="exportStartDaySelect" hidden></select>
+              <select id="exportStartYearSelect" hidden></select>
+              <select id="exportStartHourSelect" hidden></select>
+              <input id="exportStartAmPmInput" type="hidden" value="AM" />
             </div>
             <div class="export-datetime-panel">
               <div class="export-datetime-title">End date / time</div>
-              <div class="export-wheel-grid">
-                <label class="export-wheel-field"><span>Month</span><select id="exportEndMonthSelect" size="3"></select></label>
-                <label class="export-wheel-field"><span>Day</span><select id="exportEndDaySelect" size="3"></select></label>
-                <label class="export-wheel-field"><span>Year</span><select id="exportEndYearSelect" size="3"></select></label>
-                <label class="export-wheel-field"><span>Time</span><select id="exportEndHourSelect" size="3"></select></label>
+              <input id="exportEndManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YY/2:00" aria-label="Manual end date and time" />
+              <div class="export-ampm-toggle" role="tablist" aria-label="End AM or PM">
+                <button type="button" class="active" data-export-ampm-prefix="end" data-export-ampm="AM" aria-pressed="true">AM</button>
+                <button type="button" data-export-ampm-prefix="end" data-export-ampm="PM" aria-pressed="false">PM</button>
               </div>
-              <input id="exportEndManualInput" class="export-manual-input" type="text" inputmode="text" placeholder="MM/DD/YYYY 1:00 AM" aria-label="Manual end date and time" />
+              <select id="exportEndMonthSelect" hidden></select>
+              <select id="exportEndDaySelect" hidden></select>
+              <select id="exportEndYearSelect" hidden></select>
+              <select id="exportEndHourSelect" hidden></select>
+              <input id="exportEndAmPmInput" type="hidden" value="AM" />
             </div>
           </div>
           <div id="exportPickerHint" class="export-picker-hint"></div>
@@ -8102,6 +8144,7 @@
         year: `export${cap}YearSelect`,
         hour: `export${cap}HourSelect`,
         manual: `export${cap}ManualInput`,
+        ampm: `export${cap}AmPmInput`,
         hidden: prefix === "end" ? "downloadEndInput" : "downloadStartInput"
       };
     }
@@ -8177,32 +8220,55 @@
       daySelect.value = String(Math.min(days, Math.max(1, oldDay)));
     }
 
+    function getExportAmPmValue(prefix) {
+      const input = getExportWheelSelect(prefix, "ampm");
+      const raw = String(input?.value || "AM").toUpperCase();
+      return raw === "PM" ? "PM" : "AM";
+    }
+
+    function setExportAmPmValue(prefix, value) {
+      const normalized = String(value || "AM").toUpperCase() === "PM" ? "PM" : "AM";
+      const input = getExportWheelSelect(prefix, "ampm");
+      if (input) input.value = normalized;
+      document.querySelectorAll(`[data-export-ampm-prefix="${prefix}"][data-export-ampm]`).forEach(btn => {
+        const active = btn.dataset.exportAmpm === normalized;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+    }
+
     function formatExportManualDate(date) {
       const p = date ? getNyParts(date) : null;
       if (!p) return "";
       const hour12 = (p.hour % 12) || 12;
-      return `${String(p.month).padStart(2, "0")}/${String(p.day).padStart(2, "0")}/${p.year} ${hour12}:00 ${p.hour >= 12 ? "PM" : "AM"}`;
+      const yy = String(p.year % 100).padStart(2, "0");
+      return `${String(p.month).padStart(2, "0")}/${String(p.day).padStart(2, "0")}/${yy}/${hour12}:00`;
     }
 
-    function parseExportManualDate(value) {
+    function parseExportManualDate(value, prefix = null) {
       const raw = String(value || "").trim();
-      const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\s+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
+      const match = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})[\s\/]+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?$/i);
       if (!match) return null;
       let month = Number(match[1]);
       let day = Number(match[2]);
       let year = Number(match[3]);
       let hour = Number(match[4]);
       const minute = Number(match[5] || 0);
-      const ampm = (match[6] || "").toUpperCase();
+      let ampm = (match[6] || "").toUpperCase();
       if (year < 100) year += 2000;
+      if (!ampm && prefix) ampm = getExportAmPmValue(prefix);
       if (ampm === "PM" && hour < 12) hour += 12;
       if (ampm === "AM" && hour === 12) hour = 0;
       if (!Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(year) || !Number.isFinite(hour)) return null;
       if (month < 1 || month > 12 || day < 1 || day > 31 || hour < 0 || hour > 23 || minute >= 60) return null;
+      if (prefix && (match[6] || "")) setExportAmPmValue(prefix, ampm);
       return parseStoredLocalNyToDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T${String(hour).padStart(2, "0")}:00`);
     }
 
     function getExportDateFromWheels(prefix) {
+      const manual = getExportWheelSelect(prefix, "manual");
+      const manualDate = parseExportManualDate(manual?.value, prefix);
+      if (manualDate) return manualDate;
       const monthSelect = getExportWheelSelect(prefix, "month");
       const daySelect = getExportWheelSelect(prefix, "day");
       const yearSelect = getExportWheelSelect(prefix, "year");
@@ -8230,6 +8296,7 @@
       updateExportWheelDayOptions(prefix, true);
       if (daySelect) daySelect.value = String(p.day);
       if (hourSelect) hourSelect.value = String(p.hour);
+      setExportAmPmValue(prefix, p.hour >= 12 ? "PM" : "AM");
       if (manual && document.activeElement !== manual) manual.value = formatExportManualDate(date);
     }
 
@@ -8268,7 +8335,19 @@
 
     function handleExportManualInput(prefix) {
       const manual = getExportWheelSelect(prefix, "manual");
-      const date = parseExportManualDate(manual?.value);
+      const date = parseExportManualDate(manual?.value, prefix);
+      if (!date) return;
+      setHiddenExportDate(prefix, date);
+      exportCalendarSelectedDayKey = getExportDayKeyFromDate(date);
+      exportCalendarCursorDate = getExportMonthStart(date);
+      syncExportDateTimeWheelsFromInputs();
+      scheduleExportTimePickerRender(true);
+      updateDownloadSummary();
+    }
+
+    function handleExportAmPmToggle(prefix, ampm) {
+      setExportAmPmValue(prefix, ampm);
+      const date = getExportDateFromWheels(prefix);
       if (!date) return;
       setHiddenExportDate(prefix, date);
       exportCalendarSelectedDayKey = getExportDayKeyFromDate(date);
@@ -8447,8 +8526,8 @@
       const scope = getDownloadScopeValue();
       const startSig = document.getElementById("downloadStartInput")?.value || "";
       const endSig = document.getElementById("downloadEndInput")?.value || "";
-      const wheelSig = ["exportStartMonthSelect","exportStartDaySelect","exportStartYearSelect","exportEndMonthSelect","exportEndDaySelect","exportEndYearSelect"].map(id => document.getElementById(id)?.value || "").join("/");
-      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportRangePickMode, startHourSelect?.value || "", endHourSelect?.value || "", wheelSig, exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig].join("|");
+      const manualSig = ["exportStartManualInput","exportStartAmPmInput","exportEndManualInput","exportEndAmPmInput"].map(id => document.getElementById(id)?.value || "").join("/");
+      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportRangePickMode, startHourSelect?.value || "", endHourSelect?.value || "", manualSig, exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig].join("|");
       if (!force && signature === exportTimePickerLastSignature) return;
       exportTimePickerLastSignature = signature;
 
@@ -10792,6 +10871,14 @@
           manual.addEventListener("change", () => handleExportManualInput(prefix));
           manual.addEventListener("blur", () => handleExportManualInput(prefix));
         }
+      });
+
+      document.querySelectorAll("[data-export-ampm-prefix][data-export-ampm]").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
+          if (!exportInProgress) setDownloadStatus("", false);
+          handleExportAmPmToggle(btn.dataset.exportAmpmPrefix, btn.dataset.exportAmpm);
+        });
       });
 
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
