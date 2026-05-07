@@ -5495,6 +5495,7 @@
     let observedData = null;
     let observedMonthKeys = [];
     let observedFlatHours = [];
+    let observedHourIndexByDateHour = new Map();
     let topTideEvents = [];
     let currentMonthKey = null;
     let selectedObservedDate = null;
@@ -5753,9 +5754,9 @@
     }
 
     function getStoredEntryHourIndex(entry) {
-      const direct = Number(entry?.hourIndex);
-      if (Number.isInteger(direct) && direct >= 0 && direct <= 23) return direct;
-
+      // The observed archive sometimes uses hourIndex as the row number inside a
+      // sparse day bucket, while timeEST/displayTimeEST contains the real local hour.
+      // Always trust the stored local timestamp first; use hourIndex only as fallback.
       const raw = String(entry?.displayTimeEST || entry?.timeEST || entry?.timeEst || "");
       const match = raw.match(/^\d{4}-\d{2}-\d{2}T(\d{2}):/);
       if (match) {
@@ -5766,7 +5767,10 @@
       const d = getEntryESTDate(entry);
       const parts = d ? getNyParts(d) : null;
       const fallback = Number(parts?.hour24);
-      return Number.isInteger(fallback) && fallback >= 0 && fallback <= 23 ? fallback : null;
+      if (Number.isInteger(fallback) && fallback >= 0 && fallback <= 23) return fallback;
+
+      const direct = Number(entry?.hourIndex);
+      return Number.isInteger(direct) && direct >= 0 && direct <= 23 ? direct : null;
     }
 
     function normalizeObservedDayHourEntry(source, dateStr, hourIndex, sourceIndex, sourceResolutionMinutes, options = {}) {
@@ -5791,46 +5795,42 @@
     function buildObservedDayDisplaySeries(dayRecord, dateStr) {
       const hours = Array.isArray(dayRecord?.hours) ? dayRecord.hours : [];
       const sourceResolutionMinutes = detectSeriesResolutionMinutes(hours);
-
-      // observed.json is an hourly-max full-history archive. For complete archive
-      // days, the safest key is the row position/hourIndex, not reparsed timestamps.
-      // This avoids the bug where valid 12 AM–6 PM values were displayed as "No data"
-      // or shifted into the evening because of EST/EDT timestamp parsing/caching drift.
-      if (hours.length >= 20) {
-        const out = [];
-        for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
-          const source = hours[hourIndex];
-          const stage = source ? getStageValue(source) : null;
-          if (source && Number.isFinite(stage)) {
-            out.push(normalizeObservedDayHourEntry(source, dateStr, hourIndex, hourIndex, sourceResolutionMinutes, {
-              forceArchiveHourTime: true
-            }));
-          } else {
-            out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
-          }
-        }
-        return out;
-      }
-
       const byHour = new Map();
+
       hours.forEach((entry, idx) => {
-        let hourIndex = getStoredEntryHourIndex(entry);
-        if (hourIndex == null && idx >= 0 && idx <= 23) hourIndex = idx;
+        const hourIndex = getStoredEntryHourIndex(entry);
         if (hourIndex == null) return;
-        if (!byHour.has(hourIndex)) {
+        const existing = byHour.get(hourIndex);
+        const existingStage = existing ? getStageValue(existing.entry) : null;
+        const nextStage = getStageValue(entry);
+        if (!existing || (!Number.isFinite(existingStage) && Number.isFinite(nextStage))) {
           byHour.set(hourIndex, { entry, idx });
-        } else {
-          const existing = byHour.get(hourIndex);
-          const existingStage = getStageValue(existing.entry);
-          const nextStage = getStageValue(entry);
-          if (!Number.isFinite(existingStage) && Number.isFinite(nextStage)) byHour.set(hourIndex, { entry, idx });
         }
       });
 
+      const fullArchiveDay = hours.length >= 20;
       const out = [];
       for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
+        // First use the global date/hour lookup built from the full observed archive.
+        // This catches sparse day buckets where the actual hour is only in timeEST.
+        const resolved = getObservedArchiveEntryByDateHour(dateStr, hourIndex);
+        if (resolved && Number.isFinite(getStageValue(resolved.entry))) {
+          out.push(normalizeObservedDayHourEntry(resolved.entry, dateStr, hourIndex, resolved.sourceIndex ?? hourIndex, sourceResolutionMinutes, {
+            forceArchiveHourTime: true
+          }));
+          continue;
+        }
+
+        // Complete hourly days can safely fall back to row position.
+        if (fullArchiveDay && hours[hourIndex] && Number.isFinite(getStageValue(hours[hourIndex]))) {
+          out.push(normalizeObservedDayHourEntry(hours[hourIndex], dateStr, hourIndex, hourIndex, sourceResolutionMinutes, {
+            forceArchiveHourTime: true
+          }));
+          continue;
+        }
+
         const item = byHour.get(hourIndex);
-        if (item) {
+        if (item && Number.isFinite(getStageValue(item.entry))) {
           out.push(normalizeObservedDayHourEntry(item.entry, dateStr, hourIndex, item.idx, sourceResolutionMinutes, {
             forceArchiveHourTime: true
           }));
@@ -7832,10 +7832,26 @@
         "NAVD88",
         "navd88_ft",
         "navd88Ft",
-        "stage_navd88_ft"
+        "stage_navd88_ft",
+        "stageNAVD88",
+        "stageNavd88",
+        "water_level",
+        "water_level_ft",
+        "water_level_navd88",
+        "wl_navd88_ft"
       ];
       for (const key of keys) {
         if (entry[key] == null || entry[key] === "") continue;
+        const n = Number(entry[key]);
+        if (Number.isFinite(n)) return n;
+      }
+
+      // Last-resort schema tolerance for observed archives with renamed fields.
+      // Avoid fields like hourIndex, peakNAVD88, dates, ranks, and indices.
+      for (const key of Object.keys(entry)) {
+        const k = key.toLowerCase();
+        if (!/(navd|stage|water|level|height)/.test(k)) continue;
+        if (/(peak|max|min|hour|index|rank|date|time|class|source)/.test(k)) continue;
         const n = Number(entry[key]);
         if (Number.isFinite(n)) return n;
       }
@@ -7894,6 +7910,70 @@
       return maxIndex;
     }
 
+    function observedDateHourKey(dateStr, hourIndex) {
+      const h = Number(hourIndex);
+      if (!dateStr || !Number.isInteger(h) || h < 0 || h > 23) return null;
+      return `${dateStr}|${pad2(h)}`;
+    }
+
+    function getStoredLocalDateHour(entry) {
+      const raw = String(entry?.displayTimeEST || entry?.timeEST || entry?.timeEst || "");
+      const match = raw.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/);
+      if (match) {
+        const hour = Number(match[2]);
+        if (Number.isInteger(hour) && hour >= 0 && hour <= 23) {
+          return { dateStr: match[1], hourIndex: hour };
+        }
+      }
+      const d = getEntryESTDate(entry);
+      const parts = d ? getNyParts(d) : null;
+      if (!parts) return null;
+      const hour = Number(parts.hour24);
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) return null;
+      return { dateStr: `${parts.year}-${parts.month}-${parts.day}`, hourIndex: hour };
+    }
+
+    function putObservedArchiveHour(dateStr, hourIndex, entry, score, sourceIndex = null) {
+      const key = observedDateHourKey(dateStr, hourIndex);
+      if (!key || !Number.isFinite(getStageValue(entry))) return;
+      const existing = observedHourIndexByDateHour.get(key);
+      if (!existing || score > existing.score) {
+        observedHourIndexByDateHour.set(key, { entry, score, sourceIndex });
+      }
+    }
+
+    function rebuildObservedHourLookup() {
+      observedHourIndexByDateHour = new Map();
+      const rawDays = Array.isArray(observedData?.days) ? observedData.days : [];
+      rawDays.forEach(day => {
+        const dateStr = String(day?.date || "");
+        const hours = Array.isArray(day?.hours) ? day.hours : [];
+        const fullArchiveDay = hours.length >= 20;
+        hours.forEach((entry, idx) => {
+          if (!Number.isFinite(getStageValue(entry))) return;
+
+          const local = getStoredLocalDateHour(entry);
+          if (local) {
+            putObservedArchiveHour(local.dateStr, local.hourIndex, entry, 300, idx);
+          }
+
+          if (fullArchiveDay && dateStr && idx >= 0 && idx <= 23) {
+            putObservedArchiveHour(dateStr, idx, entry, 220, idx);
+          }
+
+          const storedHour = getStoredEntryHourIndex(entry);
+          if (dateStr && storedHour != null) {
+            putObservedArchiveHour(dateStr, storedHour, entry, 180, idx);
+          }
+        });
+      });
+    }
+
+    function getObservedArchiveEntryByDateHour(dateStr, hourIndex) {
+      const key = observedDateHourKey(dateStr, hourIndex);
+      return key ? (observedHourIndexByDateHour.get(key) || null) : null;
+    }
+
     function scoreObservedDayRecord(day) {
       const hours = Array.isArray(day?.hours) ? day.hours : [];
       let validStages = 0;
@@ -7913,12 +7993,13 @@
         const hours = Array.isArray(record?.hours) ? record.hours : [];
         const fullArchiveDay = hours.length >= 20;
         hours.forEach((hour, idx) => {
-          let hourIndex = Number.isInteger(Number(hour?.hourIndex)) ? Number(hour.hourIndex) : null;
-          if (!(hourIndex >= 0 && hourIndex <= 23)) {
-            hourIndex = getStoredEntryHourIndex(hour);
-          }
+          let hourIndex = getStoredEntryHourIndex(hour);
           if (!(hourIndex >= 0 && hourIndex <= 23) && fullArchiveDay && idx >= 0 && idx <= 23) {
             hourIndex = idx;
+          }
+          if (!(hourIndex >= 0 && hourIndex <= 23)) {
+            const direct = Number(hour?.hourIndex);
+            hourIndex = Number.isInteger(direct) && direct >= 0 && direct <= 23 ? direct : null;
           }
           if (!(hourIndex >= 0 && hourIndex <= 23)) return;
 
@@ -8351,6 +8432,7 @@
 
     async function loadObserved() {
       if (!observedData) observedData = await fetchJson(withFreshJsonUrl(OBSERVED_URL));
+      rebuildObservedHourLookup();
 
       const days = getObservedDays();
       observedMonthKeys = buildObservedMonthKeysFromDays(days);
@@ -8577,6 +8659,7 @@
       observedData = observed;
       observedMonthKeys = [];
       observedFlatHours = [];
+      observedHourIndexByDateHour = new Map();
       topTideEvents = [];
 
       if (observedData) {
