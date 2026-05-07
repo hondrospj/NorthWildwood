@@ -3093,13 +3093,13 @@
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 220;
-    const EXPORT_MOV_FPS = 20;
-    const EXPORT_VIDEO_BITRATE = 140000000;
-    const EXPORT_VIDEO_MAX_WIDTH = 2560;
-    const EXPORT_VIDEO_MAX_HEIGHT = 1440;
-    const EXPORT_MOV_FRAME_HOLD_MS = 900;
+    const EXPORT_MOV_FPS = 3;
+    const EXPORT_VIDEO_BITRATE = 36000000;
+    const EXPORT_VIDEO_MAX_WIDTH = 1920;
+    const EXPORT_VIDEO_MAX_HEIGHT = 1080;
+    const EXPORT_MOV_FRAME_HOLD_MS = 450;
     const EXPORT_CAPTURE_SCALE_DEFAULT = 2;
-    const EXPORT_CAPTURE_SCALE_VIDEO = 4;
+    const EXPORT_CAPTURE_SCALE_VIDEO = 2;
     const EXPORT_GIF_QUALITY = 4;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
 
@@ -5378,9 +5378,12 @@
       if (!videoType) {
         throw new Error("MOV export is unavailable because this browser does not support a compatible video encoder.");
       }
+      if (!Array.isArray(frameItems) || !frameItems.length) {
+        throw new Error("No frames are available for MOV export.");
+      }
 
       const outputCanvas = document.createElement("canvas");
-      const outputCtx = outputCanvas.getContext("2d", { alpha: false });
+      const outputCtx = outputCanvas.getContext("2d", { alpha: false, desynchronized: true });
       if (outputCtx) {
         outputCtx.imageSmoothingEnabled = true;
         outputCtx.imageSmoothingQuality = "high";
@@ -5389,6 +5392,44 @@
         throw new Error("MOV export is unavailable because this browser cannot record canvas video.");
       }
 
+      const total = Math.max(1, frameItems.length);
+      const perVideoFrameMs = Math.max(1, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
+      const holdFrameCount = Math.max(1, Math.round(EXPORT_MOV_FRAME_HOLD_MS / perVideoFrameMs));
+
+      const drawCapturedToOutput = (captured) => {
+        outputCtx.fillStyle = "#050b16";
+        outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+        outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
+      };
+
+      async function renderCapturedFrame(i) {
+        const item = frameItems[i];
+        const renderPct = 4 + ((i / total) * 84);
+        const message = `Rendering video frame ${i + 1} of ${frameItems.length}...`;
+        setDownloadStatus(message);
+        setExportProgress(message, renderPct, false);
+        await prepareExportFrame(item);
+        return await captureExportCanvas();
+      }
+
+      const holdOutputFrame = async (requestVideoFrame) => {
+        for (let hold = 0; hold < holdFrameCount; hold++) {
+          requestVideoFrame();
+          await wait(perVideoFrameMs);
+        }
+      };
+
+      setDownloadStatus("Starting MOV export...");
+      setExportProgress("Starting MOV export...", 3, false);
+
+      // Critical quality fix: size the recording canvas BEFORE calling captureStream().
+      // captureStream() can otherwise lock the video track to the default 300x150 canvas,
+      // which makes the MOV look blurry no matter how high the bitrate is.
+      const firstCaptured = await renderCapturedFrame(0);
+      const preferredSize = getPreferredVideoCanvasSize(firstCaptured.width, firstCaptured.height);
+      outputCanvas.width = preferredSize?.width || firstCaptured.width;
+      outputCanvas.height = preferredSize?.height || firstCaptured.height;
+
       const stream = outputCanvas.captureStream(EXPORT_MOV_FPS);
       const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
       const requestVideoFrame = () => {
@@ -5396,6 +5437,7 @@
           if (videoTrack && typeof videoTrack.requestFrame === "function") videoTrack.requestFrame();
         } catch (err) {}
       };
+
       const chunks = [];
       let recorder;
       try {
@@ -5416,44 +5458,21 @@
         recorder.onstop = resolve;
       });
 
-      setDownloadStatus("Starting MOV export...");
-      setExportProgress("Starting MOV export...", 3, false);
-      recorder.start(1000);
-
-      const total = Math.max(1, frameItems.length);
-      const perVideoFrameMs = Math.max(1, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
-      const frameHoldMs = EXPORT_MOV_FRAME_HOLD_MS;
-      const holdFrameCount = Math.max(1, Math.round(frameHoldMs / perVideoFrameMs));
-
       try {
-        for (let i = 0; i < frameItems.length; i++) {
-          const item = frameItems[i];
-          const renderPct = 4 + ((i / total) * 84);
-          const message = `Rendering video frame ${i + 1} of ${frameItems.length}...`;
-          setDownloadStatus(message);
-          setExportProgress(message, renderPct, false);
+        recorder.start(1000);
 
-          await prepareExportFrame(item);
-          const captured = await captureExportCanvas();
+        drawCapturedToOutput(firstCaptured);
+        await holdOutputFrame(requestVideoFrame);
+        firstCaptured.width = 1;
+        firstCaptured.height = 1;
+        setExportProgress(`Added video frame 1 of ${frameItems.length}...`, 4 + (1 / total) * 84, false);
 
-          if (!outputCanvas.width || !outputCanvas.height) {
-            const preferredSize = getPreferredVideoCanvasSize(captured.width, captured.height);
-            outputCanvas.width = preferredSize?.width || captured.width;
-            outputCanvas.height = preferredSize?.height || captured.height;
-          }
-
-          outputCtx.fillStyle = "#050b16";
-          outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-          outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
-
+        for (let i = 1; i < frameItems.length; i++) {
+          const captured = await renderCapturedFrame(i);
+          drawCapturedToOutput(captured);
+          await holdOutputFrame(requestVideoFrame);
           captured.width = 1;
           captured.height = 1;
-
-          for (let hold = 0; hold < holdFrameCount; hold++) {
-            outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
-            requestVideoFrame();
-            await wait(perVideoFrameMs);
-          }
 
           const donePct = 4 + (((i + 1) / total) * 84);
           setExportProgress(`Added video frame ${i + 1} of ${frameItems.length}...`, donePct, false);
@@ -5461,8 +5480,8 @@
 
         setDownloadStatus(`Encoding ${videoType.label} video...`);
         setExportProgress(`Encoding ${videoType.label} video...`, 92, false);
-        await wait(500);
-        recorder.stop();
+        await wait(350);
+        if (recorder.state !== "inactive") recorder.stop();
         await stopped;
       } finally {
         try {
