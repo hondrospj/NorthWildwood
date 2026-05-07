@@ -5173,6 +5173,12 @@
     const FORECAST_URL = new URL("./forecast.json", APP_BASE).href;
     const OBSERVED_URL = new URL("./observed.json", APP_BASE).href;
 
+    function withFreshJsonUrl(url) {
+      const fresh = new URL(url, window.location.href);
+      fresh.searchParams.set("_ts", String(Date.now()));
+      return fresh.href;
+    }
+
     const OVERLAY_ROOTS = {
       depth: [
         new URL("./assets/overlays/flooddepth/", APP_BASE).href,
@@ -5763,14 +5769,17 @@
       return Number.isInteger(fallback) && fallback >= 0 && fallback <= 23 ? fallback : null;
     }
 
-    function normalizeObservedDayHourEntry(source, dateStr, hourIndex, sourceIndex, sourceResolutionMinutes) {
+    function normalizeObservedDayHourEntry(source, dateStr, hourIndex, sourceIndex, sourceResolutionMinutes, options = {}) {
       const safeHour = Math.max(0, Math.min(23, Number(hourIndex) || 0));
       const stage = source?.navd88StageFt ?? source?.stageFt ?? source?.value ?? source?.waterLevel ?? source?.waterLevelNAVD88;
+      const forcedDisplayTime = `${dateStr}T${pad2(safeHour)}:00`;
       return {
         ...source,
         navd88StageFt: Number.isFinite(Number(stage)) ? Number(stage) : source?.navd88StageFt,
-        displayTimeEST: source?.displayTimeEST || source?.timeEST || source?.timeEst || `${dateStr}T${pad2(safeHour)}:00`,
-        observedDate: source?.observedDate || dateStr,
+        displayTimeEST: options.forceArchiveHourTime
+          ? forcedDisplayTime
+          : (source?.displayTimeEST || source?.timeEST || source?.timeEst || forcedDisplayTime),
+        observedDate: dateStr,
         hourIndex: safeHour,
         sourceHourIndex: source?.sourceHourIndex ?? sourceIndex,
         observationInterval: "1hour",
@@ -5782,8 +5791,28 @@
     function buildObservedDayDisplaySeries(dayRecord, dateStr) {
       const hours = Array.isArray(dayRecord?.hours) ? dayRecord.hours : [];
       const sourceResolutionMinutes = detectSeriesResolutionMinutes(hours);
-      const byHour = new Map();
 
+      // observed.json is an hourly-max full-history archive. For complete archive
+      // days, the safest key is the row position/hourIndex, not reparsed timestamps.
+      // This avoids the bug where valid 12 AM–6 PM values were displayed as "No data"
+      // or shifted into the evening because of EST/EDT timestamp parsing/caching drift.
+      if (hours.length >= 20) {
+        const out = [];
+        for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
+          const source = hours[hourIndex];
+          const stage = source ? getStageValue(source) : null;
+          if (source && Number.isFinite(stage)) {
+            out.push(normalizeObservedDayHourEntry(source, dateStr, hourIndex, hourIndex, sourceResolutionMinutes, {
+              forceArchiveHourTime: true
+            }));
+          } else {
+            out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
+          }
+        }
+        return out;
+      }
+
+      const byHour = new Map();
       hours.forEach((entry, idx) => {
         let hourIndex = getStoredEntryHourIndex(entry);
         if (hourIndex == null && idx >= 0 && idx <= 23) hourIndex = idx;
@@ -5800,32 +5829,15 @@
 
       const out = [];
       for (let hourIndex = 0; hourIndex < 24; hourIndex++) {
-        let item = byHour.get(hourIndex);
-
-        // The archive is an hourly-max full-history file. If it has a 24-row day,
-        // trust the array position as the hour fallback instead of marking valid
-        // early-day records as missing because of timezone/date parsing drift.
-        if (!item && hours.length >= 20 && hours[hourIndex]) {
-          item = { entry: hours[hourIndex], idx: hourIndex };
-        }
-
+        const item = byHour.get(hourIndex);
         if (item) {
-          out.push(normalizeObservedDayHourEntry(item.entry, dateStr, hourIndex, item.idx, sourceResolutionMinutes));
+          out.push(normalizeObservedDayHourEntry(item.entry, dateStr, hourIndex, item.idx, sourceResolutionMinutes, {
+            forceArchiveHourTime: true
+          }));
         } else {
           out.push(makeObservedMissingDayHourEntry(dateStr, hourIndex, { sourceResolutionMinutes }));
         }
       }
-
-      // Final safety: for a complete archive day, never show fabricated "No data"
-      // panes when source rows exist for those hour positions.
-      if (hours.length >= 24) {
-        for (let i = 0; i < 24; i++) {
-          if (out[i]?.isMissingObservedHour && hours[i]) {
-            out[i] = normalizeObservedDayHourEntry(hours[i], dateStr, i, i, sourceResolutionMinutes);
-          }
-        }
-      }
-
       return out;
     }
 
@@ -7941,10 +7953,18 @@
       const flat = [];
       getObservedDays().forEach(day => {
         const hours = Array.isArray(day.hours) ? day.hours : [];
+        const fullArchiveDay = hours.length >= 20;
         hours.forEach((hour, idx) => {
+          const safeHour = fullArchiveDay && idx >= 0 && idx <= 23
+            ? idx
+            : (getStoredEntryHourIndex(hour) ?? idx);
           flat.push({
             ...hour,
             observedDate: day.date,
+            displayTimeEST: fullArchiveDay && safeHour >= 0 && safeHour <= 23
+              ? `${day.date}T${pad2(safeHour)}:00`
+              : (hour.displayTimeEST || hour.timeEST || hour.timeEst),
+            hourIndex: safeHour,
             classification: day.classification || "none",
             peakNAVD88: day.peakNAVD88,
             sourceHourIndex: idx,
@@ -8086,7 +8106,7 @@
 
     function renderSelectionMeta(entry, rawStage, displayStage) {
       document.getElementById("timeText").textContent = formatSnapshotTime(entry);
-      if (entry?.isMissingObservedHour) {
+      if (entry?.isMissingObservedHour && !Number.isFinite(Number(rawStage))) {
         document.getElementById("stageText").textContent = "No data";
         document.getElementById("stageSubText").textContent = "No observed record for this hour";
       } else {
@@ -8213,7 +8233,7 @@
     }
 
     async function loadForecast() {
-      forecastData = await fetchJson(FORECAST_URL);
+      forecastData = await fetchJson(withFreshJsonUrl(FORECAST_URL));
       currentRawSeriesHours = Array.isArray(forecastData.hours) ? forecastData.hours : [];
       currentSeriesHours = currentRawSeriesHours.slice();
       currentViewType = "forecast";
@@ -8230,7 +8250,7 @@
     }
 
     async function loadObserved() {
-      if (!observedData) observedData = await fetchJson(OBSERVED_URL);
+      if (!observedData) observedData = await fetchJson(withFreshJsonUrl(OBSERVED_URL));
 
       const days = getObservedDays();
       observedMonthKeys = buildObservedMonthKeysFromDays(days);
@@ -8449,8 +8469,8 @@
       imageExistsCache = new Map();
 
       const [forecast, observed] = await Promise.all([
-        fetchJson(FORECAST_URL),
-        fetchJson(OBSERVED_URL).catch(() => null)
+        fetchJson(withFreshJsonUrl(FORECAST_URL)),
+        fetchJson(withFreshJsonUrl(OBSERVED_URL)).catch(() => null)
       ]);
 
       forecastData = forecast;
