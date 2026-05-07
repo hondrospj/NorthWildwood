@@ -3066,6 +3066,10 @@
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
     const EXPORT_CAPTURE_DELAY_MS = 220;
     const EXPORT_MOV_FPS = 2;
+    const EXPORT_VIDEO_BITRATE = 32000000;
+    const EXPORT_CAPTURE_SCALE_DEFAULT = 2;
+    const EXPORT_CAPTURE_SCALE_VIDEO = 2.75;
+    const EXPORT_GIF_QUALITY = 6;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
 
     const NORTH_WILDWOOD_POINT = { lat: 39.0008, lon: -74.7996 };
@@ -4553,10 +4557,27 @@
       return lastIndex;
     }
 
+    function getDownloadScopeValue() {
+      const activeScopeButton = document.querySelector("#downloadScopeControl button[data-scope].active");
+      const hiddenScope = document.getElementById("downloadScopeSelect");
+      const value = activeScopeButton?.dataset?.scope || hiddenScope?.value || "current";
+      if (hiddenScope && hiddenScope.value !== value) hiddenScope.value = value;
+      return value;
+    }
+
+    function getDownloadFormatValue() {
+      const activeFormatButton = document.querySelector("#downloadFormatControl button[data-format].active");
+      const hiddenFormat = document.getElementById("downloadFormatSelect");
+      const value = String(activeFormatButton?.dataset?.format || hiddenFormat?.value || "png").toLowerCase();
+      const normalized = ["png", "gif", "mov"].includes(value) ? value : "png";
+      if (hiddenFormat && hiddenFormat.value !== normalized) hiddenFormat.value = normalized;
+      return normalized;
+    }
+
     function syncDownloadRangeInputs(force = false) {
       const wrap = document.getElementById("downloadRangeFields");
       const note = document.getElementById("downloadRangeNote");
-      const scopeValue = document.getElementById("downloadScopeSelect")?.value || "current";
+      const scopeValue = getDownloadScopeValue();
       const startEl = document.getElementById("downloadStartInput");
       const endEl = document.getElementById("downloadEndInput");
       if (!wrap || !startEl || !endEl) return;
@@ -4708,7 +4729,7 @@
     }
 
     function getDownloadFrameItems(scope = null) {
-      const mode = scope || document.getElementById("downloadScopeSelect")?.value || "current";
+      const mode = scope || getDownloadScopeValue();
       const currentEntry = getDownloadCurrentEntry();
 
       if (mode === "current") {
@@ -4732,8 +4753,8 @@
       const summary = document.getElementById("downloadSummary");
       if (!summary || !isDownloadModalOpen()) return;
       syncDownloadRangeInputs(false);
-      const scope = document.getElementById("downloadScopeSelect")?.value || "current";
-      const format = String(document.getElementById("downloadFormatSelect")?.value || "png").toUpperCase();
+      const scope = getDownloadScopeValue();
+      const format = getDownloadFormatValue().toUpperCase();
 
       if (scope === "range") {
         const range = getDownloadRangeRequest();
@@ -4767,14 +4788,14 @@
     }
 
     function updateExportSegmentedUI() {
-      const scopeValue = document.getElementById("downloadScopeSelect")?.value || "current";
+      const scopeValue = getDownloadScopeValue();
       document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
         const active = btn.dataset.scope === scopeValue;
         btn.classList.toggle("active", active);
         btn.setAttribute("aria-pressed", String(active));
       });
 
-      const formatValue = document.getElementById("downloadFormatSelect")?.value || "png";
+      const formatValue = getDownloadFormatValue();
       document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
         const active = btn.dataset.format === formatValue;
         btn.classList.toggle("active", active);
@@ -5076,12 +5097,15 @@
       }
       const stage = document.getElementById("exportStageFrame");
       if (!stage) throw new Error("Export stage is unavailable.");
+      const format = getDownloadFormatValue();
+      const preferredScale = format === "mov" ? EXPORT_CAPTURE_SCALE_VIDEO : EXPORT_CAPTURE_SCALE_DEFAULT;
+      const captureScale = Math.min(3, Math.max(preferredScale, window.devicePixelRatio || 1));
       return await html2canvas(stage, {
         backgroundColor: null,
         useCORS: true,
         allowTaint: false,
         logging: false,
-        scale: Math.min(2, Math.max(1, window.devicePixelRatio || 1))
+        scale: captureScale
       });
     }
 
@@ -5235,7 +5259,7 @@
       const workerScript = await getGifWorkerUrl();
       const gif = new GIF({
         workers: 2,
-        quality: 10,
+        quality: EXPORT_GIF_QUALITY,
         workerScript
       });
       await withExportFrames(frameItems, async ({ canvas }) => {
@@ -5291,17 +5315,28 @@
 
       const outputCanvas = document.createElement("canvas");
       const outputCtx = outputCanvas.getContext("2d", { alpha: false });
+      if (outputCtx) {
+        outputCtx.imageSmoothingEnabled = true;
+        outputCtx.imageSmoothingQuality = "high";
+      }
       if (!outputCtx || typeof outputCanvas.captureStream !== "function") {
         throw new Error("MOV export is unavailable because this browser cannot record canvas video.");
       }
 
       const stream = outputCanvas.captureStream(EXPORT_MOV_FPS);
+      const videoTrack = stream.getVideoTracks && stream.getVideoTracks()[0];
+      const requestVideoFrame = () => {
+        try {
+          if (videoTrack && typeof videoTrack.requestFrame === "function") videoTrack.requestFrame();
+        } catch (err) {}
+      };
       const chunks = [];
       let recorder;
       try {
         recorder = new MediaRecorder(stream, {
           mimeType: videoType.mimeType,
-          videoBitsPerSecond: 8000000
+          bitsPerSecond: EXPORT_VIDEO_BITRATE,
+          videoBitsPerSecond: EXPORT_VIDEO_BITRATE
         });
       } catch (err) {
         recorder = new MediaRecorder(stream);
@@ -5317,7 +5352,7 @@
 
       setDownloadStatus("Starting MOV export...");
       setExportProgress("Starting MOV export...", 3, false);
-      recorder.start(250);
+      recorder.start();
 
       const total = Math.max(1, frameItems.length);
       const frameHoldMs = Math.max(420, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
@@ -5341,6 +5376,7 @@
           outputCtx.fillStyle = "#050b16";
           outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
           outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
+          requestVideoFrame();
 
           captured.width = 1;
           captured.height = 1;
@@ -5376,7 +5412,7 @@
     async function downloadCurrentSelection() {
       if (exportInProgress) return;
       syncDownloadRangeInputs(false);
-      const format = document.getElementById("downloadFormatSelect")?.value || "png";
+      const format = getDownloadFormatValue();
       const validation = validateDownloadRangeForExport();
       if (!validation.ok) {
         toast(validation.message);
@@ -6489,7 +6525,8 @@
       });
 
       document.querySelectorAll("#downloadScopeControl button[data-scope]").forEach(btn => {
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
           const input = document.getElementById("downloadScopeSelect");
           if (!input) return;
           input.value = btn.dataset.scope || "current";
@@ -6501,10 +6538,12 @@
       });
 
       document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(btn => {
-        btn.addEventListener("click", () => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
           const input = document.getElementById("downloadFormatSelect");
           if (!input) return;
           input.value = btn.dataset.format || "png";
+          document.querySelectorAll("#downloadFormatControl button[data-format]").forEach(other => other.classList.toggle("active", other === btn));
           if (!exportInProgress) setDownloadStatus("", false);
           updateExportSegmentedUI();
           updateDownloadSummary();
@@ -6540,7 +6579,7 @@
       });
       document.getElementById("downloadBtn").addEventListener("click", () => {
         downloadCurrentSelection().catch(err => {
-          const format = document.getElementById("downloadFormatSelect")?.value || "png";
+          const format = getDownloadFormatValue();
           const friendlyMessage = getFriendlyExportError(err, format);
           console.error(err);
           toast(friendlyMessage);
