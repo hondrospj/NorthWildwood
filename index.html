@@ -3026,7 +3026,6 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 
   <script>
     const APP_BASE = new URL(".", window.location.href);
@@ -4829,10 +4828,10 @@
         return "GIF export was blocked by a worker loading issue. Reload the page and try again.";
       }
       if (/Failed to fetch|NetworkError|Load failed/i.test(raw) && String(format).toLowerCase() === "mov") {
-        return "MOV export could not load or encode one of its local video components. Reload the page and try again; PNG and GIF should still work.";
+        return "Video export could not finish loading one of its browser components. Reload the page and try again; PNG and GIF should still work.";
       }
-      if (/SharedArrayBuffer|cross-origin isolation|ffmpeg|wasm/i.test(raw) && String(format).toLowerCase() === "mov") {
-        return "MOV export is unavailable in this browser build right now. PNG and GIF should still work.";
+      if (/MediaRecorder|canvas video|video encoder|native video recording|SharedArrayBuffer|cross-origin isolation|ffmpeg|wasm/i.test(raw) && String(format).toLowerCase() === "mov") {
+        return "MOV/video export is unavailable in this browser build right now. PNG and GIF should still work.";
       }
       if (/html2canvas|canvasToBlob|CanvasToBlob|Canvas export failed|taint|cross-origin resource/i.test(raw)) {
         return `${formatLabel} export could not capture the map cleanly. Reload the page and try again.`;
@@ -5261,60 +5260,117 @@
       downloadBlob(blob, `${getExportBaseName()}.gif`);
     }
 
-    async function getFfmpegClient() {
-      if (ffmpegClientPromise) return ffmpegClientPromise;
-      if (typeof FFmpeg === "undefined" || typeof FFmpeg.createFFmpeg !== "function") {
-        throw new Error("FFmpeg did not load, so MOV export is unavailable.");
+    function getBestNativeVideoType() {
+      if (typeof MediaRecorder === "undefined") return null;
+      const candidates = [
+        { mimeType: "video/quicktime;codecs=h264", extension: "mov", label: "MOV" },
+        { mimeType: "video/quicktime", extension: "mov", label: "MOV" },
+        { mimeType: "video/mp4;codecs=avc1.42E01E", extension: "mp4", label: "MP4" },
+        { mimeType: "video/mp4;codecs=h264", extension: "mp4", label: "MP4" },
+        { mimeType: "video/mp4", extension: "mp4", label: "MP4" },
+        { mimeType: "video/webm;codecs=vp9", extension: "webm", label: "WEBM" },
+        { mimeType: "video/webm;codecs=vp8", extension: "webm", label: "WEBM" },
+        { mimeType: "video/webm", extension: "webm", label: "WEBM" }
+      ];
+      for (const candidate of candidates) {
+        try {
+          if (MediaRecorder.isTypeSupported(candidate.mimeType)) return candidate;
+        } catch (err) {}
       }
-      ffmpegClientPromise = (async () => {
-        const client = FFmpeg.createFFmpeg({
-          log: false,
-          corePath: "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.6/dist/ffmpeg-core.js"
-        });
-        client.setProgress(({ ratio }) => {
-          if (!exportInProgress) return;
-          const safeRatio = Math.max(0, Math.min(1, Number(ratio) || 0));
-          const pct = 84 + safeRatio * 14;
-          setExportProgress(`Encoding MOV... ${Math.round(safeRatio * 100)}%`, pct, false);
-        });
-        setDownloadStatus("Loading MOV encoder...");
-        setExportProgress("Loading MOV encoder...", 2, false);
-        await client.load();
-        return client;
-      })();
-      return ffmpegClientPromise;
+      return null;
     }
 
     async function exportMov(frameItems) {
-      const ffmpeg = await getFfmpegClient();
-      const written = [];
-      await withExportFrames(frameItems, async ({ sequence, canvas }) => {
-        const filename = `frame-${String(sequence + 1).padStart(3, "0")}.png`;
-        const blob = await canvasToBlob(canvas, "image/png");
-        ffmpeg.FS("writeFile", filename, await blobToUint8Array(blob));
-        written.push(filename);
-      }, 4, 82);
-      setDownloadStatus("Encoding MOV... this can take a minute.");
-      setExportProgress("Encoding MOV... this can take a minute.", 84, false);
-      const outName = "north-wildwood-export.mov";
+      if (typeof MediaRecorder === "undefined") {
+        throw new Error("MOV export is unavailable because this browser does not support native video recording.");
+      }
+      const videoType = getBestNativeVideoType();
+      if (!videoType) {
+        throw new Error("MOV export is unavailable because this browser does not support a compatible video encoder.");
+      }
+
+      const outputCanvas = document.createElement("canvas");
+      const outputCtx = outputCanvas.getContext("2d", { alpha: false });
+      if (!outputCtx || typeof outputCanvas.captureStream !== "function") {
+        throw new Error("MOV export is unavailable because this browser cannot record canvas video.");
+      }
+
+      const stream = outputCanvas.captureStream(EXPORT_MOV_FPS);
+      const chunks = [];
+      let recorder;
       try {
-        await ffmpeg.run(
-          "-y",
-          "-framerate", String(EXPORT_MOV_FPS),
-          "-i", "frame-%03d.png",
-          "-c:v", "mpeg4",
-          "-q:v", "4",
-          "-pix_fmt", "yuv420p",
-          outName
-        );
-        const data = ffmpeg.FS("readFile", outName);
-        setExportProgress("Starting MOV download...", 99, false);
-        downloadBlob(new Blob([data.buffer], { type: "video/quicktime" }), `${getExportBaseName()}.mov`);
+        recorder = new MediaRecorder(stream, {
+          mimeType: videoType.mimeType,
+          videoBitsPerSecond: 8000000
+        });
+      } catch (err) {
+        recorder = new MediaRecorder(stream);
+      }
+
+      const stopped = new Promise((resolve, reject) => {
+        recorder.ondataavailable = event => {
+          if (event.data && event.data.size > 0) chunks.push(event.data);
+        };
+        recorder.onerror = event => reject(event?.error || new Error("Video export failed while recording."));
+        recorder.onstop = resolve;
+      });
+
+      setDownloadStatus("Starting MOV export...");
+      setExportProgress("Starting MOV export...", 3, false);
+      recorder.start(250);
+
+      const total = Math.max(1, frameItems.length);
+      const frameHoldMs = Math.max(420, Math.round(1000 / Math.max(1, EXPORT_MOV_FPS)));
+
+      try {
+        for (let i = 0; i < frameItems.length; i++) {
+          const item = frameItems[i];
+          const renderPct = 4 + ((i / total) * 84);
+          const message = `Rendering video frame ${i + 1} of ${frameItems.length}...`;
+          setDownloadStatus(message);
+          setExportProgress(message, renderPct, false);
+
+          await prepareExportFrame(item);
+          const captured = await captureExportCanvas();
+
+          if (!outputCanvas.width || !outputCanvas.height) {
+            outputCanvas.width = captured.width;
+            outputCanvas.height = captured.height;
+          }
+
+          outputCtx.fillStyle = "#050b16";
+          outputCtx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+          outputCtx.drawImage(captured, 0, 0, outputCanvas.width, outputCanvas.height);
+
+          captured.width = 1;
+          captured.height = 1;
+
+          const donePct = 4 + (((i + 1) / total) * 84);
+          setExportProgress(`Added video frame ${i + 1} of ${frameItems.length}...`, donePct, false);
+          await wait(frameHoldMs);
+        }
+
+        setDownloadStatus(`Encoding ${videoType.label} video...`);
+        setExportProgress(`Encoding ${videoType.label} video...`, 92, false);
+        await wait(500);
+        recorder.stop();
+        await stopped;
       } finally {
-        for (const name of [...written, outName]) {
-          try { ffmpeg.FS("unlink", name); } catch (err) {}
+        try {
+          for (const track of stream.getTracks()) track.stop();
+        } catch (err) {}
+        if (recorder && recorder.state !== "inactive") {
+          try { recorder.stop(); } catch (err) {}
         }
       }
+
+      if (!chunks.length) {
+        throw new Error("MOV export failed because no video data was recorded.");
+      }
+
+      const blob = new Blob(chunks, { type: recorder.mimeType || videoType.mimeType });
+      setExportProgress(`Starting ${videoType.label} download...`, 99, false);
+      downloadBlob(blob, `${getExportBaseName()}.${videoType.extension}`);
     }
 
     async function downloadCurrentSelection() {
