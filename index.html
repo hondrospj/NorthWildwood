@@ -4486,14 +4486,25 @@
       endEl.removeAttribute("min");
       endEl.removeAttribute("max");
 
+      if (force) {
+        delete startEl.dataset.userEdited;
+        delete endEl.dataset.userEdited;
+      }
+
       const currentDate = getEntryESTDate(getDownloadCurrentEntry());
       const defaultStart = currentDate
         ? new Date(Math.min(Math.max(currentDate.getTime(), firstDate.getTime()), lastDate.getTime()))
         : firstDate;
       const defaultEnd = new Date(Math.min(lastDate.getTime(), defaultStart.getTime() + 24 * 60 * 60 * 1000));
 
-      const shouldSeedStart = force || !startEl.value;
-      const shouldSeedEnd = force || !endEl.value;
+      // Do not reseed while the user is typing/clicking inside the native datetime control.
+      // Some browsers temporarily expose an empty value while a datetime-local field is being edited;
+      // reseeding during that moment was what made older years jump back to the current forecast year.
+      const active = document.activeElement;
+      const startTouched = startEl.dataset.userEdited === "1" || active === startEl;
+      const endTouched = endEl.dataset.userEdited === "1" || active === endEl;
+      const shouldSeedStart = force || (!startEl.value && !startTouched);
+      const shouldSeedEnd = force || (!endEl.value && !endTouched);
       if (shouldSeedStart) setRangeInputDate("downloadStartInput", defaultStart);
       if (shouldSeedEnd) setRangeInputDate("downloadEndInput", defaultEnd);
 
@@ -4690,7 +4701,7 @@
       if (/SharedArrayBuffer|cross-origin isolation|ffmpeg|wasm/i.test(raw) && String(format).toLowerCase() === "mov") {
         return "MOV export is unavailable in this browser build right now. PNG and GIF should still work.";
       }
-      if (/html2canvas|Canvas export failed|taint|cross-origin resource/i.test(raw)) {
+      if (/html2canvas|canvasToBlob|CanvasToBlob|Canvas export failed|taint|cross-origin resource/i.test(raw)) {
         return `${formatLabel} export could not capture the map cleanly. Reload the page and try again.`;
       }
       if (/JSZip did not load/i.test(raw)) {
@@ -4963,6 +4974,22 @@
         canvas.width = 1;
         canvas.height = 1;
       }
+    }
+
+    function canvasToBlob(canvas, type = "image/png", quality) {
+      return new Promise((resolve, reject) => {
+        if (!canvas || typeof canvas.toBlob !== "function") {
+          reject(new Error("Canvas export failed because this browser cannot create image blobs."));
+          return;
+        }
+        canvas.toBlob(blob => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error("Canvas export failed because the map image could not be converted to a file."));
+          }
+        }, type, quality);
+      });
     }
 
     async function exportPng(frameItems) {
@@ -6208,13 +6235,17 @@
       });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
         const input = document.getElementById(id);
+        input.addEventListener("focus", () => {
+          input.dataset.userEdited = "1";
+        });
         input.addEventListener("input", () => {
+          input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
           updateDownloadSummary();
         });
         input.addEventListener("change", () => {
+          input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
-          syncDownloadRangeInputs(false);
           updateDownloadSummary();
         });
       });
