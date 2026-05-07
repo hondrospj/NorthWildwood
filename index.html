@@ -1783,18 +1783,18 @@
       z-index:1250;
       min-width:min(520px, calc(100% - 48px));
       max-width:calc(100% - 48px);
-      padding:11px 18px;
-      border-radius:999px;
+      padding:11px 20px 12px;
+      border-radius:22px;
       border:1px solid rgba(191,219,254,.26);
       background:rgba(11,18,32,.90);
       color:#ffffff;
       box-shadow:0 18px 36px rgba(0,0,0,.32);
       font-size:clamp(18px, 1.65vw, 28px);
-      line-height:1.1;
+      line-height:1.12;
       font-weight:900;
       letter-spacing:-.025em;
       text-align:center;
-      white-space:nowrap;
+      white-space:pre-line;
       overflow:hidden;
       text-overflow:ellipsis;
       backdrop-filter:blur(14px);
@@ -9138,9 +9138,16 @@
       });
     }
 
+    function getExportFrameWaterLevelText(entry) {
+      const rawStage = getStageValue(entry);
+      const value = Number.isFinite(Number(rawStage)) ? formatStageForDisplay(rawStage) : "No data";
+      return `${value} ${getDatumLabel()}`;
+    }
+
     function getExportFrameTimestampText(entry) {
       const text = formatHourEntryTime(entry);
-      return text && text !== "--" ? text : "Selected time";
+      const timeText = text && text !== "--" ? text : "Selected time";
+      return `${timeText}\nWater level: ${getExportFrameWaterLevelText(entry)}`;
     }
 
     function updateExportTimestampLabel(entry) {
@@ -9345,42 +9352,65 @@
       });
     }
 
+    function drawRoundedRectPath(ctx, x, y, width, height, radius) {
+      const r = Math.max(0, Math.min(radius, width / 2, height / 2));
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
     function drawExportTimestampOnCanvas(ctx, canvas, entry) {
       const label = getExportFrameTimestampText(entry);
       if (!label) return;
+      const lines = String(label).split(/\n+/).filter(Boolean);
+      if (!lines.length) return;
       const w = canvas.width;
       const h = canvas.height;
-      const fontSize = Math.max(18, Math.round(Math.min(w, h) * 0.032));
-      const padX = Math.round(fontSize * 0.95);
-      const padY = Math.round(fontSize * 0.62);
+      const mainFontSize = Math.max(18, Math.round(Math.min(w, h) * 0.032));
+      const subFontSize = Math.max(13, Math.round(mainFontSize * 0.62));
+      const gap = Math.max(4, Math.round(mainFontSize * 0.18));
+      const padX = Math.round(mainFontSize * 1.05);
+      const padY = Math.round(mainFontSize * 0.58);
       ctx.save();
-      ctx.font = `900 ${fontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const textWidth = Math.min(ctx.measureText(label).width, w - 56);
-      const boxWidth = Math.min(w - 48, Math.max(Math.round(w * 0.42), Math.ceil(textWidth + padX * 2)));
-      const boxHeight = Math.ceil(fontSize + padY * 2);
+      ctx.font = `900 ${mainFontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+      const mainWidth = ctx.measureText(lines[0]).width;
+      ctx.font = `850 ${subFontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+      const subWidth = lines[1] ? ctx.measureText(lines[1]).width : 0;
+      const maxLineWidth = Math.min(Math.max(mainWidth, subWidth), w - 56);
+      const boxWidth = Math.min(w - 48, Math.max(Math.round(w * 0.44), Math.ceil(maxLineWidth + padX * 2)));
+      const contentHeight = lines[1] ? mainFontSize + gap + subFontSize : mainFontSize;
+      const boxHeight = Math.ceil(contentHeight + padY * 2);
       const x = Math.round((w - boxWidth) / 2);
       const y = h - boxHeight - Math.round(Math.max(12, h * 0.025));
-      const radius = Math.round(boxHeight / 2);
+      const radius = Math.round(Math.min(24, boxHeight / 2));
       ctx.fillStyle = "rgba(11,18,32,0.92)";
       ctx.strokeStyle = "rgba(191,219,254,0.42)";
       ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x + radius, y);
-      ctx.lineTo(x + boxWidth - radius, y);
-      ctx.quadraticCurveTo(x + boxWidth, y, x + boxWidth, y + radius);
-      ctx.lineTo(x + boxWidth, y + boxHeight - radius);
-      ctx.quadraticCurveTo(x + boxWidth, y + boxHeight, x + boxWidth - radius, y + boxHeight);
-      ctx.lineTo(x + radius, y + boxHeight);
-      ctx.quadraticCurveTo(x, y + boxHeight, x, y + boxHeight - radius);
-      ctx.lineTo(x, y + radius);
-      ctx.quadraticCurveTo(x, y, x + radius, y);
-      ctx.closePath();
+      drawRoundedRectPath(ctx, x, y, boxWidth, boxHeight, radius);
       ctx.fill();
       ctx.stroke();
+      const centerX = x + boxWidth / 2;
+      const firstY = lines[1]
+        ? y + padY + (mainFontSize / 2)
+        : y + boxHeight / 2 + 1;
+      ctx.font = `900 ${mainFontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
       ctx.fillStyle = "#ffffff";
-      ctx.fillText(label, x + boxWidth / 2, y + boxHeight / 2 + 1, boxWidth - padX * 2);
+      ctx.fillText(lines[0], centerX, firstY, boxWidth - padX * 2);
+      if (lines[1]) {
+        ctx.font = `850 ${subFontSize}px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`;
+        ctx.fillStyle = "#c7d2fe";
+        ctx.fillText(lines[1], centerX, firstY + (mainFontSize / 2) + gap + (subFontSize / 2), boxWidth - padX * 2);
+      }
       ctx.restore();
     }
 
