@@ -1252,6 +1252,7 @@
     }
 
     .export-picker{
+      contain:content;
       display:grid;
       gap:8px;
       padding:10px;
@@ -1359,6 +1360,8 @@
       opacity:.42;
       cursor:default;
     }
+
+    .export-picker.is-busy{ pointer-events:none; opacity:.62; }
 
     .export-picker-empty{
       padding:10px;
@@ -5683,15 +5686,15 @@
     const EXPORT_FRAME_LIMIT = 72;
     const EXPORT_RANGE_MAX_HOURS = 84;
     const EXPORT_RANGE_MAX_MS = EXPORT_RANGE_MAX_HOURS * 60 * 60 * 1000;
-    const EXPORT_CAPTURE_DELAY_MS = 45;
+    const EXPORT_CAPTURE_DELAY_MS = 12;
     const EXPORT_GIF_SPEEDS = {
       slow: { value: "slow", label: "Slow", delayMs: 2000 },
       normal: { value: "normal", label: "Normal", delayMs: 1000 },
       fast: { value: "fast", label: "Fast", delayMs: 500 }
     };
     const EXPORT_CAPTURE_SCALE_DEFAULT = 1;
-    const EXPORT_GIF_QUALITY = 13;
-    const EXPORT_GIF_MAX_WORKERS = 8;
+    const EXPORT_GIF_QUALITY = 18;
+    const EXPORT_GIF_MAX_WORKERS = 12;
     const EXPORT_PNG_SELECTION_LIMIT = 10;
     const GIF_WORKER_CDN_URL = "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js";
     const EXPORT_GIF_ASPECTS = {
@@ -5975,6 +5978,7 @@
 
     let forecastData = null;
     let observedData = null;
+    let observedDaysCache = null;
     let observedMonthKeys = [];
     let observedFlatHours = [];
     let observedHourIndexByDateHour = new Map();
@@ -6010,6 +6014,13 @@
     let exportCalendarSelectedDayKey = "";
     let exportRangePickMode = "start";
     let exportAvailabilityCache = null;
+    let exportAvailabilityDayMapCache = null;
+    let exportAvailabilityBoundsCache = null;
+    let exportAvailabilityHourTotalCache = null;
+    let exportEntriesForDayCache = new Map();
+    let observedExportDayIndexCache = null;
+    let exportTimePickerRenderRaf = null;
+    let exportTimePickerLastSignature = "";
 
     function pad2(n) {
       return String(n).padStart(2, "0");
@@ -6447,8 +6458,9 @@
         updateExportSegmentedUI();
         applyExportStageAspect(getDownloadAspectValue());
         syncDownloadRangeInputs(true);
-        renderExportTimePicker();
+        primeExportTimePickerShell();
         updateDownloadSummary();
+        scheduleExportTimePickerRender(true);
         document.getElementById("exportScopeCurrentBtn")?.focus();
       }
     }
@@ -7679,10 +7691,51 @@
     }
 
     function clearExportAvailabilityCache() {
-      // This intentionally no longer builds a full all-hour export cache.
-      // The export panel must open instantly; archive hours are resolved only for
-      // the single date/range the user actually chooses.
+      // Keep the export panel fast by invalidating small cached indexes only.
+      // Full historical hourly archives are never flattened when the panel opens.
       exportAvailabilityCache = null;
+      exportAvailabilityDayMapCache = null;
+      exportAvailabilityBoundsCache = null;
+      exportAvailabilityHourTotalCache = null;
+      exportEntriesForDayCache = new Map();
+      observedExportDayIndexCache = null;
+      exportTimePickerLastSignature = "";
+    }
+
+    function getObservedExportDayIndex() {
+      if (observedExportDayIndexCache) return observedExportDayIndexCache;
+      const index = new Map();
+      getObservedDays().forEach(day => {
+        const dayKey = String(day?.date || "").slice(0, 10);
+        if (!dayKey) return;
+        // If duplicates exist, keep the one with more hourly records.
+        const existing = index.get(dayKey);
+        const existingCount = Array.isArray(existing?.hours) ? existing.hours.length : 0;
+        const newCount = Array.isArray(day?.hours) ? day.hours.length : 0;
+        if (!existing || newCount >= existingCount) index.set(dayKey, day);
+      });
+      observedExportDayIndexCache = index;
+      return index;
+    }
+
+    function primeExportTimePickerShell() {
+      const calendarGrid = document.getElementById("exportCalendarGrid");
+      const hourGrid = document.getElementById("exportTimePickerGrid");
+      const title = document.getElementById("exportPickerTitle");
+      const count = document.getElementById("exportSelectionCount");
+      if (title) title.textContent = "Available export dates";
+      if (count) count.textContent = "Loading";
+      if (calendarGrid) calendarGrid.innerHTML = `<div class="export-picker-empty" style="grid-column:1/-1">Loading available dates...</div>`;
+      if (hourGrid) hourGrid.innerHTML = `<div class="export-picker-empty" style="grid-column:1/-1">Choose a highlighted date.</div>`;
+    }
+
+    function scheduleExportTimePickerRender(force = false) {
+      if (!isDownloadModalOpen() && !force) return;
+      if (exportTimePickerRenderRaf != null) cancelAnimationFrame(exportTimePickerRenderRaf);
+      exportTimePickerRenderRaf = requestAnimationFrame(() => {
+        exportTimePickerRenderRaf = null;
+        renderExportTimePicker(force);
+      });
     }
 
     function getForecastExportEntriesLimited() {
@@ -7699,8 +7752,8 @@
     }
 
     function getExportAvailabilityDayMap() {
-      // Fast day-level map only. Do NOT flatten every historical hour here.
-      // Flattening the full observed archive was why opening the export panel hung.
+      // Cached day-level map only. No full-hour historical scan on open.
+      if (exportAvailabilityDayMapCache) return exportAvailabilityDayMapCache;
       const map = new Map();
 
       function ensureMeta(dayKey) {
@@ -7718,34 +7771,34 @@
         return map.get(dayKey);
       }
 
-      getObservedDays().forEach(day => {
-        const dayKey = String(day?.date || "").slice(0, 10);
-        if (!dayKey) return;
+      getObservedExportDayIndex().forEach((day, dayKey) => {
         const meta = ensureMeta(dayKey);
         if (!meta) return;
         meta.observed = true;
         const hours = Array.isArray(day?.hours) ? day.hours : [];
-        // Counting the array length is cheap. We do not parse each hour until the date is clicked.
+        // Cheap estimate only. Actual valid hours are parsed after a date is clicked.
         meta.count += Math.max(1, hours.length || 24);
       });
 
       getForecastExportEntriesLimited().forEach(entry => {
-        const dayKey = getExportDayKeyFromDate(getEntryESTDate(entry));
+        const d = getEntryESTDate(entry);
+        const dayKey = getExportDayKeyFromDate(d);
         const meta = ensureMeta(dayKey);
         if (!meta) return;
         meta.forecast = true;
         meta.count += 1;
-        const d = getEntryESTDate(entry);
         if (d) {
           if (!meta.firstDate || d.getTime() < meta.firstDate.getTime()) meta.firstDate = d;
           if (!meta.lastDate || d.getTime() > meta.lastDate.getTime()) meta.lastDate = d;
         }
       });
 
+      exportAvailabilityDayMapCache = map;
       return map;
     }
 
     function getExportAvailabilityBounds() {
+      if (exportAvailabilityBoundsCache) return exportAvailabilityBoundsCache;
       const dayMap = getExportAvailabilityDayMap();
       if (!dayMap.size) return null;
       let firstDate = null;
@@ -7756,15 +7809,17 @@
         if (a && (!firstDate || a.getTime() < firstDate.getTime())) firstDate = a;
         if (b && (!lastDate || b.getTime() > lastDate.getTime())) lastDate = b;
       });
-      return firstDate && lastDate ? { firstDate, lastDate } : null;
+      exportAvailabilityBoundsCache = firstDate && lastDate ? { firstDate, lastDate } : null;
+      return exportAvailabilityBoundsCache;
     }
 
     function getExportEntriesForDay(dayKey) {
-      // Only parse one selected day, plus the current 72-hour forecast run.
+      // Parse only one clicked day and memoize it.
       if (!dayKey) return [];
+      if (exportEntriesForDayCache.has(dayKey)) return exportEntriesForDayCache.get(dayKey);
       const combined = [];
 
-      const day = getObservedDays().find(item => String(item?.date || "").slice(0, 10) === dayKey);
+      const day = getObservedExportDayIndex().get(dayKey);
       if (day) {
         const hours = Array.isArray(day.hours) ? day.hours : [];
         hours.forEach((hour, idx) => {
@@ -7795,14 +7850,48 @@
         const d = getEntryESTDate(entry);
         const key = d ? formatNyLocalIso(d) : String(entryTimeMs(entry));
         const existing = byHour.get(key);
-        // Forecast wins where observed and forecast overlap because it is the active future run.
         if (!existing || entry.exportSourceMode === "forecast") byHour.set(key, entry);
       });
 
-      return Array.from(byHour.values())
+      const result = Array.from(byHour.values())
         .filter(entry => entryTimeMs(entry) != null)
         .sort((a, b) => entryTimeMs(a) - entryTimeMs(b))
         .map((entry, idx) => ({ entry, idx }));
+      exportEntriesForDayCache.set(dayKey, result);
+      return result;
+    }
+
+    function ensureExportCalendarCursor() {
+      const dayMap = getExportAvailabilityDayMap();
+      const bounds = getExportAvailabilityBounds();
+      if (!bounds || !dayMap.size) return;
+      const currentDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(getDownloadCurrentEntry()) || bounds.lastDate || bounds.firstDate;
+      let selectedKey = getExportDayKeyFromDate(currentDate);
+      if (!dayMap.has(selectedKey)) {
+        const currentMs = currentDate ? currentDate.getTime() : null;
+        let best = null;
+        let bestDiff = Infinity;
+        dayMap.forEach((meta, key) => {
+          const t = meta.firstDate ? meta.firstDate.getTime() : (parseStoredLocalNyToDate(`${key}T00:00`)?.getTime() || 0);
+          const diff = currentMs == null ? 0 : Math.abs(t - currentMs);
+          if (diff < bestDiff) { best = key; bestDiff = diff; }
+        });
+        selectedKey = best || getExportDayKeyFromDate(bounds.firstDate);
+      }
+      if (!exportCalendarSelectedDayKey || !dayMap.has(exportCalendarSelectedDayKey)) exportCalendarSelectedDayKey = selectedKey;
+      if (!exportCalendarCursorDate) {
+        const cursorSource = parseStoredLocalNyToDate(`${exportCalendarSelectedDayKey}T00:00`) || bounds.firstDate;
+        exportCalendarCursorDate = getExportMonthStart(cursorSource);
+      }
+    }
+
+    function getExportPickerHourEstimate() {
+      if (exportAvailabilityHourTotalCache != null) return exportAvailabilityHourTotalCache;
+      const dayMap = getExportAvailabilityDayMap();
+      let total = 0;
+      dayMap.forEach(meta => { total += Number(meta.count) || 0; });
+      exportAvailabilityHourTotalCache = total;
+      return total;
     }
 
     function getExportPickerEntries() {
@@ -7836,7 +7925,7 @@
         const item = getDownloadFrameItemFromEntry(entry, fallbackIndex);
         if (item) exportPngSelections.set(key, item);
       }
-      renderExportTimePicker();
+      scheduleExportTimePickerRender(true);
       updateDownloadSummary();
     }
 
@@ -7857,7 +7946,7 @@
       }
       if (startEl) startEl.dataset.userEdited = "1";
       if (endEl) endEl.dataset.userEdited = "1";
-      renderExportTimePicker();
+      scheduleExportTimePickerRender(true);
       updateDownloadSummary();
     }
 
@@ -7869,38 +7958,7 @@
       return `${hour12} ${parts.hour >= 12 ? "PM" : "AM"}`;
     }
 
-    function ensureExportCalendarCursor() {
-      const dayMap = getExportAvailabilityDayMap();
-      const bounds = getExportAvailabilityBounds();
-      if (!bounds || !dayMap.size) return;
-      const currentDate = getRangeInputDate("downloadStartInput") || getEntryESTDate(getDownloadCurrentEntry()) || bounds.lastDate || bounds.firstDate;
-      let selectedKey = getExportDayKeyFromDate(currentDate);
-      if (!dayMap.has(selectedKey)) {
-        const currentMs = currentDate ? currentDate.getTime() : null;
-        let best = null;
-        let bestDiff = Infinity;
-        dayMap.forEach((meta, key) => {
-          const t = meta.firstDate ? meta.firstDate.getTime() : (parseStoredLocalNyToDate(`${key}T00:00`)?.getTime() || 0);
-          const diff = currentMs == null ? 0 : Math.abs(t - currentMs);
-          if (diff < bestDiff) { best = key; bestDiff = diff; }
-        });
-        selectedKey = best || getExportDayKeyFromDate(bounds.firstDate);
-      }
-      if (!exportCalendarSelectedDayKey || !dayMap.has(exportCalendarSelectedDayKey)) exportCalendarSelectedDayKey = selectedKey;
-      if (!exportCalendarCursorDate) {
-        const cursorSource = parseStoredLocalNyToDate(`${exportCalendarSelectedDayKey}T00:00`) || bounds.firstDate;
-        exportCalendarCursorDate = getExportMonthStart(cursorSource);
-      }
-    }
-
-    function getExportPickerHourEstimate() {
-      const dayMap = getExportAvailabilityDayMap();
-      let total = 0;
-      dayMap.forEach(meta => { total += Number(meta.count) || 0; });
-      return total;
-    }
-
-    function renderExportTimePicker() {
+    function renderExportTimePicker(force = false) {
       const wrap = document.getElementById("exportTimePicker");
       const calendarGrid = document.getElementById("exportCalendarGrid");
       const hourGrid = document.getElementById("exportTimePickerGrid");
@@ -7917,6 +7975,11 @@
 
       const format = getDownloadFormatValue();
       const scope = getDownloadScopeValue();
+      const startSig = document.getElementById("downloadStartInput")?.value || "";
+      const endSig = document.getElementById("downloadEndInput")?.value || "";
+      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig, exportPngSelections.size].join("|");
+      if (!force && signature === exportTimePickerLastSignature) return;
+      exportTimePickerLastSignature = signature;
       const dayMap = getExportAvailabilityDayMap();
       const bounds = getExportAvailabilityBounds();
       wrap.hidden = false;
@@ -7980,7 +8043,7 @@
           if (meta.forecast) btn.classList.add("forecast-day");
           btn.textContent = String(day);
           btn.title = `${meta.count || 0} exportable hour${(meta.count || 0) === 1 ? "" : "s"}`;
-          btn.addEventListener("click", () => { exportCalendarSelectedDayKey = dayKey; renderExportTimePicker(); });
+          btn.addEventListener("click", () => { exportCalendarSelectedDayKey = dayKey; scheduleExportTimePickerRender(true); });
         } else {
           btn.textContent = "";
           btn.disabled = true;
@@ -8025,7 +8088,7 @@
           button.addEventListener("click", () => {
             setRangeInputDate("downloadStartInput", getEntryESTDate(entry));
             setRangeInputDate("downloadEndInput", getEntryESTDate(entry));
-            renderExportTimePicker();
+            scheduleExportTimePickerRender(true);
             updateDownloadSummary();
           });
         }
@@ -8042,7 +8105,6 @@
       const formatLabel = format.toUpperCase();
       const aspectLabel = getExportAspectConfig().label;
       const speed = EXPORT_GIF_SPEEDS[getDownloadSpeedValue()]?.label || "Normal";
-      renderExportTimePicker();
 
       if (format === "png") {
         const selectedItems = getSelectedPngFrameItems();
@@ -8137,7 +8199,9 @@
       if (format) format.disabled = isBusy;
       if (aspect) aspect.disabled = isBusy;
       if (speed) speed.disabled = isBusy;
-      document.querySelectorAll("#downloadScopeControl button, #downloadFormatControl button, #downloadAspectControl button, #downloadSpeedControl button, #exportTimePicker button").forEach(el => { el.disabled = isBusy; });
+      document.querySelectorAll("#downloadScopeControl button, #downloadFormatControl button, #downloadAspectControl button, #downloadSpeedControl button").forEach(el => { el.disabled = isBusy; });
+      const picker = document.getElementById("exportTimePicker");
+      if (picker) picker.classList.toggle("is-busy", isBusy);
       if (start) start.disabled = isBusy;
       if (end) end.disabled = isBusy;
       if (isBusy) {
@@ -9142,8 +9206,12 @@
     }
 
     function getObservedDays() {
+      if (observedDaysCache) return observedDaysCache;
       const rawDays = Array.isArray(observedData?.days) ? observedData.days : [];
-      if (!rawDays.length) return [];
+      if (!rawDays.length) {
+        observedDaysCache = [];
+        return observedDaysCache;
+      }
       const byDate = new Map();
       rawDays.forEach(day => {
         const date = String(day?.date || "");
@@ -9151,10 +9219,11 @@
         if (!byDate.has(date)) byDate.set(date, []);
         byDate.get(date).push(day);
       });
-      return Array.from(byDate.entries())
+      observedDaysCache = Array.from(byDate.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))
         .map(([, records]) => mergeObservedDayRecords(records))
         .filter(Boolean);
+      return observedDaysCache;
     }
 
     function getMonthKeyFromDate(dateStr) {
@@ -9521,6 +9590,7 @@
 
     async function loadForecast() {
       forecastData = await fetchJson(withFreshJsonUrl(FORECAST_URL));
+      clearExportAvailabilityCache();
       currentRawSeriesHours = Array.isArray(forecastData.hours) ? forecastData.hours : [];
       currentSeriesHours = currentRawSeriesHours.slice();
       currentViewType = "forecast";
@@ -9537,7 +9607,11 @@
     }
 
     async function loadObserved() {
-      if (!observedData) observedData = await fetchJson(withFreshJsonUrl(OBSERVED_URL));
+      if (!observedData) {
+        observedData = await fetchJson(withFreshJsonUrl(OBSERVED_URL));
+        observedDaysCache = null;
+        clearExportAvailabilityCache();
+      }
       rebuildObservedHourLookup();
 
       const days = getObservedDays();
@@ -9763,6 +9837,8 @@
 
       forecastData = forecast;
       observedData = observed;
+      observedDaysCache = null;
+      clearExportAvailabilityCache();
       observedMonthKeys = [];
       observedFlatHours = [];
       observedHourIndexByDateHour = new Map();
@@ -10188,7 +10264,7 @@
           input.value = btn.dataset.format || "gif";
           if (!exportInProgress) setDownloadStatus("", false);
           updateExportSegmentedUI();
-          renderExportTimePicker();
+          scheduleExportTimePickerRender(true);
           updateDownloadSummary();
         });
       });
@@ -10233,15 +10309,15 @@
 
       document.getElementById("exportCalendarPrevBtn")?.addEventListener("click", () => {
         exportCalendarCursorDate = shiftExportMonth(exportCalendarCursorDate || new Date(), -1);
-        renderExportTimePicker();
+        scheduleExportTimePickerRender(true);
       });
       document.getElementById("exportCalendarNextBtn")?.addEventListener("click", () => {
         exportCalendarCursorDate = shiftExportMonth(exportCalendarCursorDate || new Date(), 1);
-        renderExportTimePicker();
+        scheduleExportTimePickerRender(true);
       });
       document.getElementById("clearPngSelectionsBtn")?.addEventListener("click", () => {
         exportPngSelections.clear();
-        renderExportTimePicker();
+        scheduleExportTimePickerRender(true);
         updateDownloadSummary();
       });
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
@@ -10252,13 +10328,13 @@
         input.addEventListener("input", () => {
           input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
-          renderExportTimePicker();
+          scheduleExportTimePickerRender(true);
           updateDownloadSummary();
         });
         input.addEventListener("change", () => {
           input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
-          renderExportTimePicker();
+          scheduleExportTimePickerRender(true);
           updateDownloadSummary();
         });
       });
