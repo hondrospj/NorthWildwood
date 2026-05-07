@@ -1308,6 +1308,16 @@
     .export-range-status{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;line-height:1.3;color:var(--muted);}
     .export-range-status span{min-width:0;padding:7px 8px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .export-range-status strong{color:#eaf0ff;}
+    .export-range-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px;}
+    .export-range-mode button{min-height:30px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;}
+    .export-range-mode button.active{background:rgba(96,165,250,.18);border-color:#bfdbfe;color:#eaf0ff;}
+    .export-hour-select-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+    .export-hour-select-row label{display:grid;gap:4px;font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
+    .export-hour-select-row select{min-height:34px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);font-size:12px;font-weight:850;padding:0 10px;}
+    .export-calendar-day.in-range{color:#fff;background:rgba(96,165,250,.20);border-color:rgba(191,219,254,.40);}
+    .export-calendar-day.range-start,.export-calendar-day.range-end{background:rgba(213,138,0,.30);border-color:#fef3c7;color:#fff;}
+    .export-calendar-day.forecast-day.in-range{background:rgba(45,212,191,.20);}
+    .export-picker-hint{font-size:10.5px;line-height:1.35;color:var(--muted);}
     .export-picker-hours-title{margin-top:2px;font-size:10px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
     .export-hour-btn.range-start,.export-hour-btn.range-end{border-color:#fef3c7;background:rgba(213,138,0,.30);color:#fff;}
     .export-hour-btn.in-range{border-color:rgba(191,219,254,.36);background:rgba(96,165,250,.20);color:#fff;}
@@ -5581,10 +5591,19 @@
           <div class="export-picker-head">
             <span id="exportPickerTitle">Available export dates</span>
             <div class="export-picker-tools">
-              <span id="exportSelectionCount">0 dates</span>
+              <span id="exportSelectionCount">Loading range</span>
               <button id="clearPngSelectionsBtn" type="button">Clear</button>
             </div>
           </div>
+          <div class="export-range-mode" aria-label="Choose whether the calendar click sets the export start or end">
+            <button id="exportPickStartBtn" type="button" class="active" data-pick="start">Set start</button>
+            <button id="exportPickEndBtn" type="button" data-pick="end">Set end</button>
+          </div>
+          <div class="export-hour-select-row" aria-label="Export start and end hour controls">
+            <label>Start hour <select id="exportStartHourSelect"></select></label>
+            <label>End hour <select id="exportEndHourSelect"></select></label>
+          </div>
+          <div id="exportPickerHint" class="export-picker-hint">Click a highlighted date to set the start, then switch to Set end and click another date. Use the hour boxes for exact times.</div>
           <div class="export-calendar-nav" aria-label="Export calendar month navigation">
             <button id="exportCalendarPrevBtn" type="button" aria-label="Previous export month">‹</button>
             <div id="exportCalendarTitle" class="export-calendar-title">--</div>
@@ -6457,6 +6476,8 @@
         applyExportStageAspect(getDownloadAspectValue());
         syncDownloadRangeInputs(true);
         primeExportTimePickerShell();
+        populateExportHourSelects();
+        updateExportPickModeUI();
         updateDownloadSummary();
         scheduleExportTimePickerRender(true);
         document.getElementById("exportScopeCurrentBtn")?.focus();
@@ -7892,6 +7913,112 @@
       return total;
     }
 
+
+    function formatExportCompactDate(date) {
+      if (!date) return "--";
+      return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "America/New_York" }).format(date);
+    }
+
+    function getExportAvailabilityRangeText() {
+      const dayMap = getExportAvailabilityDayMap();
+      if (!dayMap.size) return "No dates";
+      let historicalFirst = null;
+      let historicalLast = null;
+      let forecastLast = null;
+      dayMap.forEach(meta => {
+        const first = meta.firstDate || parseStoredLocalNyToDate(`${meta.dayKey}T00:00`);
+        const last = meta.lastDate || parseStoredLocalNyToDate(`${meta.dayKey}T23:00`);
+        if (meta.observed) {
+          if (first && (!historicalFirst || first.getTime() < historicalFirst.getTime())) historicalFirst = first;
+          if (last && (!historicalLast || last.getTime() > historicalLast.getTime())) historicalLast = last;
+        }
+        if (meta.forecast && last && (!forecastLast || last.getTime() > forecastLast.getTime())) forecastLast = last;
+      });
+      const pieces = [];
+      if (historicalFirst && historicalLast) pieces.push(`Historical: ${formatExportCompactDate(historicalFirst)}–${formatExportCompactDate(historicalLast)}`);
+      if (forecastLast) pieces.push(`Forecast through ${formatExportCompactDate(forecastLast)}`);
+      return pieces.join(" · ") || "No dates";
+    }
+
+    function populateExportHourSelects() {
+      const selects = [document.getElementById("exportStartHourSelect"), document.getElementById("exportEndHourSelect")].filter(Boolean);
+      if (!selects.length) return;
+      selects.forEach(select => {
+        if (select.options.length >= 24) return;
+        select.innerHTML = "";
+        for (let h = 0; h < 24; h++) {
+          const opt = document.createElement("option");
+          opt.value = String(h);
+          const hour12 = (h % 12) || 12;
+          opt.textContent = `${hour12}:00 ${h >= 12 ? "PM" : "AM"}`;
+          select.appendChild(opt);
+        }
+      });
+    }
+
+    function getExportHourSelectValue(id, fallbackHour = 0) {
+      const value = Number(document.getElementById(id)?.value);
+      return Number.isFinite(value) ? Math.max(0, Math.min(23, Math.round(value))) : fallbackHour;
+    }
+
+    function setExportHourSelectFromDate(id, date) {
+      const select = document.getElementById(id);
+      const parts = date ? getNyParts(date) : null;
+      if (select && parts) select.value = String(parts.hour);
+    }
+
+    function syncExportHourSelectsFromInputs() {
+      populateExportHourSelects();
+      const start = getRangeInputDate("downloadStartInput");
+      const end = getRangeInputDate("downloadEndInput");
+      setExportHourSelectFromDate("exportStartHourSelect", start);
+      setExportHourSelectFromDate("exportEndHourSelect", end);
+    }
+
+    function getExportDateForDayAndHour(dayKey, hour) {
+      if (!dayKey) return null;
+      return parseStoredLocalNyToDate(`${dayKey}T${String(hour).padStart(2, "0")}:00`);
+    }
+
+    function updateExportPickModeUI() {
+      document.querySelectorAll("#exportPickStartBtn, #exportPickEndBtn").forEach(btn => {
+        const active = btn.dataset.pick === exportRangePickMode;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+      const hint = document.getElementById("exportPickerHint");
+      if (hint) hint.textContent = exportRangePickMode === "start"
+        ? "Click a highlighted date to set the start. Use Start hour for the exact time."
+        : "Click a highlighted date to set the end. Use End hour for the exact time.";
+    }
+
+    function setExportRangeBoundaryFromDayKey(dayKey, boundary = exportRangePickMode) {
+      const dayMap = getExportAvailabilityDayMap();
+      const meta = dayMap.get(dayKey);
+      if (!meta) return;
+      populateExportHourSelects();
+      const startEl = document.getElementById("downloadStartInput");
+      const endEl = document.getElementById("downloadEndInput");
+      const startHour = getExportHourSelectValue("exportStartHourSelect", 0);
+      const endHour = getExportHourSelectValue("exportEndHourSelect", 23);
+      const picked = getExportDateForDayAndHour(dayKey, boundary === "end" ? endHour : startHour);
+      if (!picked) return;
+      let currentStart = getRangeInputDate("downloadStartInput");
+      let currentEnd = getRangeInputDate("downloadEndInput");
+      if (boundary === "start") {
+        currentStart = picked;
+        if (!currentEnd || currentEnd.getTime() < currentStart.getTime()) currentEnd = currentStart;
+      } else {
+        currentEnd = picked;
+        if (!currentStart || currentStart.getTime() > currentEnd.getTime()) currentStart = currentEnd;
+      }
+      setRangeInputDate("downloadStartInput", currentStart);
+      setRangeInputDate("downloadEndInput", currentEnd);
+      if (startEl) startEl.dataset.userEdited = "1";
+      if (endEl) endEl.dataset.userEdited = "1";
+      syncExportHourSelectsFromInputs();
+    }
+
     function getExportPickerEntries() {
       const scope = getDownloadScopeValue();
       const range = scope === "range" ? getDownloadRangeRequest() : null;
@@ -7957,37 +8084,8 @@
     }
 
     function setExportRangeFromDayKey(dayKey) {
-      const items = getExportEntriesForDay(dayKey);
-      if (!items.length) return;
-      const sorted = items.slice().sort((a, b) => entryTimeMs(a.entry) - entryTimeMs(b.entry));
-      const firstEntry = sorted[0]?.entry;
-      const lastEntry = sorted[sorted.length - 1]?.entry || firstEntry;
-      const firstDate = getEntryESTDate(firstEntry);
-      const lastDate = getEntryESTDate(lastEntry) || firstDate;
-      if (!firstDate || !lastDate) return;
-
-      const scope = getDownloadScopeValue();
-      const startEl = document.getElementById("downloadStartInput");
-      const endEl = document.getElementById("downloadEndInput");
-
-      if (scope === "range") {
-        const currentStart = getRangeInputDate("downloadStartInput");
-        const currentEnd = getRangeInputDate("downloadEndInput");
-        if (!currentStart || !currentEnd || Math.abs(currentEnd.getTime() - currentStart.getTime()) < 1000) {
-          setRangeInputDate("downloadStartInput", firstDate);
-          setRangeInputDate("downloadEndInput", lastDate);
-        } else if (firstDate.getTime() < currentStart.getTime()) {
-          setRangeInputDate("downloadStartInput", firstDate);
-        } else {
-          setRangeInputDate("downloadEndInput", lastDate);
-        }
-      } else {
-        setRangeInputDate("downloadStartInput", firstDate);
-        setRangeInputDate("downloadEndInput", firstDate);
-      }
-
-      if (startEl) startEl.dataset.userEdited = "1";
-      if (endEl) endEl.dataset.userEdited = "1";
+      setExportRangeBoundaryFromDayKey(dayKey, exportRangePickMode);
+      exportCalendarSelectedDayKey = dayKey;
     }
 
     function renderExportTimePicker(force = false) {
@@ -8001,13 +8099,15 @@
       const nextBtn = document.getElementById("exportCalendarNextBtn");
       const startText = document.getElementById("exportRangeStartText");
       const endText = document.getElementById("exportRangeEndText");
+      const startHourSelect = document.getElementById("exportStartHourSelect");
+      const endHourSelect = document.getElementById("exportEndHourSelect");
       if (!wrap || !calendarGrid) return;
 
       const format = getDownloadFormatValue();
       const scope = getDownloadScopeValue();
       const startSig = document.getElementById("downloadStartInput")?.value || "";
       const endSig = document.getElementById("downloadEndInput")?.value || "";
-      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig].join("|");
+      const signature = [format, scope, getDownloadAspectValue(), getDownloadSpeedValue(), exportRangePickMode, startHourSelect?.value || "", endHourSelect?.value || "", exportCalendarSelectedDayKey, exportCalendarCursorDate ? getExportMonthKey(exportCalendarCursorDate) : "", startSig, endSig].join("|");
       if (!force && signature === exportTimePickerLastSignature) return;
       exportTimePickerLastSignature = signature;
 
@@ -8025,8 +8125,10 @@
       }
 
       ensureExportCalendarCursor();
+      populateExportHourSelects();
+      updateExportPickModeUI();
       if (title) title.textContent = scope === "range" ? "Choose export dates" : "Available export dates";
-      if (count) count.textContent = `${dayMap.size} date${dayMap.size === 1 ? "" : "s"}`;
+      if (count) count.textContent = getExportAvailabilityRangeText();
       if (clearBtn) clearBtn.hidden = true;
 
       const start = getRangeInputDate("downloadStartInput");
@@ -8076,6 +8178,10 @@
           if (minRangeMs != null && maxRangeMs != null && firstMs != null && lastMs != null && lastMs >= minRangeMs && firstMs <= maxRangeMs) {
             btn.classList.add("in-range");
           }
+          const startDayKey = start ? getExportDayKeyFromDate(start) : "";
+          const endDayKey = end ? getExportDayKeyFromDate(end) : "";
+          if (dayKey === startDayKey) btn.classList.add("range-start");
+          if (dayKey === endDayKey) btn.classList.add("range-end");
           btn.addEventListener("click", () => {
             exportCalendarSelectedDayKey = dayKey;
             setExportRangeFromDayKey(dayKey);
@@ -10314,6 +10420,29 @@
         scheduleExportTimePickerRender(true);
         updateDownloadSummary();
       });
+
+      document.querySelectorAll("#exportPickStartBtn, #exportPickEndBtn").forEach(btn => {
+        btn.addEventListener("click", event => {
+          event.preventDefault();
+          exportRangePickMode = btn.dataset.pick === "end" ? "end" : "start";
+          updateExportPickModeUI();
+          scheduleExportTimePickerRender(true);
+        });
+      });
+
+      ["exportStartHourSelect", "exportEndHourSelect"].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        select.addEventListener("change", () => {
+          const targetInput = id === "exportStartHourSelect" ? "downloadStartInput" : "downloadEndInput";
+          const date = getRangeInputDate(targetInput);
+          const dayKey = getExportDayKeyFromDate(date);
+          if (dayKey) setExportRangeBoundaryFromDayKey(dayKey, id === "exportStartHourSelect" ? "start" : "end");
+          scheduleExportTimePickerRender(true);
+          updateDownloadSummary();
+        });
+      });
+
       ["downloadStartInput", "downloadEndInput"].forEach(id => {
         const input = document.getElementById(id);
         input.addEventListener("focus", () => {
@@ -10322,12 +10451,14 @@
         input.addEventListener("input", () => {
           input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
+          syncExportHourSelectsFromInputs();
           scheduleExportTimePickerRender(true);
           updateDownloadSummary();
         });
         input.addEventListener("change", () => {
           input.dataset.userEdited = "1";
           if (!exportInProgress) setDownloadStatus("", false);
+          syncExportHourSelectsFromInputs();
           scheduleExportTimePickerRender(true);
           updateDownloadSummary();
         });
