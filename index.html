@@ -1262,15 +1262,26 @@
     }
 
     .export-picker-head{
-      display:flex;
+      display:grid;
+      grid-template-columns:auto minmax(0,1fr);
       align-items:center;
-      justify-content:space-between;
-      gap:10px;
+      gap:12px;
       font-size:10px;
       font-weight:850;
       color:var(--muted);
       text-transform:uppercase;
       letter-spacing:.08em;
+    }
+
+    #exportSelectionCount{
+      display:block;
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      text-align:right;
+      color:#c7d2fe;
+      font-weight:900;
     }
 
     .export-picker-tools{
@@ -1305,12 +1316,7 @@
     .export-calendar-day.available{color:#dbe8ff;background:rgba(96,165,250,.12);border-color:rgba(96,165,250,.34);pointer-events:auto;}
     .export-calendar-day.forecast-day{background:rgba(45,212,191,.13);border-color:rgba(45,212,191,.30);}
     .export-calendar-day.selected{color:#fff;background:linear-gradient(180deg,rgba(96,165,250,.32),rgba(96,165,250,.18));border-color:#bfdbfe;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
-    .export-range-status{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:10px;line-height:1.3;color:var(--muted);}
-    .export-range-status span{min-width:0;padding:7px 8px;border-radius:11px;border:1px solid var(--line);background:rgba(255,255,255,.035);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-    .export-range-status strong{color:#eaf0ff;}
-    .export-range-mode{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:2px;}
-    .export-range-mode button{min-height:30px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;}
-    .export-range-mode button.active{background:rgba(96,165,250,.18);border-color:#bfdbfe;color:#eaf0ff;}
+    .export-range-status,.export-range-mode{display:none !important;}
     .export-hour-select-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
     .export-hour-select-row label{display:grid;gap:4px;font-size:9px;font-weight:900;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;}
     .export-hour-select-row select{min-height:34px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.045);color:var(--text);font-size:12px;font-weight:850;padding:0 10px;}
@@ -5585,25 +5591,20 @@
             <input id="downloadEndInput" type="datetime-local" step="3600" />
           </label>
         </div>
-        <p class="export-modal-copy">Export a range of times out to 84 hours.</p>
-            <div id="downloadRangeNote" class="download-note"></div>
+        <div id="downloadRangeNote" class="download-note"></div>
         <section id="exportTimePicker" class="export-picker" aria-label="Available export dates">
           <div class="export-picker-head">
-            <span id="exportPickerTitle">Available export dates</span>
+            <span id="exportPickerTitle">Available export range</span>
             <div class="export-picker-tools">
               <span id="exportSelectionCount">Loading range</span>
               <button id="clearPngSelectionsBtn" type="button">Clear</button>
             </div>
           </div>
-          <div class="export-range-mode" aria-label="Choose whether the calendar click sets the export start or end">
-            <button id="exportPickStartBtn" type="button" class="active" data-pick="start">Set start</button>
-            <button id="exportPickEndBtn" type="button" data-pick="end">Set end</button>
+          <div class="export-hour-select-row" aria-label="Export start and end time controls">
+            <label>Start time <select id="exportStartHourSelect"></select></label>
+            <label>End time <select id="exportEndHourSelect"></select></label>
           </div>
-          <div class="export-hour-select-row" aria-label="Export start and end hour controls">
-            <label>Start hour <select id="exportStartHourSelect"></select></label>
-            <label>End hour <select id="exportEndHourSelect"></select></label>
-          </div>
-          <div id="exportPickerHint" class="export-picker-hint">Click a highlighted date to set the start, then switch to Set end and click another date. Use the hour boxes for exact times.</div>
+          <div id="exportPickerHint" class="export-picker-hint">Click a highlighted date to set the start date, then click another highlighted date to set the end date. Use the time boxes for exact hours.</div>
           <div class="export-calendar-nav" aria-label="Export calendar month navigation">
             <button id="exportCalendarPrevBtn" type="button" aria-label="Previous export month">‹</button>
             <div id="exportCalendarTitle" class="export-calendar-title">--</div>
@@ -5613,10 +5614,6 @@
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
           </div>
           <div id="exportCalendarGrid" class="export-calendar-grid"></div>
-          <div id="exportRangeStatus" class="export-range-status" aria-live="polite">
-            <span>Start: <strong id="exportRangeStartText">--</strong></span>
-            <span>End: <strong id="exportRangeEndText">--</strong></span>
-          </div>
         </section>
         <input id="downloadScopeSelect" type="hidden" value="current" />
             <input id="downloadFormatSelect" type="hidden" value="gif" />
@@ -6029,7 +6026,7 @@
     let exportPngSelections = new Map();
     let exportCalendarCursorDate = null;
     let exportCalendarSelectedDayKey = "";
-    let exportRangePickMode = "start";
+    let exportRangePickMode = "start"; // auto mode: first calendar click sets start, second sets end
     let exportAvailabilityCache = null;
     let exportAvailabilityDayMapCache = null;
     let exportAvailabilityBoundsCache = null;
@@ -7920,24 +7917,9 @@
     }
 
     function getExportAvailabilityRangeText() {
-      const dayMap = getExportAvailabilityDayMap();
-      if (!dayMap.size) return "No dates";
-      let historicalFirst = null;
-      let historicalLast = null;
-      let forecastLast = null;
-      dayMap.forEach(meta => {
-        const first = meta.firstDate || parseStoredLocalNyToDate(`${meta.dayKey}T00:00`);
-        const last = meta.lastDate || parseStoredLocalNyToDate(`${meta.dayKey}T23:00`);
-        if (meta.observed) {
-          if (first && (!historicalFirst || first.getTime() < historicalFirst.getTime())) historicalFirst = first;
-          if (last && (!historicalLast || last.getTime() > historicalLast.getTime())) historicalLast = last;
-        }
-        if (meta.forecast && last && (!forecastLast || last.getTime() > forecastLast.getTime())) forecastLast = last;
-      });
-      const pieces = [];
-      if (historicalFirst && historicalLast) pieces.push(`Historical: ${formatExportCompactDate(historicalFirst)}–${formatExportCompactDate(historicalLast)}`);
-      if (forecastLast) pieces.push(`Forecast through ${formatExportCompactDate(forecastLast)}`);
-      return pieces.join(" · ") || "No dates";
+      const bounds = getExportAvailabilityBounds();
+      if (!bounds) return "No dates";
+      return `${formatExportCompactDate(bounds.firstDate)}–${formatExportCompactDate(bounds.lastDate)}`;
     }
 
     function populateExportHourSelects() {
@@ -7981,15 +7963,18 @@
     }
 
     function updateExportPickModeUI() {
-      document.querySelectorAll("#exportPickStartBtn, #exportPickEndBtn").forEach(btn => {
-        const active = btn.dataset.pick === exportRangePickMode;
-        btn.classList.toggle("active", active);
-        btn.setAttribute("aria-pressed", String(active));
-      });
       const hint = document.getElementById("exportPickerHint");
-      if (hint) hint.textContent = exportRangePickMode === "start"
-        ? "Click a highlighted date to set the start. Use Start hour for the exact time."
-        : "Click a highlighted date to set the end. Use End hour for the exact time.";
+      if (!hint) return;
+      const range = getDownloadRangeRequest();
+      const hasStart = Boolean(getRangeInputDate("downloadStartInput"));
+      const hasEnd = Boolean(getRangeInputDate("downloadEndInput"));
+      if (exportRangePickMode === "end" && hasStart) {
+        hint.textContent = "Now click the end date. Use End time for the exact hour.";
+      } else if (hasStart && hasEnd && range && range.durationMs > 0) {
+        hint.textContent = "Range selected. Click another highlighted date to start a new range, or adjust the time boxes.";
+      } else {
+        hint.textContent = "Click a highlighted date to set the start date, then click another highlighted date to set the end date. Use the time boxes for exact hours.";
+      }
     }
 
     function setExportRangeBoundaryFromDayKey(dayKey, boundary = exportRangePickMode) {
@@ -8084,8 +8069,14 @@
     }
 
     function setExportRangeFromDayKey(dayKey) {
-      setExportRangeBoundaryFromDayKey(dayKey, exportRangePickMode);
+      const start = getRangeInputDate("downloadStartInput");
+      const end = getRangeInputDate("downloadEndInput");
+      const hasCompletedRange = Boolean(start && end && end.getTime() > start.getTime());
+      const boundary = (!start || hasCompletedRange || exportRangePickMode === "start") ? "start" : "end";
+      setExportRangeBoundaryFromDayKey(dayKey, boundary);
       exportCalendarSelectedDayKey = dayKey;
+      exportRangePickMode = boundary === "start" ? "end" : "start";
+      updateExportPickModeUI();
     }
 
     function renderExportTimePicker(force = false) {
@@ -8097,8 +8088,6 @@
       const monthTitle = document.getElementById("exportCalendarTitle");
       const prevBtn = document.getElementById("exportCalendarPrevBtn");
       const nextBtn = document.getElementById("exportCalendarNextBtn");
-      const startText = document.getElementById("exportRangeStartText");
-      const endText = document.getElementById("exportRangeEndText");
       const startHourSelect = document.getElementById("exportStartHourSelect");
       const endHourSelect = document.getElementById("exportEndHourSelect");
       if (!wrap || !calendarGrid) return;
@@ -8127,14 +8116,12 @@
       ensureExportCalendarCursor();
       populateExportHourSelects();
       updateExportPickModeUI();
-      if (title) title.textContent = scope === "range" ? "Choose export dates" : "Available export dates";
+      if (title) title.textContent = "Available export range";
       if (count) count.textContent = getExportAvailabilityRangeText();
       if (clearBtn) clearBtn.hidden = true;
 
       const start = getRangeInputDate("downloadStartInput");
       const end = getRangeInputDate("downloadEndInput");
-      if (startText) startText.textContent = start ? formatFixedESTFromUtc(start.toISOString()).replace(/^[A-Za-z]+\s+/, "") : "--";
-      if (endText) endText.textContent = end ? formatFixedESTFromUtc(end.toISOString()).replace(/^[A-Za-z]+\s+/, "") : "--";
 
       const cursorParts = getNyParts(exportCalendarCursorDate || bounds.firstDate);
       const monthName = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "America/New_York" }).format(exportCalendarCursorDate || bounds.firstDate);
@@ -8173,8 +8160,8 @@
           if (meta.forecast) btn.classList.add("forecast-day");
           btn.textContent = String(day);
           btn.title = meta.forecast && meta.observed ? "Forecast + historical data available" : meta.forecast ? "Forecast data available" : "Historical data available";
-          const firstMs = meta.firstMs ?? null;
-          const lastMs = meta.lastMs ?? null;
+          const firstMs = meta.firstDate ? meta.firstDate.getTime() : (parseStoredLocalNyToDate(`${dayKey}T00:00`)?.getTime() ?? null);
+          const lastMs = meta.lastDate ? meta.lastDate.getTime() : (parseStoredLocalNyToDate(`${dayKey}T23:00`)?.getTime() ?? null);
           if (minRangeMs != null && maxRangeMs != null && firstMs != null && lastMs != null && lastMs >= minRangeMs && firstMs <= maxRangeMs) {
             btn.classList.add("in-range");
           }
@@ -10421,14 +10408,6 @@
         updateDownloadSummary();
       });
 
-      document.querySelectorAll("#exportPickStartBtn, #exportPickEndBtn").forEach(btn => {
-        btn.addEventListener("click", event => {
-          event.preventDefault();
-          exportRangePickMode = btn.dataset.pick === "end" ? "end" : "start";
-          updateExportPickModeUI();
-          scheduleExportTimePickerRender(true);
-        });
-      });
 
       ["exportStartHourSelect", "exportEndHourSelect"].forEach(id => {
         const select = document.getElementById(id);
